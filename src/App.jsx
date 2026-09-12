@@ -8,7 +8,11 @@ import ManagementTabs from "./components/ManagementTabs";
 function readStoredCard() {
   const cardId = new URLSearchParams(window.location.search).get("card");
   if (!cardId) return null;
-  try { return JSON.parse(localStorage.getItem(`ygo-card-${cardId}`)) || null; } catch { return null; }
+  try {
+    return JSON.parse(localStorage.getItem(`ygo-card-${cardId}`)) || null;
+  } catch {
+    return null;
+  }
 }
 
 export default function App() {
@@ -30,7 +34,9 @@ export default function App() {
   useEffect(() => {
     if (!supabase) return undefined;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
     return () => subscription.unsubscribe();
   }, []);
 
@@ -51,16 +57,23 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase || !session || !selectedCard) return undefined;
-    supabase.from("inventory_items").select("*").eq("user_id", session.user.id).eq("card_id", selectedCard.cardId).maybeSingle().then(({ data, error }) => {
-      if (error) setActionError(`재고 조회 오류: ${error.message}`);
-      setInventory(data);
-      setPurchasePrice(data?.purchase_price ?? "");
-      setCondition(data?.condition || "미등록");
-    });
+    supabase
+      .from("inventory_items")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .eq("card_id", selectedCard.cardId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) setActionError(`재고 조회 오류: ${error.message}`);
+        setInventory(data);
+        setPurchasePrice(data?.purchase_price ?? "");
+        setCondition(data?.condition || "미등록");
+      });
     return undefined;
   }, [session, selectedCard]);
 
-  const loginWithGoogle = () => supabase?.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+  const loginWithGoogle = () =>
+    supabase?.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
   const logout = () => supabase?.auth.signOut();
 
   const openCardWindow = (card) => {
@@ -74,36 +87,133 @@ export default function App() {
     const isFavorite = favoriteIds.has(card.cardId);
     const result = isFavorite
       ? await supabase.from("favorites").delete().eq("user_id", session.user.id).eq("card_id", card.cardId)
-      : await supabase.from("favorites").upsert({ user_id: session.user.id, card_id: card.cardId, card_name: card.name, card_snapshot: card });
+      : await supabase
+          .from("favorites")
+          .upsert({ user_id: session.user.id, card_id: card.cardId, card_name: card.name, card_snapshot: card });
     if (result.error) return setActionError(`찜 저장 오류: ${result.error.message}`);
-    setFavoriteIds((ids) => { const next = new Set(ids); isFavorite ? next.delete(card.cardId) : next.add(card.cardId); return next; });
-    setFavoriteCards((items) => isFavorite ? items.filter((item) => item.cardId !== card.cardId) : [...items.filter((item) => item.cardId !== card.cardId), card]);
+    setFavoriteIds((ids) => {
+      const next = new Set(ids);
+      isFavorite ? next.delete(card.cardId) : next.add(card.cardId);
+      return next;
+    });
+    setFavoriteCards((items) =>
+      isFavorite
+        ? items.filter((item) => item.cardId !== card.cardId)
+        : [...items.filter((item) => item.cardId !== card.cardId), card],
+    );
   };
 
   const saveInventory = async (quantityDelta) => {
-    if (!supabase || !session || !selectedCard || inventoryBusy) return setActionError("재고 기능은 로그인 후 사용할 수 있습니다.");
+    if (!supabase || !session || !selectedCard || inventoryBusy)
+      return setActionError("재고 기능은 로그인 후 사용할 수 있습니다.");
     setInventoryBusy(true);
     const quantity = Math.max(0, (inventory?.quantity || 0) + quantityDelta);
-    const payload = { user_id: session.user.id, card_id: selectedCard.cardId, card_name: selectedCard.name, card_snapshot: selectedCard, rarity: selectedCard.card_sets?.[0]?.set_rarity || null, condition, quantity, purchase_price: purchasePrice === "" ? null : Number(purchasePrice), memo: null };
-    const { data, error } = await supabase.from("inventory_items").upsert(payload, { onConflict: "user_id,card_id" }).select().single();
-    if (error) setActionError(`재고 저장 오류: ${error.message}`); else { setInventory(data); setInventoryItems((items) => [data, ...items.filter((item) => item.card_id !== selectedCard.cardId && data.quantity > 0)]); }
+    const payload = {
+      user_id: session.user.id,
+      card_id: selectedCard.cardId,
+      card_name: selectedCard.name,
+      card_snapshot: selectedCard,
+      rarity: selectedCard.card_sets?.[0]?.set_rarity || null,
+      condition,
+      quantity,
+      purchase_price: purchasePrice === "" ? null : Number(purchasePrice),
+      memo: null,
+    };
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .upsert(payload, { onConflict: "user_id,card_id" })
+      .select()
+      .single();
+    if (error) setActionError(`재고 저장 오류: ${error.message}`);
+    else {
+      setInventory(data);
+      setInventoryItems((items) => [
+        data,
+        ...items.filter((item) => item.card_id !== selectedCard.cardId && data.quantity > 0),
+      ]);
+    }
     setInventoryBusy(false);
   };
 
   const searchCard = async () => {
     if (!searchTerm.trim()) return;
-    setLoading(true); setActionError("");
-    try { setCards(await searchOfficialCards(searchTerm)); } catch (error) { setActionError(error.message); setCards([]); } finally { setLoading(false); }
+    setLoading(true);
+    setActionError("");
+    try {
+      setCards(await searchOfficialCards(searchTerm));
+    } catch (error) {
+      setActionError(error.message);
+      setCards([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return <main className="app-shell">
-    <header className="app-header"><h1>🃏 유희왕 카드 & 시세 검색</h1>{session ? <button onClick={logout}>로그아웃 ({session.user.email})</button> : <button onClick={loginWithGoogle} disabled={!isSupabaseConfigured}>Google 로그인</button>}</header>
-    {!isSupabaseConfigured && <p className="setup-message">Supabase 환경변수를 설정하면 로그인을 사용할 수 있습니다.</p>}
-    <div className="search-bar"><input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} onKeyDown={(event) => event.key === "Enter" && searchCard()} placeholder="카드 이름을 입력하세요 (예: 푸른 눈의 백룡)" /><button onClick={searchCard}>검색</button></div>
-    <ManagementTabs activeTab={activeTab} onTabChange={setActiveTab} session={session} inventoryItems={inventoryItems} favoriteCards={favoriteCards} onOpenCard={openCardWindow} />
-    {loading && <p>카드를 검색하고 있습니다...</p>}
-    {actionError && <p className="action-error" role="alert">{actionError}</p>}
-    {activeTab === "search" && <section className="card-grid">{cards.map((card) => <CardResult key={card.id} card={card} isFavorite={favoriteIds.has(card.cardId)} onFavorite={toggleFavorite} onOpen={openCardWindow} />)}</section>}
-    {selectedCard && <CardDetail card={selectedCard} session={session} inventory={inventory} condition={condition} purchasePrice={purchasePrice} inventoryBusy={inventoryBusy} onClose={() => setSelectedCard(null)} onConditionChange={setCondition} onPurchasePriceChange={setPurchasePrice} onInventory={saveInventory} />}
-  </main>;
+  return (
+    <main className="app-shell">
+      <header className="app-header">
+        <h1>🃏 유희왕 카드 & 시세 검색</h1>
+        {session ? (
+          <button onClick={logout}>로그아웃 ({session.user.email})</button>
+        ) : (
+          <button onClick={loginWithGoogle} disabled={!isSupabaseConfigured}>
+            Google 로그인
+          </button>
+        )}
+      </header>
+      {!isSupabaseConfigured && (
+        <p className="setup-message">Supabase 환경변수를 설정하면 로그인을 사용할 수 있습니다.</p>
+      )}
+      <div className="search-bar">
+        <input
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          onKeyDown={(event) => event.key === "Enter" && searchCard()}
+          placeholder="카드 이름을 입력하세요 (예: 푸른 눈의 백룡)"
+        />
+        <button onClick={searchCard}>검색</button>
+      </div>
+      <ManagementTabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        session={session}
+        inventoryItems={inventoryItems}
+        favoriteCards={favoriteCards}
+        onOpenCard={openCardWindow}
+      />
+      {loading && <p>카드를 검색하고 있습니다...</p>}
+      {actionError && (
+        <p className="action-error" role="alert">
+          {actionError}
+        </p>
+      )}
+      {activeTab === "search" && (
+        <section className="card-grid">
+          {cards.map((card) => (
+            <CardResult
+              key={card.id}
+              card={card}
+              isFavorite={favoriteIds.has(card.cardId)}
+              onFavorite={toggleFavorite}
+              onOpen={openCardWindow}
+            />
+          ))}
+        </section>
+      )}
+      {selectedCard && (
+        <CardDetail
+          card={selectedCard}
+          session={session}
+          inventory={inventory}
+          condition={condition}
+          purchasePrice={purchasePrice}
+          inventoryBusy={inventoryBusy}
+          onClose={() => setSelectedCard(null)}
+          onConditionChange={setCondition}
+          onPurchasePriceChange={setPurchasePrice}
+          onInventory={saveInventory}
+        />
+      )}
+    </main>
+  );
 }
