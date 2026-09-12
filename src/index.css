@@ -403,9 +403,25 @@ p {
 }
 
 .heart-button {
+  appearance: none;
+  border: 0 !important;
+  outline: 0;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition:
     transform 160ms ease,
     color 160ms ease;
+}
+.heart-button:focus-visible {
+  outline: 2px solid #e54870;
+  outline-offset: 3px;
+  border-radius: 50%;
 }
 
 .heart-button:hover:not(:disabled) {
