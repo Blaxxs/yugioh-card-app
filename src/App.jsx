@@ -135,6 +135,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("search");
   const [favoriteCards, setFavoriteCards] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
+  const [actionError, setActionError] = useState("");
 
   useEffect(() => {
     if (!supabase) return undefined;
@@ -161,7 +162,10 @@ export default function App() {
       .from("favorites")
       .select("card_id, card_snapshot")
       .then(({ data, error }) => {
-        if (error) console.error("찜 목록을 불러오지 못했습니다:", error);
+        if (error) {
+          console.error("찜 목록을 불러오지 못했습니다:", error);
+          setActionError(`찜 목록을 불러오지 못했습니다: ${error.message}`);
+        }
         setFavoriteIds(new Set((data || []).map((item) => item.card_id)));
         setFavoriteCards((data || []).map((item) => item.card_snapshot).filter(Boolean));
       });
@@ -172,7 +176,10 @@ export default function App() {
       .gt("quantity", 0)
       .order("updated_at", { ascending: false })
       .then(({ data, error }) => {
-        if (error) console.error("재고 목록을 불러오지 못했습니다:", error);
+        if (error) {
+          console.error("재고 목록을 불러오지 못했습니다:", error);
+          setActionError(`재고 목록을 불러오지 못했습니다: ${error.message}`);
+        }
         setInventoryItems(data || []);
       });
 
@@ -191,7 +198,10 @@ export default function App() {
       .eq("card_id", selectedCard.cardId)
       .maybeSingle()
       .then(({ data, error }) => {
-        if (error) console.error("재고를 불러오지 못했습니다:", error);
+        if (error) {
+          console.error("재고를 불러오지 못했습니다:", error);
+          setActionError(`재고를 불러오지 못했습니다: ${error.message}`);
+        }
         setInventory(data);
         setPurchasePrice(data?.purchase_price ?? "");
         setCondition(data?.condition || "미등록");
@@ -201,7 +211,11 @@ export default function App() {
   }, [session, selectedCard]);
 
   const toggleFavorite = async (card) => {
-    if (!supabase || !session) return;
+    if (!supabase || !session) {
+      setActionError("찜 기능은 Google 로그인 후 사용할 수 있습니다.");
+      return;
+    }
+    setActionError("");
     const isFavorite = favoriteIds.has(card.cardId);
     const nextFavorites = new Set(favoriteIds);
     if (isFavorite) {
@@ -210,13 +224,21 @@ export default function App() {
         .delete()
         .eq("user_id", session.user.id)
         .eq("card_id", card.cardId);
-      if (error) return console.error("찜을 취소하지 못했습니다:", error);
+      if (error) {
+        console.error("찜을 취소하지 못했습니다:", error);
+        setActionError(`찜을 취소하지 못했습니다: ${error.message}`);
+        return;
+      }
       nextFavorites.delete(card.cardId);
     } else {
       const { error } = await supabase
         .from("favorites")
         .upsert({ user_id: session.user.id, card_id: card.cardId, card_name: card.name, card_snapshot: card });
-      if (error) return console.error("카드를 찜하지 못했습니다:", error);
+      if (error) {
+        console.error("카드를 찜하지 못했습니다:", error);
+        setActionError(`카드를 찜하지 못했습니다: ${error.message}`);
+        return;
+      }
       nextFavorites.add(card.cardId);
       setFavoriteCards((items) => [...items.filter((item) => item.cardId !== card.cardId), card]);
     }
@@ -225,7 +247,11 @@ export default function App() {
   };
 
   const saveInventory = async (quantityDelta) => {
-    if (!supabase || !session || !selectedCard || inventoryBusy) return;
+    if (!supabase || !session || !selectedCard || inventoryBusy) {
+      if (!session) setActionError("재고 기능은 Google 로그인 후 사용할 수 있습니다.");
+      return;
+    }
+    setActionError("");
     setInventoryBusy(true);
     const currentQuantity = inventory?.quantity || 0;
     const nextQuantity = Math.max(0, currentQuantity + quantityDelta);
@@ -245,8 +271,10 @@ export default function App() {
       .upsert(payload, { onConflict: "user_id,card_id" })
       .select()
       .single();
-    if (error) console.error("재고를 저장하지 못했습니다:", error);
-    else {
+    if (error) {
+      console.error("재고를 저장하지 못했습니다:", error);
+      setActionError(`재고를 저장하지 못했습니다: ${error.message}`);
+    } else {
       setInventory(data);
       setInventoryItems((items) => {
         const remaining = items.filter((item) => item.card_id !== selectedCard.cardId);
@@ -360,6 +388,11 @@ export default function App() {
       </nav>
 
       {loading && <p>카드를 검색하고 있습니다...</p>}
+      {actionError && (
+        <p className="action-error" role="alert">
+          {actionError}
+        </p>
+      )}
 
       {activeTab === "inventory" && session && (
         <section className="management-panel">

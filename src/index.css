@@ -153,6 +153,14 @@ p {
   text-align: left;
 }
 
+.action-error {
+  color: #b42318;
+  background: #fff1f0;
+  border: 1px solid #f3b3ad;
+  padding: 10px 12px;
+  text-align: left;
+}
+
 .managed-card {
   width: 100%;
   display: flex;
