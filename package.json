@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "deploy": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy.ps1",
     "preview": "vite preview"
   },
   "dependencies": {
