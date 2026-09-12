@@ -3,6 +3,7 @@ create table public.inventory_items (
   user_id uuid not null references auth.users(id) on delete cascade,
   card_id text not null,
   card_name text not null,
+  card_snapshot jsonb not null default '{}'::jsonb,
   rarity text,
   condition text,
   quantity integer not null default 0 check (quantity >= 0),

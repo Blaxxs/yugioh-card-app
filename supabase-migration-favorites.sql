@@ -10,6 +10,9 @@ create table if not exists public.favorites (
 create unique index if not exists inventory_items_user_card_idx
   on public.inventory_items(user_id, card_id);
 
+alter table public.inventory_items
+  add column if not exists card_snapshot jsonb not null default '{}'::jsonb;
+
 alter table public.favorites enable row level security;
 
 drop policy if exists "Users manage their favorites" on public.favorites;

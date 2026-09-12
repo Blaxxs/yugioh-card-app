@@ -116,12 +116,25 @@ export default function App() {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(false);
   const [session, setSession] = useState(null);
-  const [selectedCard, setSelectedCard] = useState(null);
+  const [selectedCard, setSelectedCard] = useState(() => {
+    const cardId = new URLSearchParams(window.location.search).get("card");
+    if (!cardId) return null;
+    try {
+      const storedCard = localStorage.getItem(`ygo-card-${cardId}`);
+      return storedCard ? JSON.parse(storedCard) : null;
+    } catch (error) {
+      console.error("카드 상세 정보를 복원하지 못했습니다:", error);
+      return null;
+    }
+  });
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [inventory, setInventory] = useState(null);
   const [inventoryBusy, setInventoryBusy] = useState(false);
   const [purchasePrice, setPurchasePrice] = useState("");
   const [condition, setCondition] = useState("미등록");
+  const [activeTab, setActiveTab] = useState("search");
+  const [favoriteCards, setFavoriteCards] = useState([]);
+  const [inventoryItems, setInventoryItems] = useState([]);
 
   useEffect(() => {
     if (!supabase) return undefined;
@@ -146,10 +159,21 @@ export default function App() {
 
     supabase
       .from("favorites")
-      .select("card_id")
+      .select("card_id, card_snapshot")
       .then(({ data, error }) => {
         if (error) console.error("찜 목록을 불러오지 못했습니다:", error);
         setFavoriteIds(new Set((data || []).map((item) => item.card_id)));
+        setFavoriteCards((data || []).map((item) => item.card_snapshot).filter(Boolean));
+      });
+
+    supabase
+      .from("inventory_items")
+      .select("*")
+      .gt("quantity", 0)
+      .order("updated_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) console.error("재고 목록을 불러오지 못했습니다:", error);
+        setInventoryItems(data || []);
       });
 
     return undefined;
@@ -194,7 +218,9 @@ export default function App() {
         .upsert({ user_id: session.user.id, card_id: card.cardId, card_name: card.name, card_snapshot: card });
       if (error) return console.error("카드를 찜하지 못했습니다:", error);
       nextFavorites.add(card.cardId);
+      setFavoriteCards((items) => [...items.filter((item) => item.cardId !== card.cardId), card]);
     }
+    if (isFavorite) setFavoriteCards((items) => items.filter((item) => item.cardId !== card.cardId));
     setFavoriteIds(nextFavorites);
   };
 
@@ -207,6 +233,7 @@ export default function App() {
       user_id: session.user.id,
       card_id: selectedCard.cardId,
       card_name: selectedCard.name,
+      card_snapshot: selectedCard,
       rarity: selectedCard.card_sets?.[0]?.set_rarity || null,
       condition,
       quantity: nextQuantity,
@@ -219,7 +246,13 @@ export default function App() {
       .select()
       .single();
     if (error) console.error("재고를 저장하지 못했습니다:", error);
-    else setInventory(data);
+    else {
+      setInventory(data);
+      setInventoryItems((items) => {
+        const remaining = items.filter((item) => item.card_id !== selectedCard.cardId);
+        return data.quantity > 0 ? [data, ...remaining] : remaining;
+      });
+    }
     setInventoryBusy(false);
   };
 
@@ -231,6 +264,15 @@ export default function App() {
   const logout = async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
+  };
+
+  const openCardWindow = (card) => {
+    localStorage.setItem(`ygo-card-${card.cardId}`, JSON.stringify(card));
+    window.open(`${window.location.origin}/?card=${encodeURIComponent(card.cardId)}`, "_blank", "noopener,noreferrer");
+  };
+
+  const openStoredCard = (card) => {
+    if (card) openCardWindow(card);
   };
 
   const searchCard = async () => {
@@ -297,163 +339,218 @@ export default function App() {
         </button>
       </div>
 
+      <nav className="app-tabs" aria-label="내 카드 관리">
+        <button className={activeTab === "search" ? "active" : ""} onClick={() => setActiveTab("search")}>
+          카드 검색
+        </button>
+        <button
+          className={activeTab === "inventory" ? "active" : ""}
+          onClick={() => setActiveTab("inventory")}
+          disabled={!session}
+        >
+          내 재고 ({inventoryItems.length})
+        </button>
+        <button
+          className={activeTab === "favorites" ? "active" : ""}
+          onClick={() => setActiveTab("favorites")}
+          disabled={!session}
+        >
+          찜 관리 ({favoriteCards.length})
+        </button>
+      </nav>
+
       {loading && <p>카드를 검색하고 있습니다...</p>}
 
-      {/* 카드 리스트 */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "20px" }}>
-        {cards.map((card) => (
-          <div
-            key={card.id}
-            onClick={() => setSelectedCard(card)}
-            style={{
-              border: "1px solid #ccc",
-              borderRadius: "8px",
-              padding: "15px",
-              textAlign: "center",
-              cursor: "pointer",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button
-                type="button"
-                aria-label={favoriteIds.has(card.cardId) ? "찜 취소" : "찜하기"}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  toggleFavorite(card);
-                }}
-                disabled={!session}
-                style={{
-                  border: 0,
-                  background: "transparent",
-                  fontSize: "24px",
-                  cursor: session ? "pointer" : "not-allowed",
-                }}
-              >
-                {favoriteIds.has(card.cardId) ? "♥" : "♡"}
+      {activeTab === "inventory" && session && (
+        <section className="management-panel">
+          <h2>내 재고 관리</h2>
+          {inventoryItems.length === 0 ? (
+            <p>보유 중인 카드가 없습니다.</p>
+          ) : (
+            inventoryItems.map((item) => (
+              <button className="managed-card" key={item.id} onClick={() => openStoredCard(item.card_snapshot)}>
+                <span>{item.card_name}</span>
+                <strong>{item.quantity}장</strong>
               </button>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: "8px" }}>
-              {card.card_images?.map((image) => (
-                <img
-                  key={image.id}
-                  src={image.image_url_small}
-                  alt={`${card.name} 일러스트`}
-                  style={{ width: "100%", borderRadius: "4px" }}
-                />
-              ))}
-            </div>
-            <h3 style={{ fontSize: "16px", margin: "10px 0 5px" }}>{card.koreanData.cardName}</h3>
+            ))
+          )}
+        </section>
+      )}
 
-            {/* 카드 기본 정보 */}
+      {activeTab === "favorites" && session && (
+        <section className="management-panel">
+          <h2>찜 관리</h2>
+          {favoriteCards.length === 0 ? (
+            <p>찜한 카드가 없습니다.</p>
+          ) : (
+            favoriteCards.map((card) => (
+              <button className="managed-card" key={card.cardId} onClick={() => openStoredCard(card)}>
+                <span>♥ {card.name}</span>
+                <strong>상세 보기</strong>
+              </button>
+            ))
+          )}
+        </section>
+      )}
+
+      {/* 카드 리스트 */}
+      {activeTab === "search" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "20px" }}>
+          {cards.map((card) => (
             <div
+              key={card.id}
+              onClick={() => openCardWindow(card)}
               style={{
-                fontSize: "13px",
-                lineHeight: "1.6",
-                color: "#444",
-                textAlign: "left",
-                margin: "10px 0",
-                padding: "10px",
-                backgroundColor: "#f7f7f7",
-                borderRadius: "4px",
+                border: "1px solid #ccc",
+                borderRadius: "8px",
+                padding: "15px",
+                textAlign: "center",
+                cursor: "pointer",
               }}
             >
-              <p>
-                <strong>종류:</strong> {card.koreanData.cardOther || card.type}
-              </p>
-              {card.koreanData.cardAttr && (
-                <p>
-                  <strong>속성:</strong> {card.koreanData.cardAttr}
-                </p>
-              )}
-              {card.koreanData.cardLevel && (
-                <p>
-                  <strong>레벨/랭크:</strong> {card.koreanData.cardLevel}
-                </p>
-              )}
-              {card.koreanData.cardAtk && (
-                <p>
-                  <strong>공격력:</strong> {card.koreanData.cardAtk}
-                </p>
-              )}
-              {card.koreanData.cardDef && (
-                <p>
-                  <strong>수비력:</strong> {card.koreanData.cardDef}
-                </p>
-              )}
-              <p style={{ whiteSpace: "pre-wrap", marginTop: "8px" }}>
-                <strong>카드 텍스트:</strong> {card.koreanData.cardText}
-              </p>
-            </div>
-
-            {/* 해외 시세 */}
-            {card.card_prices?.[0] && (
-              <div style={{ fontSize: "12px", color: "#555", textAlign: "left", margin: "10px 0" }}>
-                <strong>해외 시세:</strong> 카드마켓 €{card.card_prices[0].cardmarket_price} / TCGplayer $
-                {card.card_prices[0].tcgplayer_price} / eBay ${card.card_prices[0].ebay_price}
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  aria-label={favoriteIds.has(card.cardId) ? "찜 취소" : "찜하기"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    toggleFavorite(card);
+                  }}
+                  disabled={!session}
+                  style={{
+                    border: 0,
+                    background: "transparent",
+                    fontSize: "24px",
+                    cursor: session ? "pointer" : "not-allowed",
+                  }}
+                  className={favoriteIds.has(card.cardId) ? "heart-button is-favorite" : "heart-button"}
+                >
+                  {favoriteIds.has(card.cardId) ? "♥" : "♡"}
+                </button>
               </div>
-            )}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: "8px" }}>
+                {card.card_images?.map((image) => (
+                  <img
+                    key={image.id}
+                    src={image.image_url_small}
+                    alt={`${card.name} 일러스트`}
+                    style={{ width: "100%", borderRadius: "4px" }}
+                  />
+                ))}
+              </div>
+              <h3 style={{ fontSize: "16px", margin: "10px 0 5px" }}>{card.koreanData.cardName}</h3>
 
-            {/* 수록 팩 & 코드 */}
-            <div
-              style={{
-                fontSize: "12px",
-                color: "#666",
-                textAlign: "left",
-                margin: "10px 0",
-                maxHeight: "240px",
-                overflowY: "auto",
-              }}
-            >
-              <strong>수록 팩 / 코드:</strong>
-              {card.card_sets ? (
-                <ul style={{ paddingLeft: "15px", margin: "5px 0" }}>
-                  {card.card_sets.map((set, idx) => (
-                    <li key={idx}>
-                      {set.set_name} ({set.set_code}) - {set.set_rarity || "레어도 정보 없음"}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p style={{ margin: "5px 0" }}>수록 정보 없음</p>
+              {/* 카드 기본 정보 */}
+              <div
+                style={{
+                  fontSize: "13px",
+                  lineHeight: "1.6",
+                  color: "#444",
+                  textAlign: "left",
+                  margin: "10px 0",
+                  padding: "10px",
+                  backgroundColor: "#f7f7f7",
+                  borderRadius: "4px",
+                }}
+              >
+                <p>
+                  <strong>종류:</strong> {card.koreanData.cardOther || card.type}
+                </p>
+                {card.koreanData.cardAttr && (
+                  <p>
+                    <strong>속성:</strong> {card.koreanData.cardAttr}
+                  </p>
+                )}
+                {card.koreanData.cardLevel && (
+                  <p>
+                    <strong>레벨/랭크:</strong> {card.koreanData.cardLevel}
+                  </p>
+                )}
+                {card.koreanData.cardAtk && (
+                  <p>
+                    <strong>공격력:</strong> {card.koreanData.cardAtk}
+                  </p>
+                )}
+                {card.koreanData.cardDef && (
+                  <p>
+                    <strong>수비력:</strong> {card.koreanData.cardDef}
+                  </p>
+                )}
+                <p style={{ whiteSpace: "pre-wrap", marginTop: "8px" }}>
+                  <strong>카드 텍스트:</strong> {card.koreanData.cardText}
+                </p>
+              </div>
+
+              {/* 해외 시세 */}
+              {card.card_prices?.[0] && (
+                <div style={{ fontSize: "12px", color: "#555", textAlign: "left", margin: "10px 0" }}>
+                  <strong>해외 시세:</strong> 카드마켓 €{card.card_prices[0].cardmarket_price} / TCGplayer $
+                  {card.card_prices[0].tcgplayer_price} / eBay ${card.card_prices[0].ebay_price}
+                </div>
               )}
-            </div>
 
-            {/* 국내 시세 바로가기 버튼 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "5px", marginTop: "10px" }}>
-              <a
-                href={`https://smartstore.naver.com/main/search?q=${encodeURIComponent(card.name)}`}
-                target="_blank"
-                rel="noreferrer"
+              {/* 수록 팩 & 코드 */}
+              <div
                 style={{
-                  padding: "6px",
-                  backgroundColor: "#03C75A",
-                  color: "white",
-                  textDecoration: "none",
-                  borderRadius: "4px",
                   fontSize: "12px",
+                  color: "#666",
+                  textAlign: "left",
+                  margin: "10px 0",
+                  maxHeight: "240px",
+                  overflowY: "auto",
                 }}
               >
-                네이버 쇼핑 시세
-              </a>
-              <a
-                href={`https://m.bunjang.co.kr/search/products?q=${encodeURIComponent(card.name)}`}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  padding: "6px",
-                  backgroundColor: "#FF5058",
-                  color: "white",
-                  textDecoration: "none",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-              >
-                번개장터 실거래가
-              </a>
+                <strong>수록 팩 / 코드:</strong>
+                {card.card_sets ? (
+                  <ul style={{ paddingLeft: "15px", margin: "5px 0" }}>
+                    {card.card_sets.map((set, idx) => (
+                      <li key={idx}>
+                        {set.set_name} ({set.set_code}) - {set.set_rarity || "레어도 정보 없음"}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p style={{ margin: "5px 0" }}>수록 정보 없음</p>
+                )}
+              </div>
+
+              {/* 국내 시세 바로가기 버튼 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "5px", marginTop: "10px" }}>
+                <a
+                  href={`https://smartstore.naver.com/main/search?q=${encodeURIComponent(card.name)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: "6px",
+                    backgroundColor: "#03C75A",
+                    color: "white",
+                    textDecoration: "none",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                  }}
+                >
+                  네이버 쇼핑 시세
+                </a>
+                <a
+                  href={`https://m.bunjang.co.kr/search/products?q=${encodeURIComponent(card.name)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: "6px",
+                    backgroundColor: "#FF5058",
+                    color: "white",
+                    textDecoration: "none",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                  }}
+                >
+                  번개장터 실거래가
+                </a>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {selectedCard && (
         <section
