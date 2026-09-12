@@ -1,8 +1,1 @@
-{
-	"rewrites": [
-		{
-			"source": "/official-ygo/:path*",
-			"destination": "/api/official-ygo?path=:path*"
-		}
-	]
-}
+{ "rewrites": [{ "source": "/official-ygo/:path*", "destination": "/api/official-ygo?path=:path*" }] }
