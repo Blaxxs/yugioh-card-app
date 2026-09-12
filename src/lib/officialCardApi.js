@@ -2,6 +2,20 @@ const OFFICIAL_SITE_ORIGIN = "https://www.db.yugioh-card.com";
 
 const normalizeCardName = (name) => name.replace(/\s+/g, "");
 
+const readCardText = (root, selector) => {
+  const element = root.querySelector(selector);
+  if (!element) return null;
+
+  const clone = element.cloneNode(true);
+  clone.querySelectorAll("br").forEach((lineBreak) => lineBreak.replaceWith("\n"));
+  return clone.textContent
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .trim() || null;
+};
+
 const fetchOfficialHtml = async (url) => {
   const response = await fetch(`/official-ygo${url.pathname}${url.search}`);
   if (!response.ok) throw new Error("공식 카드 데이터베이스에 연결할 수 없습니다.");
@@ -98,7 +112,7 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
       cardOther: read(".species"),
       cardAtk: itemValue("ATK") ? `공격력 ${itemValue("ATK")}` : null,
       cardDef: itemValue("DEF") ? `수비력 ${itemValue("DEF")}` : null,
-      cardText: read(".top .CardText .text_linebreak"),
+      cardText: readCardText(root, ".top .CardText .text_linebreak"),
     },
     card_sets: cardSets,
   };
