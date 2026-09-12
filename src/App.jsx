@@ -15,9 +15,17 @@ function readStoredCard() {
   }
 }
 
+function readStoredSearchResults() {
+  try {
+    return JSON.parse(localStorage.getItem("ygo-search-results")) || [];
+  } catch {
+    return [];
+  }
+}
+
 export default function App() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [cards, setCards] = useState([]);
+  const [cards, setCards] = useState(readStoredSearchResults);
   const [loading, setLoading] = useState(false);
   const [session, setSession] = useState(null);
   const [selectedCard, setSelectedCard] = useState(readStoredCard);
@@ -29,7 +37,7 @@ export default function App() {
   const [purchasePrice, setPurchasePrice] = useState("");
   const [condition, setCondition] = useState("미등록");
   const [activeTab, setActiveTab] = useState("search");
-  const [viewMode, setViewMode] = useState("album");
+  const [viewModes, setViewModes] = useState({ search: "album", inventory: "album", favorites: "album" });
   const [actionError, setActionError] = useState("");
 
   useEffect(() => {
@@ -80,6 +88,7 @@ export default function App() {
   const openCardWindow = (card) => {
     if (!card) return;
     localStorage.setItem(`ygo-card-${card.cardId}`, JSON.stringify(card));
+    localStorage.setItem("ygo-search-results", JSON.stringify(cards));
     window.open(`${window.location.origin}/?card=${encodeURIComponent(card.cardId)}`, "_blank", "noopener,noreferrer");
   };
 
@@ -141,7 +150,9 @@ export default function App() {
     setLoading(true);
     setActionError("");
     try {
-      setCards(await searchOfficialCards(searchTerm));
+      const results = await searchOfficialCards(searchTerm);
+      setCards(results);
+      localStorage.setItem("ygo-search-results", JSON.stringify(results));
     } catch (error) {
       setActionError(error.message);
       setCards([]);
@@ -181,6 +192,10 @@ export default function App() {
         inventoryItems={inventoryItems}
         favoriteCards={favoriteCards}
         onOpenCard={openCardWindow}
+        viewMode={viewModes[activeTab]}
+        onViewModeChange={(mode) => setViewModes((current) => ({ ...current, [activeTab]: mode }))}
+        favoriteIds={favoriteIds}
+        onFavorite={toggleFavorite}
       />
       {loading && <p>카드를 검색하고 있습니다...</p>}
       {actionError && (
@@ -193,22 +208,43 @@ export default function App() {
           <div className="results-toolbar">
             <strong>검색 결과 {cards.length}개</strong>
             <div className="view-filters" aria-label="검색 결과 보기 방식">
-              <button className={viewMode === "album" ? "active" : ""} onClick={() => setViewMode("album")} aria-label="앨범형 보기" title="앨범형 보기">▦</button>
-              <button className={viewMode === "expanded" ? "active" : ""} onClick={() => setViewMode("expanded")} aria-label="펼쳐 보기" title="펼쳐 보기">⊞</button>
-              <button className={viewMode === "list" ? "active" : ""} onClick={() => setViewMode("list")} aria-label="목록형 보기" title="목록형 보기">☷</button>
+              <button
+                className={viewModes.search === "album" ? "active" : ""}
+                onClick={() => setViewModes((current) => ({ ...current, search: "album" }))}
+                aria-label="앨범형 보기"
+                title="앨범형 보기"
+              >
+                ▦
+              </button>
+              <button
+                className={viewModes.search === "expanded" ? "active" : ""}
+                onClick={() => setViewModes((current) => ({ ...current, search: "expanded" }))}
+                aria-label="펼쳐 보기"
+                title="펼쳐 보기"
+              >
+                ⊞
+              </button>
+              <button
+                className={viewModes.search === "list" ? "active" : ""}
+                onClick={() => setViewModes((current) => ({ ...current, search: "list" }))}
+                aria-label="목록형 보기"
+                title="목록형 보기"
+              >
+                ☷
+              </button>
             </div>
           </div>
-          <section className={`card-grid view-${viewMode}`}>
-          {cards.map((card) => (
-            <CardResult
-              key={card.id}
-              card={card}
-              isFavorite={favoriteIds.has(card.cardId)}
-              onFavorite={toggleFavorite}
-              onOpen={openCardWindow}
-              viewMode={viewMode}
-            />
-          ))}
+          <section className={`card-grid view-${viewModes.search}`}>
+            {cards.map((card) => (
+              <CardResult
+                key={card.id}
+                card={card}
+                isFavorite={favoriteIds.has(card.cardId)}
+                onFavorite={toggleFavorite}
+                onOpen={openCardWindow}
+                viewMode={viewModes.search}
+              />
+            ))}
           </section>
         </>
       )}
