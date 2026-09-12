@@ -25,16 +25,18 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewM
 
   return (
     <article className={`card-result card-result-${viewMode}`} onClick={() => onOpen(card)}>
-      <button
-        className={`heart-button ${isFavorite ? "is-favorite" : ""}`}
-        aria-label={isFavorite ? "찜 취소" : "찜하기"}
-        onClick={(event) => {
-          event.stopPropagation();
-          onFavorite(card);
-        }}
-      >
-        {isFavorite ? "♥" : "♡"}
-      </button>
+      <div className="card-actions">
+        <button
+          className={`heart-button ${isFavorite ? "is-favorite" : ""}`}
+          aria-label={isFavorite ? "찜 취소" : "찜하기"}
+          onClick={(event) => {
+            event.stopPropagation();
+            onFavorite(card);
+          }}
+        >
+          {isFavorite ? "♥" : "♡"}
+        </button>
+      </div>
       <div className="card-carousel" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
         {images.length > 1 && (
           <button

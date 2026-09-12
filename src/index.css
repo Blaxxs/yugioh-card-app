@@ -171,11 +171,11 @@ body {
 .card-result-album .card-summary {
   display: none;
 }
-.card-result > .heart-button {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 42px;
+  margin: -4px -4px 4px;
 }
 .detail-images {
   display: grid;
@@ -409,8 +409,9 @@ p {
   box-shadow: none !important;
   background: transparent !important;
   padding: 0 !important;
-  width: 32px;
-  height: 32px;
+  width: 42px;
+  height: 42px;
+  font-size: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
