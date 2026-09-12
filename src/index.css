@@ -167,6 +167,10 @@ body {
 .card-result-list h3 {
   margin: 0;
 }
+.card-result-album h3,
+.card-result-album .card-summary {
+  display: none;
+}
 .card-result > .heart-button {
   position: absolute;
   top: 8px;
