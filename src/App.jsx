@@ -29,6 +29,7 @@ export default function App() {
   const [purchasePrice, setPurchasePrice] = useState("");
   const [condition, setCondition] = useState("미등록");
   const [activeTab, setActiveTab] = useState("search");
+  const [viewMode, setViewMode] = useState("album");
   const [actionError, setActionError] = useState("");
 
   useEffect(() => {
@@ -188,7 +189,16 @@ export default function App() {
         </p>
       )}
       {activeTab === "search" && (
-        <section className="card-grid">
+        <>
+          <div className="results-toolbar">
+            <strong>검색 결과 {cards.length}개</strong>
+            <div className="view-filters" aria-label="검색 결과 보기 방식">
+              <button className={viewMode === "album" ? "active" : ""} onClick={() => setViewMode("album")} aria-label="앨범형 보기" title="앨범형 보기">▦</button>
+              <button className={viewMode === "expanded" ? "active" : ""} onClick={() => setViewMode("expanded")} aria-label="펼쳐 보기" title="펼쳐 보기">⊞</button>
+              <button className={viewMode === "list" ? "active" : ""} onClick={() => setViewMode("list")} aria-label="목록형 보기" title="목록형 보기">☷</button>
+            </div>
+          </div>
+          <section className={`card-grid view-${viewMode}`}>
           {cards.map((card) => (
             <CardResult
               key={card.id}
@@ -196,9 +206,11 @@ export default function App() {
               isFavorite={favoriteIds.has(card.cardId)}
               onFavorite={toggleFavorite}
               onOpen={openCardWindow}
+              viewMode={viewMode}
             />
           ))}
-        </section>
+          </section>
+        </>
       )}
       {selectedCard && (
         <CardDetail

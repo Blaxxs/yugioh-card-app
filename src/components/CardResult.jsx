@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 
-export default function CardResult({ card, isFavorite, onFavorite, onOpen }) {
+export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewMode }) {
   const [imageIndex, setImageIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState("next");
   const pointerStart = useRef(null);
@@ -24,7 +24,7 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen }) {
   };
 
   return (
-    <article className="card-result" onClick={() => onOpen(card)}>
+    <article className={`card-result card-result-${viewMode}`} onClick={() => onOpen(card)}>
       <button
         className={`heart-button ${isFavorite ? "is-favorite" : ""}`}
         aria-label={isFavorite ? "찜 취소" : "찜하기"}
@@ -36,10 +36,46 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen }) {
         {isFavorite ? "♥" : "♡"}
       </button>
       <div className="card-carousel" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
-        {images.length > 1 && <button type="button" className="carousel-arrow previous" aria-label="이전 일러스트" onClick={(event) => { event.stopPropagation(); changeImage("previous"); }}>‹</button>}
-        {images[imageIndex] && <img key={images[imageIndex].id} className={`carousel-image slide-${slideDirection}`} src={images[imageIndex].image_url_small} alt={`${card.name} 일러스트 ${imageIndex + 1}`} draggable="false" />}
-        {images.length > 1 && <button type="button" className="carousel-arrow next" aria-label="다음 일러스트" onClick={(event) => { event.stopPropagation(); changeImage("next"); }}>›</button>}
-        {images.length > 1 && <span className="carousel-counter">{imageIndex + 1} / {images.length}</span>}
+        {images.length > 1 && (
+          <button
+            type="button"
+            className="carousel-arrow previous"
+            aria-label="이전 일러스트"
+            onClick={(event) => {
+              event.stopPropagation();
+              changeImage("previous");
+            }}
+          >
+            ‹
+          </button>
+        )}
+        {images[imageIndex] && (
+          <img
+            key={images[imageIndex].id}
+            className={`carousel-image slide-${slideDirection}`}
+            src={images[imageIndex].image_url_small}
+            alt={`${card.name} 일러스트 ${imageIndex + 1}`}
+            draggable="false"
+          />
+        )}
+        {images.length > 1 && (
+          <button
+            type="button"
+            className="carousel-arrow next"
+            aria-label="다음 일러스트"
+            onClick={(event) => {
+              event.stopPropagation();
+              changeImage("next");
+            }}
+          >
+            ›
+          </button>
+        )}
+        {images.length > 1 && (
+          <span className="carousel-counter">
+            {imageIndex + 1} / {images.length}
+          </span>
+        )}
       </div>
       <h3>{card.koreanData.cardName}</h3>
       <div className="card-summary">
