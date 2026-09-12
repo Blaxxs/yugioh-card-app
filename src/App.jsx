@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
+import Header from "./components/Header";
+import SearchBar from "./components/SearchBar";
+import CardResult from "./components/CardResult";
+import CardDetail from "./components/CardDetail";
+import { CardsIcon } from "./components/icons";
 
 const normalizeCardName = (name) => name.replace(/\s+/g, "");
 const OFFICIAL_SITE_ORIGIN = "https://www.db.yugioh-card.com";
