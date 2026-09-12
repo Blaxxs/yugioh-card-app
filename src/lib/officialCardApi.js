@@ -8,12 +8,14 @@ const readCardText = (root, selector) => {
 
   const clone = element.cloneNode(true);
   clone.querySelectorAll("br").forEach((lineBreak) => lineBreak.replaceWith("\n"));
-  return clone.textContent
-    .replace(/<\s*br\s*\/?>/gi, "\n")
-    .replace(/\r\n/g, "\n")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n[ \t]+/g, "\n")
-    .trim() || null;
+  return (
+    clone.textContent
+      .replace(/<\s*br\s*\/?>/gi, "\n")
+      .replace(/\r\n/g, "\n")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n[ \t]+/g, "\n")
+      .trim() || null
+  );
 };
 
 const fetchOfficialHtml = async (url) => {

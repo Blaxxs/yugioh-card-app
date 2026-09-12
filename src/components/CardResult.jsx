@@ -1,4 +1,28 @@
+import { useRef, useState } from "react";
+
 export default function CardResult({ card, isFavorite, onFavorite, onOpen }) {
+  const [imageIndex, setImageIndex] = useState(0);
+  const [slideDirection, setSlideDirection] = useState("next");
+  const pointerStart = useRef(null);
+  const images = card.card_images || [];
+
+  const changeImage = (direction) => {
+    if (images.length < 2) return;
+    setSlideDirection(direction);
+    setImageIndex((current) => (current + (direction === "next" ? 1 : -1) + images.length) % images.length);
+  };
+
+  const handlePointerDown = (event) => {
+    pointerStart.current = event.clientX;
+  };
+
+  const handlePointerUp = (event) => {
+    if (pointerStart.current === null) return;
+    const distance = event.clientX - pointerStart.current;
+    pointerStart.current = null;
+    if (Math.abs(distance) > 35) changeImage(distance < 0 ? "next" : "previous");
+  };
+
   return (
     <article className="card-result" onClick={() => onOpen(card)}>
       <button
@@ -11,10 +35,11 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen }) {
       >
         {isFavorite ? "♥" : "♡"}
       </button>
-      <div className="card-images">
-        {card.card_images?.map((image) => (
-          <img key={image.id} src={image.image_url_small} alt={`${card.name} 일러스트`} />
-        ))}
+      <div className="card-carousel" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
+        {images.length > 1 && <button type="button" className="carousel-arrow previous" aria-label="이전 일러스트" onClick={(event) => { event.stopPropagation(); changeImage("previous"); }}>‹</button>}
+        {images[imageIndex] && <img key={images[imageIndex].id} className={`carousel-image slide-${slideDirection}`} src={images[imageIndex].image_url_small} alt={`${card.name} 일러스트 ${imageIndex + 1}`} draggable="false" />}
+        {images.length > 1 && <button type="button" className="carousel-arrow next" aria-label="다음 일러스트" onClick={(event) => { event.stopPropagation(); changeImage("next"); }}>›</button>}
+        {images.length > 1 && <span className="carousel-counter">{imageIndex + 1} / {images.length}</span>}
       </div>
       <h3>{card.koreanData.cardName}</h3>
       <div className="card-summary">
