@@ -6,11 +6,18 @@ import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
 
 export default function App() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [cards, setCards] = useState([]);
+  const savedView = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("ygo-view-state") || "null") || {};
+    } catch {
+      return {};
+    }
+  })();
+  const [searchTerm, setSearchTerm] = useState(savedView.searchTerm || "");
+  const [cards, setCards] = useState(savedView.cards || []);
   const [loading, setLoading] = useState(false);
   const [session, setSession] = useState(null);
-  const [selectedCard, setSelectedCard] = useState(null);
+  const [selectedCard, setSelectedCard] = useState(savedView.selectedCard || null);
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [favoriteCards, setFavoriteCards] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
@@ -18,9 +25,13 @@ export default function App() {
   const [inventoryBusy, setInventoryBusy] = useState(false);
   const [purchasePrice, setPurchasePrice] = useState("");
   const [condition, setCondition] = useState("미등록");
-  const [activeTab, setActiveTab] = useState("search");
-  const [viewModes, setViewModes] = useState({ search: "album", inventory: "album", favorites: "album" });
+  const [activeTab, setActiveTab] = useState(savedView.activeTab || "search");
+  const [viewModes, setViewModes] = useState(savedView.viewModes || { search: "album", inventory: "album", favorites: "album" });
   const [actionError, setActionError] = useState("");
+
+  useEffect(() => {
+    sessionStorage.setItem("ygo-view-state", JSON.stringify({ searchTerm, cards, selectedCard, activeTab, viewModes }));
+  }, [searchTerm, cards, selectedCard, activeTab, viewModes]);
 
   useEffect(() => {
     if (window.location.search) window.history.replaceState({}, "", window.location.pathname);
@@ -70,6 +81,8 @@ export default function App() {
   const loginWithGoogle = () =>
     supabase?.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
   const logout = () => supabase?.auth.signOut();
+
+  const closeCardDetail = () => setSelectedCard(null);
 
   const openCardWindow = (card) => {
     if (!card) return;
@@ -239,7 +252,7 @@ export default function App() {
           condition={condition}
           purchasePrice={purchasePrice}
           inventoryBusy={inventoryBusy}
-          onClose={() => setSelectedCard(null)}
+          onClose={closeCardDetail}
           onConditionChange={setCondition}
           onPurchasePriceChange={setPurchasePrice}
           onInventory={saveInventory}
