@@ -281,7 +281,7 @@ body {
 .rarity-exse { background: #c43f4c; }
 .rarity-qcse::before { content: "25"; position: absolute; inset: 1px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.7); border-radius: 50%; font-size: 8px; font-weight: 900; }
 .rarity-qcse::after,
-.rarity-pse::after { content: ""; position: absolute; inset: -25%; background: linear-gradient(45deg, transparent 43%, rgba(255,255,255,.95) 49%, transparent 55%), linear-gradient(-45deg, transparent 43%, rgba(255,255,255,.8) 49%, transparent 55%); animation: rarity-cross-shine 1.8s linear infinite; }
+.rarity-pse::after { content: ""; position: absolute; inset: -25%; background: linear-gradient(90deg, transparent 43%, rgba(255,255,255,.95) 49%, transparent 55%), linear-gradient(0deg, transparent 43%, rgba(255,255,255,.8) 49%, transparent 55%); animation: rarity-cross-shine 1.8s linear infinite; }
 .rarity-exse::after { content: ""; position: absolute; inset: -40%; background: linear-gradient(135deg, transparent 43%, rgba(255,255,255,.95) 49%, transparent 55%); animation: rarity-diagonal-shine 1.6s linear infinite; }
 @keyframes rarity-cross-shine { from { transform: translate(-30%, -30%); } to { transform: translate(30%, 30%); } }
 @keyframes rarity-diagonal-shine { from { transform: translate(-30%, -30%); } to { transform: translate(30%, 30%); } }
