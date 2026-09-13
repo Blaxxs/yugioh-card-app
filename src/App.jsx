@@ -241,7 +241,7 @@ export default function App() {
         />
         <button onClick={searchCard}>검색</button>
       </div>
-      <ManagementTabs
+      {!selectedCard && <ManagementTabs
         activeTab={activeTab}
         onTabChange={setActiveTab}
         session={session}
@@ -252,7 +252,7 @@ export default function App() {
         onViewModeChange={(mode) => setViewModes((current) => ({ ...current, [activeTab]: mode }))}
         favoriteIds={favoriteIds}
         onFavorite={toggleFavorite}
-      />
+      />}
       {loading && <p>카드를 검색하고 있습니다...</p>}
       {actionError && (
         <p className="action-error" role="alert">

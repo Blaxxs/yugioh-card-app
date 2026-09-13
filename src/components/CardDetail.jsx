@@ -145,11 +145,7 @@ export default function CardDetail({
                     <td className="set-code">{copiedCode === `${set.set_code}-${index}` ? "복사됨" : set.set_code}</td>
                     <td>{set.set_name}</td>
                     <td>
-                      <span
-                        className={`rarity-chip rarity-${(set.rarity_code || "").replace(/[^a-z0-9+]/gi, "").toLowerCase()}`}
-                      >
-                        {set.rarity_code || set.set_rarity}
-                      </span>
+                      <span className="rarity-tooltip" data-tooltip={set.set_rarity} title={set.set_rarity}><span className={`rarity-chip rarity-${(set.rarity_code || "").replace(/[^a-z0-9+]/gi, "").toLowerCase()}`}>{set.rarity_code || set.set_rarity}</span></span>
                     </td>
                   </tr>
                 ))}
