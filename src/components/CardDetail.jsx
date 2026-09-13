@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function CardDetail({
   card,
@@ -14,7 +14,25 @@ export default function CardDetail({
 }) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const pendingImageIndex = useRef(null);
+  const frameRequest = useRef(null);
   const selectedImage = card.card_images?.[selectedImageIndex] || card.card_images?.[0];
+
+  const selectImage = (index) => {
+    pendingImageIndex.current = index;
+    if (frameRequest.current) cancelAnimationFrame(frameRequest.current);
+    frameRequest.current = requestAnimationFrame(() => {
+      setSelectedImageIndex(pendingImageIndex.current);
+      pendingImageIndex.current = null;
+      frameRequest.current = null;
+    });
+  };
+
+  useEffect(() => {
+    card.card_images?.forEach((image) => {
+      const preload = new Image();
+      preload.src = image.image_url_small;
+    });
+  }, [card.card_images]);
 
   return (
     <section className="card-detail">
@@ -36,16 +54,11 @@ export default function CardDetail({
                 type="button"
                 key={image.id}
                 className={selectedImageIndex === index ? "selected" : ""}
-                onMouseEnter={() => setSelectedImageIndex(index)}
+                onMouseEnter={() => selectImage(index)}
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  if (pendingImageIndex.current === index) return;
-                  pendingImageIndex.current = index;
-                  setSelectedImageIndex(index);
-                  requestAnimationFrame(() => {
-                    pendingImageIndex.current = null;
-                  });
+                  selectImage(index);
                 }}
               >
                 <img
