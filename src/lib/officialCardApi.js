@@ -22,6 +22,26 @@ const RARITY_CODES = new Map([
   ["그랜드마스터 레어", "GMR"],
 ]);
 
+const RARITY_ENGLISH = new Map([
+  ["노멀", "Normal"],
+  ["패러렐 노멀", "Parallel Rare"],
+  ["레어", "Rare"],
+  ["골드 레어", "Gold Rare"],
+  ["밀레니엄 레어", "Millennium Rare"],
+  ["슈퍼 레어", "Super Rare"],
+  ["울트라 레어", "Ultra Rare"],
+  ["패러렐 울트라 레어", "Parallel Ultra Rare"],
+  ["얼티미트 레어", "Ultimate Rare"],
+  ["시크릿 레어", "Secret Rare"],
+  ["홀로그래픽 레어", "Holographic Rare"],
+  ["프리미엄 골드 레어", "Premium Gold Rare"],
+  ["엑스트라 시크릿 레어", "Extra Secret Rare"],
+  ["패러렐 엑스트라 시크릿 레어", "Parallel Extra Secret Rare"],
+  ["프리즈마틱 시크릿 레어", "Prismatic Secret Rare"],
+  ["쿼터 센추리 시크릿 레어", "Quarter Century Secret Rare"],
+  ["그랜드마스터 레어", "Grandmaster Rare"],
+]);
+
 const getRarityCode = (rarity) => {
   const normalized = rarity.replace(/\s+/g, " ").trim();
   return RARITY_CODES.get(normalized) || normalized;
@@ -125,12 +145,27 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
       const setCode = row.querySelector(".card_number")?.textContent.trim();
       const setName = row.querySelector(".pack_name")?.textContent.trim();
       const setRarity = row.querySelector(".rarity p")?.textContent.trim();
+      const rarityCode = setRarity ? getRarityCode(setRarity) : null;
+      const compactRarity = setRarity?.replace(/\s+/g, "");
+      const englishRarity = setRarity ? RARITY_ENGLISH.get(setRarity.replace(/\s+/g, " ").trim()) : null;
       return {
         set_code: setCode,
         set_name: setName,
         set_rarity: setRarity,
-        rarity_code: setRarity ? getRarityCode(setRarity) : null,
-        price_query: setCode && setRarity ? `${setCode} ${getRarityCode(setRarity)}` : null,
+        rarity_code: rarityCode,
+        price_query: setCode && setRarity ? `${setCode} ${setRarity}` : null,
+        price_queries: setCode && setRarity
+          ? [
+              `${setCode} ${setRarity}`,
+              `${setCode} ${compactRarity}`,
+              `${setCode} ${rarityCode}`,
+              englishRarity && `${setCode} ${englishRarity}`,
+              `${name} ${setCode} ${setRarity}`,
+              `${name} ${setCode} ${compactRarity}`,
+              `${name} ${setCode} ${rarityCode}`,
+              englishRarity && `${name} ${setCode} ${englishRarity}`,
+            ].filter(Boolean)
+          : [],
       };
     })
     .filter((set) => set.set_code && set.set_name && set.set_rarity);
