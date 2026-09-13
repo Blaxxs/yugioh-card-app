@@ -147,14 +147,20 @@ body {
 .card-result-list {
   display: grid;
   grid-template-columns: 150px 1fr;
+  grid-template-rows: auto 1fr;
   gap: 16px;
   text-align: left;
   min-width: 0;
+  min-height: 220px;
 }
 .card-result-list .card-carousel {
-  grid-row: span 2;
+  grid-column: 1;
+  grid-row: 1 / span 2;
   min-height: 190px;
 }
+.card-result-list .card-actions { position: absolute; top: 8px; right: 8px; z-index: 2; min-height: 0; margin: 0; }
+.card-result-list h3 { grid-column: 2; grid-row: 1; align-self: end; padding-right: 44px; }
+.card-result-list .card-summary { grid-column: 2; grid-row: 2; align-self: start; }
 .card-result-list .carousel-image {
   max-height: 250px;
   object-fit: contain;
@@ -390,6 +396,7 @@ body {
   .card-result-list {
     grid-template-columns: 100px 1fr;
     gap: 10px;
+    min-height: 160px;
   }
   .card-result-list .card-carousel {
     min-height: 145px;
@@ -488,7 +495,9 @@ body {
   background: linear-gradient(145deg, #1e2d4a, #080b13);
   transform: perspective(700px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
   transform-style: preserve-3d;
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
   overflow: hidden;
 }
 .detail-main-image::after {
@@ -497,14 +506,31 @@ body {
   inset: 0;
   pointer-events: none;
   opacity: 0;
-  background: linear-gradient(105deg, transparent 40%, rgba(255,219,112,.72) 45%, rgba(104,218,255,.28) 50%, rgba(255,93,190,.34) 54%, transparent 60%), radial-gradient(circle at var(--pointer-x,50%) var(--pointer-y,50%), rgba(255,255,255,.32), transparent 24%);
-  background-size: 180% 180%, 100% 100%;
-  background-position: calc(var(--pointer-x,50%) / 2 + var(--pointer-y,50%) / 2) var(--pointer-y,50%), center;
+  background:
+    linear-gradient(
+      105deg,
+      transparent 40%,
+      rgba(255, 219, 112, 0.72) 45%,
+      rgba(104, 218, 255, 0.28) 50%,
+      rgba(255, 93, 190, 0.34) 54%,
+      transparent 60%
+    ),
+    radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 50%), rgba(255, 255, 255, 0.32), transparent 24%);
+  background-size:
+    180% 180%,
+    100% 100%;
+  background-position:
+    calc(var(--pointer-x, 50%) / 2 + var(--pointer-y, 50%) / 2) var(--pointer-y, 50%),
+    center;
   mix-blend-mode: screen;
   transition: opacity 180ms ease;
 }
-.detail-main-image:hover { box-shadow: 0 18px 42px rgba(0,0,0,.4); }
-.detail-main-image:hover::after { opacity: 1; }
+.detail-main-image:hover {
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.4);
+}
+.detail-main-image:hover::after {
+  opacity: 1;
+}
 .detail-main-image img {
   width: 100%;
   max-height: 520px;
