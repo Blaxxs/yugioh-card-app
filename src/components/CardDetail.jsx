@@ -13,6 +13,7 @@ export default function CardDetail({
   onInventory,
   inventoryTransactions = [],
   onCancelTransaction,
+  onUpdateTransaction,
 }) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const pendingImageIndex = useRef(null);
@@ -211,13 +212,13 @@ export default function CardDetail({
                 <div className="transaction-row" key={transaction.id}>
                   <span>
                     {transaction.type === "purchase" ? "매입" : "매출"} ·{" "}
-                    {new Date(transaction.occurred_at).toLocaleString("ko-KR")} · {transaction.quantity}장 ·{" "}
-                    {transaction.unit_price ?? "-"}원
+                    {new Date(transaction.occurred_at).toLocaleString("ko-KR")} · {transaction.quantity}장
                   </span>
-                  {transaction.canceled_at ? (
-                    <em>취소됨</em>
-                  ) : (
-                    <button onClick={() => onCancelTransaction(transaction)}>거래 취소</button>
+                  {transaction.canceled_at ? <em>취소됨</em> : (
+                    <span className="transaction-controls">
+                      <input type="number" min="0" step="0.01" defaultValue={transaction.unit_price ?? ""} aria-label="거래 금액" onBlur={(event) => onUpdateTransaction(transaction, event.target.value)} />
+                      <button onClick={() => onCancelTransaction(transaction)}>거래 취소</button>
+                    </span>
                   )}
                 </div>
               ))

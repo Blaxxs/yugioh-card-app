@@ -282,6 +282,13 @@ body {
 .rarity-gmr {
   background: #768d17;
 }
+.rarity-n { background: #777f8d; }
+.rarity-r { background: #2f9b5f; }
+.rarity-p { background: #b58be5; }
+.rarity-pur { background: #5d2b9b; }
+.rarity-qcse { background: #c63d4f; background-image: linear-gradient(135deg, transparent 42%, rgba(255,255,255,.9) 47%, transparent 52%, transparent 60%, rgba(255,255,255,.7) 65%, transparent 70%); }
+.rarity-pse { background: #c63d4f; background-image: linear-gradient(45deg, transparent 42%, rgba(255,255,255,.9) 48%, transparent 54%), linear-gradient(-45deg, transparent 42%, rgba(255,255,255,.7) 48%, transparent 54%); }
+.rarity-exse { background: #c63d4f; background-image: linear-gradient(135deg, transparent 40%, rgba(255,255,255,.85) 48%, transparent 56%); }
 .card-carousel {
   position: relative;
   display: flex;
@@ -631,6 +638,8 @@ body {
   color: #f6b5b5;
   font-style: normal;
 }
+.transaction-controls { display: flex; align-items: center; gap: 6px; }
+.transaction-controls input { width: 84px; padding: 4px 6px; }
 .inventory-help { color: var(--text); font-size: 12px; margin: 2px 0 8px; }
 .rarity-guide {
   margin: 12px 0 20px;

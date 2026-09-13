@@ -150,7 +150,7 @@ export default function App() {
         ...items.filter((item) => item.card_id !== selectedCard.cardId && data.quantity > 0),
       ]);
       if (quantityDelta !== 0) {
-        await supabase
+        const { error: transactionError } = await supabase
           .from("inventory_transactions")
           .insert({
             user_id: session.user.id,
@@ -159,6 +159,7 @@ export default function App() {
             quantity: Math.abs(quantityDelta),
             unit_price: purchasePrice === "" ? null : Number(purchasePrice),
           });
+        if (transactionError) setActionError(`거래 이력 저장 오류: ${transactionError.message}`);
         const { data: transactions } = await supabase
           .from("inventory_transactions")
           .select("*")
@@ -173,6 +174,13 @@ export default function App() {
 
   const cancelTransaction = async (transaction) => {
     if (!supabase || !session) return;
+    const nextQuantity = Math.max(0, (inventory?.quantity || 0) + (transaction.type === "purchase" ? -transaction.quantity : transaction.quantity));
+    const { error: inventoryError } = await supabase
+      .from("inventory_items")
+      .update({ quantity: nextQuantity, updated_at: new Date().toISOString() })
+      .eq("id", inventory.id)
+      .eq("user_id", session.user.id);
+    if (inventoryError) return setActionError(`재고 조정 오류: ${inventoryError.message}`);
     const { error } = await supabase
       .from("inventory_transactions")
       .update({ canceled_at: new Date().toISOString() })
@@ -182,6 +190,15 @@ export default function App() {
     setInventoryTransactions((items) =>
       items.map((item) => (item.id === transaction.id ? { ...item, canceled_at: new Date().toISOString() } : item)),
     );
+    setInventory((item) => ({ ...item, quantity: nextQuantity }));
+  };
+
+  const updateTransaction = async (transaction, unitPrice) => {
+    if (!supabase || !session) return;
+    const value = unitPrice === "" ? null : Number(unitPrice);
+    const { error } = await supabase.from("inventory_transactions").update({ unit_price: value }).eq("id", transaction.id).eq("user_id", session.user.id);
+    if (error) return setActionError(`거래 금액 수정 오류: ${error.message}`);
+    setInventoryTransactions((items) => items.map((item) => item.id === transaction.id ? { ...item, unit_price: value } : item));
   };
 
   const searchCard = async () => {
@@ -301,6 +318,7 @@ export default function App() {
           onInventory={saveInventory}
           inventoryTransactions={inventoryTransactions}
           onCancelTransaction={cancelTransaction}
+          onUpdateTransaction={updateTransaction}
         />
       )}
     </main>
