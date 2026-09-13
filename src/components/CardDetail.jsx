@@ -17,6 +17,21 @@ export default function CardDetail({
   const frameRequest = useRef(null);
   const selectedImage = card.card_images?.[selectedImageIndex] || card.card_images?.[0];
 
+  const handleMainImageMove = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    event.currentTarget.style.setProperty("--tilt-x", `${(0.5 - y) * 10}deg`);
+    event.currentTarget.style.setProperty("--tilt-y", `${(x - 0.5) * 14}deg`);
+    event.currentTarget.style.setProperty("--pointer-x", `${x * 100}%`);
+    event.currentTarget.style.setProperty("--pointer-y", `${y * 100}%`);
+  };
+
+  const resetMainImage = (event) => {
+    event.currentTarget.style.setProperty("--tilt-x", "0deg");
+    event.currentTarget.style.setProperty("--tilt-y", "0deg");
+  };
+
   const selectImage = (index) => {
     pendingImageIndex.current = index;
     if (frameRequest.current) cancelAnimationFrame(frameRequest.current);
@@ -45,7 +60,7 @@ export default function CardDetail({
       </header>
       <div className="detail-layout">
         <div className="detail-image-viewer">
-          <div className="detail-main-image">
+          <div className="detail-main-image" onPointerMove={handleMainImageMove} onPointerLeave={resetMainImage}>
             {selectedImage && <img src={selectedImage.image_url_small} alt={`${card.name} 대표 이미지`} />}
           </div>
           <div className="detail-thumbnails">
