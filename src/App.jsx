@@ -26,7 +26,9 @@ export default function App() {
   const [purchasePrice, setPurchasePrice] = useState("");
   const [condition, setCondition] = useState("미등록");
   const [activeTab, setActiveTab] = useState(savedView.activeTab || "search");
-  const [viewModes, setViewModes] = useState(savedView.viewModes || { search: "album", inventory: "album", favorites: "album" });
+  const [viewModes, setViewModes] = useState(
+    savedView.viewModes || { search: "album", inventory: "album", favorites: "album" },
+  );
   const [actionError, setActionError] = useState("");
 
   useEffect(() => {

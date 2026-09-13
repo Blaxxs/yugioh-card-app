@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export default function CardDetail({
   card,
@@ -13,6 +13,7 @@ export default function CardDetail({
   onInventory,
 }) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const pendingImageIndex = useRef(null);
   const selectedImage = card.card_images?.[selectedImageIndex] || card.card_images?.[0];
 
   return (
@@ -30,9 +31,28 @@ export default function CardDetail({
             {selectedImage && <img src={selectedImage.image_url_small} alt={`${card.name} 대표 이미지`} />}
           </div>
           <div className="detail-thumbnails">
-              {card.card_images?.map((image, index) => (
-                <button type="button" key={image.id} className={selectedImageIndex === index ? "selected" : ""} onMouseEnter={() => setSelectedImageIndex(index)} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); setSelectedImageIndex(index); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}>
-                  <img loading="lazy" draggable="false" src={image.image_url_small} alt={`${card.name} 일러스트 ${index + 1}`} />
+            {card.card_images?.map((image, index) => (
+              <button
+                type="button"
+                key={image.id}
+                className={selectedImageIndex === index ? "selected" : ""}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (pendingImageIndex.current === index) return;
+                  pendingImageIndex.current = index;
+                  setSelectedImageIndex(index);
+                  requestAnimationFrame(() => {
+                    pendingImageIndex.current = null;
+                  });
+                }}
+              >
+                <img
+                  decoding="async"
+                  draggable="false"
+                  src={image.image_url_small}
+                  alt={`${card.name} 일러스트 ${index + 1}`}
+                />
               </button>
             ))}
           </div>
