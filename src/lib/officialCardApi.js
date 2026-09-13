@@ -149,6 +149,7 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
       const compactRarity = setRarity?.replace(/\s+/g, "");
       const englishRarity = setRarity ? RARITY_ENGLISH.get(setRarity.replace(/\s+/g, " ").trim()) : null;
       return {
+        set_date: row.querySelector(".time")?.textContent.trim() || null,
         set_code: setCode,
         set_name: setName,
         set_rarity: setRarity,

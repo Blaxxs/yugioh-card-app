@@ -69,13 +69,12 @@ export default function CardDetail({
             </p>
           </div>
           <h3>수록 팩과 레어도</h3>
-          <ul>
-            {card.card_sets?.map((set, index) => (
-              <li key={`${set.set_code}-${index}`}>
-                {set.set_name} ({set.set_code}) - {set.set_rarity} [{set.rarity_code}]
-              </li>
-            ))}
-          </ul>
+          <div className="set-table-wrap">
+            <table className="set-table">
+              <thead><tr><th>발매일</th><th>코드</th><th>수록 팩</th><th>레어도</th></tr></thead>
+              <tbody>{card.card_sets?.map((set, index) => <tr key={`${set.set_code}-${index}`}><td>{set.set_date || "-"}</td><td className="set-code">{set.set_code}</td><td>{set.set_name}</td><td><span className={`rarity-chip rarity-${(set.rarity_code || "").replace(/[^a-z0-9+]/gi, "").toLowerCase()}`}>{set.rarity_code || set.set_rarity}</span></td></tr>)}</tbody>
+            </table>
+          </div>
         </div>
       </div>
       <h3>내 재고</h3>
