@@ -22,6 +22,7 @@ export default function App() {
   const [favoriteCards, setFavoriteCards] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
   const [inventory, setInventory] = useState(null);
+  const [inventoryTransactions, setInventoryTransactions] = useState([]);
   const [inventoryBusy, setInventoryBusy] = useState(false);
   const [purchasePrice, setPurchasePrice] = useState("");
   const [condition, setCondition] = useState("미등록");
@@ -76,6 +77,7 @@ export default function App() {
         setInventory(data);
         setPurchasePrice(data?.purchase_price ?? "");
         setCondition(data?.condition || "미등록");
+        if (data) supabase.from("inventory_transactions").select("*").eq("user_id", session.user.id).eq("inventory_item_id", data.id).order("occurred_at", { ascending: false }).then(({ data: transactions }) => setInventoryTransactions(transactions || []));
       });
     return undefined;
   }, [session, selectedCard]);
@@ -140,8 +142,20 @@ export default function App() {
         data,
         ...items.filter((item) => item.card_id !== selectedCard.cardId && data.quantity > 0),
       ]);
+      if (quantityDelta !== 0) {
+        await supabase.from("inventory_transactions").insert({ user_id: session.user.id, inventory_item_id: data.id, type: quantityDelta > 0 ? "purchase" : "sale", quantity: Math.abs(quantityDelta), unit_price: purchasePrice === "" ? null : Number(purchasePrice) });
+        const { data: transactions } = await supabase.from("inventory_transactions").select("*").eq("user_id", session.user.id).eq("inventory_item_id", data.id).order("occurred_at", { ascending: false });
+        setInventoryTransactions(transactions || []);
+      }
     }
     setInventoryBusy(false);
+  };
+
+  const cancelTransaction = async (transaction) => {
+    if (!supabase || !session) return;
+    const { error } = await supabase.from("inventory_transactions").update({ canceled_at: new Date().toISOString() }).eq("id", transaction.id).eq("user_id", session.user.id);
+    if (error) return setActionError(`거래 취소 오류: ${error.message}`);
+    setInventoryTransactions((items) => items.map((item) => item.id === transaction.id ? { ...item, canceled_at: new Date().toISOString() } : item));
   };
 
   const searchCard = async () => {
@@ -258,6 +272,8 @@ export default function App() {
           onConditionChange={setCondition}
           onPurchasePriceChange={setPurchasePrice}
           onInventory={saveInventory}
+          inventoryTransactions={inventoryTransactions}
+          onCancelTransaction={cancelTransaction}
         />
       )}
     </main>

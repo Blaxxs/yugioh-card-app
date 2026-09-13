@@ -14,6 +14,19 @@ create table public.inventory_items (
   updated_at timestamptz not null default now()
 );
 
+create table public.inventory_transactions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  inventory_item_id uuid not null references public.inventory_items(id) on delete cascade,
+  type text not null check (type in ('purchase', 'sale')),
+  quantity integer not null check (quantity > 0),
+  unit_price numeric(12, 2),
+  occurred_at timestamptz not null default now(),
+  canceled_at timestamptz,
+  memo text,
+  created_at timestamptz not null default now()
+);
+
 create unique index inventory_items_user_card_idx on public.inventory_items(user_id, card_id);
 
 create table public.favorites (
@@ -58,6 +71,7 @@ create table public.sale_items (
 );
 
 alter table public.inventory_items enable row level security;
+alter table public.inventory_transactions enable row level security;
 alter table public.favorites enable row level security;
 alter table public.decks enable row level security;
 alter table public.deck_cards enable row level security;
@@ -66,6 +80,9 @@ alter table public.sale_items enable row level security;
 
 create policy "Users manage their inventory"
   on public.inventory_items for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "Users manage their inventory transactions"
+  on public.inventory_transactions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create policy "Users manage their favorites"
   on public.favorites for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
