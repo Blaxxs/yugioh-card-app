@@ -36,6 +36,7 @@ export default function CardDetail({
                 type="button"
                 key={image.id}
                 className={selectedImageIndex === index ? "selected" : ""}
+                onMouseEnter={() => setSelectedImageIndex(index)}
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
