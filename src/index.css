@@ -255,6 +255,7 @@ body {
   white-space: nowrap;
 }
 .rarity-chip {
+  position: relative;
   display: inline-block;
   min-width: 42px;
   padding: 3px 7px;
@@ -264,31 +265,26 @@ body {
   font-size: 11px;
   font-weight: 700;
   text-align: center;
+  overflow: hidden;
 }
-.rarity-se,
-.rarity-pse,
+.rarity-n { background: #737a86; }
+.rarity-r { background: #258b50; }
+.rarity-sr { background: #65bfe8; color: #07121b; }
+.rarity-ur { background: #e1ad36; color: #241600; }
+.rarity-se { background: #c43f4c; }
+.rarity-hr { background: linear-gradient(135deg, #eef3f7, #8793a0, #ffffff); color: #111820; }
+.rarity-pg { background: linear-gradient(135deg, #b77a16, #f3d36b, #9b5e0e); color: #211300; }
+.rarity-p { background: #c8a5ec; color: #24133d; }
+.rarity-pur { background: #57218f; }
 .rarity-qcse,
-.rarity-exse {
-  background: #a64655;
-}
-.rarity-sr {
-  background: #2e79ad;
-}
-.rarity-ul,
-.rarity-ur {
-  background: #a87931;
-}
-.rarity-pg,
-.rarity-gmr {
-  background: #768d17;
-}
-.rarity-n { background: #777f8d; }
-.rarity-r { background: #2f9b5f; }
-.rarity-p { background: #b58be5; }
-.rarity-pur { background: #5d2b9b; }
-.rarity-qcse { background: #c63d4f; background-image: linear-gradient(135deg, transparent 42%, rgba(255,255,255,.9) 47%, transparent 52%, transparent 60%, rgba(255,255,255,.7) 65%, transparent 70%); }
-.rarity-pse { background: #c63d4f; background-image: linear-gradient(45deg, transparent 42%, rgba(255,255,255,.9) 48%, transparent 54%), linear-gradient(-45deg, transparent 42%, rgba(255,255,255,.7) 48%, transparent 54%); }
-.rarity-exse { background: #c63d4f; background-image: linear-gradient(135deg, transparent 40%, rgba(255,255,255,.85) 48%, transparent 56%); }
+.rarity-pse { background: #c43f4c; }
+.rarity-exse { background: #c43f4c; }
+.rarity-qcse::before { content: "25"; position: absolute; inset: 1px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.7); border-radius: 50%; font-size: 8px; font-weight: 900; }
+.rarity-qcse::after,
+.rarity-pse::after { content: ""; position: absolute; inset: -25%; background: linear-gradient(45deg, transparent 43%, rgba(255,255,255,.95) 49%, transparent 55%), linear-gradient(-45deg, transparent 43%, rgba(255,255,255,.8) 49%, transparent 55%); animation: rarity-cross-shine 1.8s linear infinite; }
+.rarity-exse::after { content: ""; position: absolute; inset: -40%; background: linear-gradient(135deg, transparent 43%, rgba(255,255,255,.95) 49%, transparent 55%); animation: rarity-diagonal-shine 1.6s linear infinite; }
+@keyframes rarity-cross-shine { from { transform: translate(-30%, -30%); } to { transform: translate(30%, 30%); } }
+@keyframes rarity-diagonal-shine { from { transform: translate(-30%, -30%); } to { transform: translate(30%, 30%); } }
 .card-carousel {
   position: relative;
   display: flex;
