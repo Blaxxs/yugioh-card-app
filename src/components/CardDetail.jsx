@@ -22,13 +22,11 @@ export default function CardDetail({
   const pointerFrameRequest = useRef(null);
   const pointerPosition = useRef(null);
   const hasGmr = card.card_sets?.some((set) => set.rarity_code === "GMR");
-  const hasOverframe = card.card_sets?.some((set) => ["PSE", "EXSE", "QCSE"].includes(set.rarity_code));
   const gmrBaseImage = card.card_images?.[card.card_images.length - 1];
   const sourceImages = card.card_images || [];
-  const overframeIndex = hasOverframe && sourceImages.length > 1 ? sourceImages.length - 1 : -1;
   const detailImages = hasGmr && gmrBaseImage
     ? [...sourceImages, { ...gmrBaseImage, id: `${gmrBaseImage.id}-gmr`, isGmrComposite: true }]
-    : sourceImages.map((image, index) => ({ ...image, isOverframe: index === overframeIndex }));
+    : sourceImages;
   const selectedImage = detailImages[selectedImageIndex] || detailImages[0];
 
   const handleMainImageMove = (event) => {
@@ -145,11 +143,26 @@ export default function CardDetail({
                 className={`detail-card-stage ${
                   selectedImage.isGmrComposite
                     ? "detail-card-stage-gmr"
-                    : selectedImage.isOverframe
-                      ? "detail-card-stage-overframe"
-                      : ""
+                    : ""
                 }`}
               >
+                {selectedImage.isGmrComposite && (
+                  <>
+                    <svg className="gmr-filter-defs" aria-hidden="true" focusable="false">
+                      <defs>
+                        <filter id="gmr-turbulence-filter" x="-20%" y="-20%" width="140%" height="140%">
+                          <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="2" seed="17" />
+                          <feColorMatrix type="saturate" values="0" />
+                          <feComponentTransfer>
+                            <feFuncA type="table" tableValues="0 0.16" />
+                          </feComponentTransfer>
+                        </filter>
+                      </defs>
+                    </svg>
+                    <span className="gmr-noise-layer gmr-noise-layer-a" />
+                    <span className="gmr-noise-layer gmr-noise-layer-b" />
+                  </>
+                )}
                 <img
                   className="detail-card-art"
                   src={selectedImage.image_url_small}
