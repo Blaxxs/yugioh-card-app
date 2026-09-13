@@ -320,6 +320,20 @@ body {
   font-size: 12px;
   margin-top: 2px;
 }
+.price-button {
+  display: block;
+  margin-top: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+.price-button:disabled { cursor: wait; opacity: 0.55; }
+.price-results { display: grid; gap: 4px; margin-top: 6px; }
+.price-results a { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; background: var(--code-bg); color: var(--text-h); text-decoration: none; font-size: 12px; }
+.price-results a:hover { outline: 1px solid var(--accent); }
 .card-detail {
   margin-top: 24px;
   padding: 20px;

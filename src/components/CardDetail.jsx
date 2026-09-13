@@ -9,6 +9,9 @@ export default function CardDetail({
   onConditionChange,
   onPurchasePriceChange,
   onInventory,
+  priceResults,
+  priceLoading,
+  onSearchPrice,
 }) {
   return (
     <section className="card-detail">
@@ -47,6 +50,16 @@ export default function CardDetail({
           <li key={`${set.set_code}-${index}`}>
             {set.set_name} ({set.set_code}) - {set.set_rarity} [{set.rarity_code}]
             <small className="price-query">네이버 검색어: {set.price_queries?.join(" / ") || set.price_query}</small>
+            <button className="price-button" onClick={() => onSearchPrice(card, set)} disabled={priceLoading}>네이버 가격 조회</button>
+            {priceResults?.[`${set.set_code}-${set.rarity_code}`] && (
+              <div className="price-results">
+                {priceResults[`${set.set_code}-${set.rarity_code}`].items.slice(0, 5).map((item) => (
+                  <a key={item.productId || item.link} href={item.link} target="_blank" rel="noreferrer">
+                    <span>{item.mallName} · {item.title}</span><strong>{item.lowestPrice?.toLocaleString("ko-KR")}원</strong>
+                  </a>
+                ))}
+              </div>
+            )}
           </li>
         ))}
       </ul>

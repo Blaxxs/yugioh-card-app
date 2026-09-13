@@ -154,18 +154,19 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
         set_rarity: setRarity,
         rarity_code: rarityCode,
         price_query: setCode && setRarity ? `${setCode} ${setRarity}` : null,
-        price_queries: setCode && setRarity
-          ? [
-              `${setCode} ${setRarity}`,
-              `${setCode} ${compactRarity}`,
-              `${setCode} ${rarityCode}`,
-              englishRarity && `${setCode} ${englishRarity}`,
-              `${name} ${setCode} ${setRarity}`,
-              `${name} ${setCode} ${compactRarity}`,
-              `${name} ${setCode} ${rarityCode}`,
-              englishRarity && `${name} ${setCode} ${englishRarity}`,
-            ].filter(Boolean)
-          : [],
+        price_queries:
+          setCode && setRarity
+            ? [
+                `${setCode} ${setRarity}`,
+                `${setCode} ${compactRarity}`,
+                `${setCode} ${rarityCode}`,
+                englishRarity && `${setCode} ${englishRarity}`,
+                `${name} ${setCode} ${setRarity}`,
+                `${name} ${setCode} ${compactRarity}`,
+                `${name} ${setCode} ${rarityCode}`,
+                englishRarity && `${name} ${setCode} ${englishRarity}`,
+              ].filter(Boolean)
+            : [],
       };
     })
     .filter((set) => set.set_code && set.set_name && set.set_rarity);

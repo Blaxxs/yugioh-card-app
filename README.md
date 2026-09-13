@@ -23,7 +23,11 @@
 ```text
 VITE_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY
+NAVER_CLIENT_ID
+NAVER_CLIENT_SECRET
 ```
+
+네이버 쇼핑 API 키는 Vercel 환경변수에만 등록합니다. `NAVER_CLIENT_SECRET`은 절대 `VITE_` 접두사를 붙이지 않으며 브라우저에 노출하지 않습니다. 카드 상세의 각 세트 코드·레어도 옆 `네이버 가격 조회` 버튼이 서버 프록시를 통해 검색합니다.
 
 5. Deploy 후 발급된 `https://프로젝트명.vercel.app` 주소를 Supabase Authentication → URL Configuration의 Site URL과 Redirect URLs에 추가합니다.
 6. Google Cloud OAuth 클라이언트의 승인된 JavaScript 원본과 Supabase Google Provider 설정도 같은 공개 주소 기준으로 확인합니다.
