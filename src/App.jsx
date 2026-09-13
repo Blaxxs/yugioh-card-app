@@ -160,6 +160,7 @@ export default function App() {
 
   const searchCard = async () => {
     if (!searchTerm.trim()) return;
+    setActiveTab("search");
     setLoading(true);
     setActionError("");
     try {
