@@ -45,7 +45,8 @@ export default function CardDetail({
       <ul>
         {card.card_sets?.map((set, index) => (
           <li key={`${set.set_code}-${index}`}>
-            {set.set_name} ({set.set_code}) - {set.set_rarity}
+            {set.set_name} ({set.set_code}) - {set.set_rarity} [{set.rarity_code}]
+            <small className="price-query">가격 검색 키: {set.price_query}</small>
           </li>
         ))}
       </ul>

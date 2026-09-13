@@ -314,6 +314,12 @@ body {
 .detail-info p {
   margin: 4px 0;
 }
+.price-query {
+  display: block;
+  color: var(--text);
+  font-size: 12px;
+  margin-top: 2px;
+}
 .card-detail {
   margin-top: 24px;
   padding: 20px;

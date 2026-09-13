@@ -2,6 +2,31 @@ const OFFICIAL_SITE_ORIGIN = "https://www.db.yugioh-card.com";
 
 const normalizeCardName = (name) => name.replace(/\s+/g, "");
 
+const RARITY_CODES = new Map([
+  ["노멀", "N"],
+  ["패러렐 노멀", "P"],
+  ["레어", "R"],
+  ["골드 레어", "GR"],
+  ["밀레니엄 레어", "M"],
+  ["슈퍼 레어", "SR"],
+  ["울트라 레어", "UR"],
+  ["패러렐 울트라 레어", "P+UR"],
+  ["얼티미트 레어", "UL"],
+  ["시크릿 레어", "SE"],
+  ["홀로그래픽 레어", "HR"],
+  ["프리미엄 골드 레어", "PG"],
+  ["엑스트라 시크릿 레어", "EXSE"],
+  ["패러렐 엑스트라 시크릿 레어", "P+ES"],
+  ["프리즈마틱 시크릿 레어", "PSE"],
+  ["쿼터 센추리 시크릿 레어", "QCSE"],
+  ["그랜드마스터 레어", "GMR"],
+]);
+
+const getRarityCode = (rarity) => {
+  const normalized = rarity.replace(/\s+/g, " ").trim();
+  return RARITY_CODES.get(normalized) || normalized;
+};
+
 const readCardText = (root, selector) => {
   const element = root.querySelector(selector);
   if (!element) return null;
@@ -96,11 +121,18 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
     };
   });
   const cardSets = [...document.querySelectorAll(".t_row")]
-    .map((row) => ({
-      set_code: row.querySelector(".card_number")?.textContent.trim(),
-      set_name: row.querySelector(".pack_name")?.textContent.trim(),
-      set_rarity: row.querySelector(".rarity p")?.textContent.trim(),
-    }))
+    .map((row) => {
+      const setCode = row.querySelector(".card_number")?.textContent.trim();
+      const setName = row.querySelector(".pack_name")?.textContent.trim();
+      const setRarity = row.querySelector(".rarity p")?.textContent.trim();
+      return {
+        set_code: setCode,
+        set_name: setName,
+        set_rarity: setRarity,
+        rarity_code: setRarity ? getRarityCode(setRarity) : null,
+        price_query: setCode && setRarity ? `${setCode} ${getRarityCode(setRarity)}` : null,
+      };
+    })
     .filter((set) => set.set_code && set.set_name && set.set_rarity);
   return {
     id: cardId,
