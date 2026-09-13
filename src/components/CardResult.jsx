@@ -42,8 +42,6 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewM
     <article
       className={`card-result card-result-${viewMode}`}
       onClick={() => onOpen(card)}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={resetPointer}
     >
       <div className="card-actions">
         <button
@@ -57,7 +55,7 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewM
           {isFavorite ? "♥" : "♡"}
         </button>
       </div>
-      <div className="card-carousel" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
+      <div className="card-carousel" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onPointerMove={handlePointerMove} onPointerLeave={resetPointer}>
         {images.length > 1 && (
           <button
             type="button"

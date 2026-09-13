@@ -5,30 +5,12 @@ import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
 
-function readStoredCard() {
-  const cardId = new URLSearchParams(window.location.search).get("card");
-  if (!cardId) return null;
-  try {
-    return JSON.parse(localStorage.getItem(`ygo-card-${cardId}`)) || null;
-  } catch {
-    return null;
-  }
-}
-
-function readStoredSearchResults() {
-  try {
-    return JSON.parse(localStorage.getItem("ygo-search-results")) || [];
-  } catch {
-    return [];
-  }
-}
-
 export default function App() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [cards, setCards] = useState(readStoredSearchResults);
+  const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(false);
   const [session, setSession] = useState(null);
-  const [selectedCard, setSelectedCard] = useState(readStoredCard);
+  const [selectedCard, setSelectedCard] = useState(null);
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [favoriteCards, setFavoriteCards] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
@@ -39,6 +21,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("search");
   const [viewModes, setViewModes] = useState({ search: "album", inventory: "album", favorites: "album" });
   const [actionError, setActionError] = useState("");
+
+  useEffect(() => {
+    if (window.location.search) window.history.replaceState({}, "", window.location.pathname);
+  }, []);
 
   useEffect(() => {
     if (!supabase) return undefined;
@@ -87,7 +73,6 @@ export default function App() {
 
   const openCardWindow = (card) => {
     if (!card) return;
-    localStorage.setItem("ygo-search-results", JSON.stringify(cards));
     setSelectedCard(card);
   };
 
@@ -151,7 +136,6 @@ export default function App() {
     try {
       const results = await searchOfficialCards(searchTerm);
       setCards(results);
-      localStorage.setItem("ygo-search-results", JSON.stringify(results));
     } catch (error) {
       setActionError(error.message);
       setCards([]);
