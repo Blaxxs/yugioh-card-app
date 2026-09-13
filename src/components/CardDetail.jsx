@@ -31,8 +31,8 @@ export default function CardDetail({
           </div>
           <div className="detail-thumbnails">
               {card.card_images?.map((image, index) => (
-                <button type="button" key={image.id} className={selectedImageIndex === index ? "selected" : ""} onMouseEnter={() => setSelectedImageIndex(index)} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setSelectedImageIndex(index); }}>
-                  <img loading="lazy" src={image.image_url_small} alt={`${card.name} 일러스트 ${index + 1}`} />
+                <button type="button" key={image.id} className={selectedImageIndex === index ? "selected" : ""} onMouseEnter={() => setSelectedImageIndex(index)} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); setSelectedImageIndex(index); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}>
+                  <img loading="lazy" draggable="false" src={image.image_url_small} alt={`${card.name} 일러스트 ${index + 1}`} />
               </button>
             ))}
           </div>
