@@ -49,6 +49,17 @@ export default function CardDetail({
     });
   };
 
+  const handleMainImageDown = (event) => {
+    if (event.pointerType === "touch") event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleMainImageUp = (event) => {
+    if (event.pointerType === "touch" && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    resetMainImage(event);
+  };
+
   const resetMainImage = (event) => {
     event.currentTarget.style.setProperty("--tilt-x", "0deg");
     event.currentTarget.style.setProperty("--tilt-y", "0deg");
@@ -137,7 +148,14 @@ export default function CardDetail({
       </header>
       <div className="detail-layout">
         <div className="detail-image-viewer">
-          <div className="detail-main-image" onPointerMove={handleMainImageMove} onPointerLeave={resetMainImage}>
+          <div
+            className="detail-main-image"
+            onPointerDown={handleMainImageDown}
+            onPointerMove={handleMainImageMove}
+            onPointerUp={handleMainImageUp}
+            onPointerCancel={handleMainImageUp}
+            onPointerLeave={resetMainImage}
+          >
             {selectedImage && (
               <div
                 className={`detail-card-stage ${
@@ -235,13 +253,14 @@ export default function CardDetail({
                   ["R", "레어"],
                   ["SR", "슈퍼 레어"],
                   ["UR", "울트라 레어"],
+                  ["P+UR", "패러렐 울트라 레어"],
                   ["SE", "시크릿 레어"],
                   ["HR", "홀로그래픽 레어"],
                   ["PG", "프리미엄 골드 레어"],
-                  ["P+UR", "패러렐 울트라 레어"],
-                  ["QCSE", "쿼터 센추리 시크릿 레어"],
-                  ["PSE", "프리즈마틱 시크릿 레어"],
                   ["EXSE", "엑스트라 시크릿 레어"],
+                  ["PSE", "프리즈마틱 시크릿 레어"],
+                  ["QCSE", "쿼터 센추리 시크릿 레어"],
+                  ["GMR", "그랜드마스터 레어"],
                 ].map(([code, name]) => (
                   <span key={code}>
                     <b className={`rarity-chip rarity-${code.toLowerCase().replace("+", "")}`}>{code}</b>

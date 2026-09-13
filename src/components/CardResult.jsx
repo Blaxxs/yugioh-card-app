@@ -23,16 +23,28 @@ export default function CardResult({
 
   const handlePointerDown = (event) => {
     pointerStart.current = event.clientX;
+    if (event.pointerType === "touch") event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handlePointerUp = (event) => {
     if (pointerStart.current === null) return;
     const distance = event.clientX - pointerStart.current;
     pointerStart.current = null;
+    if (event.pointerType === "touch" && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
     if (Math.abs(distance) > 35) {
       event.stopPropagation();
       changeImage(distance < 0 ? "next" : "previous");
     }
+  };
+
+  const handlePointerCancel = (event) => {
+    pointerStart.current = null;
+    if (event.pointerType === "touch" && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    resetPointer(event);
   };
 
   const handlePointerMove = (event) => {
@@ -81,6 +93,7 @@ export default function CardResult({
         className="card-carousel"
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         onPointerMove={handlePointerMove}
         onPointerLeave={resetPointer}
       >
