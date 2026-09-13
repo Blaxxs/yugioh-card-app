@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-export default function CardDetail({ 
+export default function CardDetail({
   card,
   session,
   inventory,
@@ -144,7 +144,30 @@ export default function CardDetail({
               </tbody>
             </table>
           </div>
-          <details className="rarity-guide"><summary>레어도 안내</summary><div className="rarity-guide-grid">{[["N","노멀"],["P","패러렐 노멀"],["R","레어"],["SR","슈퍼 레어"],["UR","울트라 레어"],["SE","시크릿 레어"],["HR","홀로그래픽 레어"],["PG","프리미엄 골드 레어"],["P+UR","패러렐 울트라 레어"],["QCSE","쿼터 센추리 시크릿 레어"],["PSE","프리즈마틱 시크릿 레어"],["EXSE","엑스트라 시크릿 레어"]].map(([code, name]) => <span key={code}><b className={`rarity-chip rarity-${code.toLowerCase().replace("+", "")}`}>{code}</b>{name}</span>)}</div></details>
+          <details className="rarity-guide">
+            <summary>레어도 안내</summary>
+            <div className="rarity-guide-grid">
+              {[
+                ["N", "노멀"],
+                ["P", "패러렐 노멀"],
+                ["R", "레어"],
+                ["SR", "슈퍼 레어"],
+                ["UR", "울트라 레어"],
+                ["SE", "시크릿 레어"],
+                ["HR", "홀로그래픽 레어"],
+                ["PG", "프리미엄 골드 레어"],
+                ["P+UR", "패러렐 울트라 레어"],
+                ["QCSE", "쿼터 센추리 시크릿 레어"],
+                ["PSE", "프리즈마틱 시크릿 레어"],
+                ["EXSE", "엑스트라 시크릿 레어"],
+              ].map(([code, name]) => (
+                <span key={code}>
+                  <b className={`rarity-chip rarity-${code.toLowerCase().replace("+", "")}`}>{code}</b>
+                  {name}
+                </span>
+              ))}
+            </div>
+          </details>
         </div>
       </div>
       <h3>내 재고</h3>
@@ -156,14 +179,15 @@ export default function CardDetail({
             <strong>보유 수량:</strong> {inventory?.quantity || 0}
           </p>
           <label>
-              상태<select value={condition} onChange={(event) => onConditionChange(event.target.value)}>
-                <option>미등록</option>
-                <option>S급 - 신품급</option>
-                <option>S-급 - 미품급</option>
-                <option>A급 - 상태 좋음</option>
-                <option>A-급 - 상태 보통</option>
-                <option>B급 - 상태 나쁨</option>
-              </select>
+            상태
+            <select value={condition} onChange={(event) => onConditionChange(event.target.value)}>
+              <option>미등록</option>
+              <option>S급 - 신품급</option>
+              <option>S-급 - 미품급</option>
+              <option>A급 - 상태 좋음</option>
+              <option>A-급 - 상태 보통</option>
+              <option>B급 - 상태 나쁨</option>
+            </select>
           </label>
           <label>
             매입가
@@ -175,16 +199,32 @@ export default function CardDetail({
               onChange={(event) => onPurchasePriceChange(event.target.value)}
             />
           </label>
-            <p><strong>등록일:</strong> {inventory?.created_at ? new Date(inventory.created_at).toLocaleString("ko-KR") : "미등록"}</p>
-            <h4>거래 이력</h4>
-            <div className="transaction-list">
-              {inventoryTransactions.length ? inventoryTransactions.map((transaction) => (
+          <p>
+            <strong>등록일:</strong>{" "}
+            {inventory?.created_at ? new Date(inventory.created_at).toLocaleString("ko-KR") : "미등록"}
+          </p>
+          <p className="inventory-help">+1/-1은 수량과 거래 이력을 자동 저장합니다. 상태·매입가만 바꿀 때는 아래 저장 버튼을 사용하세요.</p>
+          <h4>거래 이력</h4>
+          <div className="transaction-list">
+            {inventoryTransactions.length ? (
+              inventoryTransactions.map((transaction) => (
                 <div className="transaction-row" key={transaction.id}>
-                  <span>{transaction.type === "purchase" ? "매입" : "매출"} · {new Date(transaction.occurred_at).toLocaleString("ko-KR")} · {transaction.quantity}장 · {transaction.unit_price ?? "-"}원</span>
-                  {transaction.canceled_at ? <em>취소됨</em> : <button onClick={() => onCancelTransaction(transaction)}>거래 취소</button>}
+                  <span>
+                    {transaction.type === "purchase" ? "매입" : "매출"} ·{" "}
+                    {new Date(transaction.occurred_at).toLocaleString("ko-KR")} · {transaction.quantity}장 ·{" "}
+                    {transaction.unit_price ?? "-"}원
+                  </span>
+                  {transaction.canceled_at ? (
+                    <em>취소됨</em>
+                  ) : (
+                    <button onClick={() => onCancelTransaction(transaction)}>거래 취소</button>
+                  )}
                 </div>
-              )) : <p>거래 이력이 없습니다.</p>}
-            </div>
+              ))
+            ) : (
+              <p>거래 이력이 없습니다.</p>
+            )}
+          </div>
           <div>
             <button onClick={() => onInventory(-1)} disabled={inventoryBusy || !inventory?.quantity}>
               -1 재고 차감
@@ -193,7 +233,7 @@ export default function CardDetail({
               +1 재고 추가
             </button>
             <button onClick={() => onInventory(0)} disabled={inventoryBusy}>
-              정보 저장
+              상태·매입가 저장
             </button>
           </div>
         </div>
