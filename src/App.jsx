@@ -39,8 +39,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("search");
   const [viewModes, setViewModes] = useState({ search: "album", inventory: "album", favorites: "album" });
   const [actionError, setActionError] = useState("");
-  const [priceResults, setPriceResults] = useState({});
-  const [priceLoading, setPriceLoading] = useState(false);
 
   useEffect(() => {
     if (!supabase) return undefined;
@@ -89,9 +87,8 @@ export default function App() {
 
   const openCardWindow = (card) => {
     if (!card) return;
-    localStorage.setItem(`ygo-card-${card.cardId}`, JSON.stringify(card));
     localStorage.setItem("ygo-search-results", JSON.stringify(cards));
-    window.open(`${window.location.origin}/?card=${encodeURIComponent(card.cardId)}`, "_blank", "noopener,noreferrer");
+    setSelectedCard(card);
   };
 
   const toggleFavorite = async (card) => {
@@ -163,21 +160,6 @@ export default function App() {
     }
   };
 
-  const searchNaverPrice = async (card, set) => {
-    const query = set.price_queries?.[0] || `${card.name} ${set.set_code} ${set.rarity_code || set.set_rarity}`;
-    setPriceLoading(true);
-    setActionError("");
-    try {
-      const response = await fetch(`/api/naver-shopping?query=${encodeURIComponent(query)}`);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "네이버 가격 조회에 실패했습니다.");
-      setPriceResults((current) => ({ ...current, [`${set.set_code}-${set.rarity_code}`]: { query, ...data } }));
-    } catch (error) {
-      setActionError(error.message);
-    } finally {
-      setPriceLoading(false);
-    }
-  };
 
   return (
     <main className="app-shell">
@@ -221,7 +203,7 @@ export default function App() {
           {actionError}
         </p>
       )}
-      {activeTab === "search" && (
+      {activeTab === "search" && !selectedCard && (
         <>
           <div className="results-toolbar">
             <strong>검색 결과 {cards.length}개</strong>
@@ -278,9 +260,6 @@ export default function App() {
           onConditionChange={setCondition}
           onPurchasePriceChange={setPurchasePrice}
           onInventory={saveInventory}
-          priceResults={priceResults}
-          priceLoading={priceLoading}
-          onSearchPrice={searchNaverPrice}
         />
       )}
     </main>

@@ -23,8 +23,14 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewM
     if (Math.abs(distance) > 35) changeImage(distance < 0 ? "next" : "previous");
   };
 
+  const handlePointerMove = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.style.setProperty("--pointer-x", `${((event.clientX - rect.left) / rect.width) * 100}%`);
+    event.currentTarget.style.setProperty("--pointer-y", `${((event.clientY - rect.top) / rect.height) * 100}%`);
+  };
+
   return (
-    <article className={`card-result card-result-${viewMode}`} onClick={() => onOpen(card)}>
+    <article className={`card-result card-result-${viewMode}`} onClick={() => onOpen(card)} onPointerMove={handlePointerMove}>
       <div className="card-actions">
         <button
           className={`heart-button ${isFavorite ? "is-favorite" : ""}`}
