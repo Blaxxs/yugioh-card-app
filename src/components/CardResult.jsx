@@ -25,12 +25,26 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewM
 
   const handlePointerMove = (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    event.currentTarget.style.setProperty("--pointer-x", `${((event.clientX - rect.left) / rect.width) * 100}%`);
-    event.currentTarget.style.setProperty("--pointer-y", `${((event.clientY - rect.top) / rect.height) * 100}%`);
+    const pointerX = (event.clientX - rect.left) / rect.width;
+    const pointerY = (event.clientY - rect.top) / rect.height;
+    event.currentTarget.style.setProperty("--pointer-x", `${pointerX * 100}%`);
+    event.currentTarget.style.setProperty("--pointer-y", `${pointerY * 100}%`);
+    event.currentTarget.style.setProperty("--tilt-x", `${(0.5 - pointerY) * 12}deg`);
+    event.currentTarget.style.setProperty("--tilt-y", `${(pointerX - 0.5) * 16}deg`);
+  };
+
+  const resetPointer = (event) => {
+    event.currentTarget.style.setProperty("--tilt-x", "0deg");
+    event.currentTarget.style.setProperty("--tilt-y", "0deg");
   };
 
   return (
-    <article className={`card-result card-result-${viewMode}`} onClick={() => onOpen(card)} onPointerMove={handlePointerMove}>
+    <article
+      className={`card-result card-result-${viewMode}`}
+      onClick={() => onOpen(card)}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={resetPointer}
+    >
       <div className="card-actions">
         <button
           className={`heart-button ${isFavorite ? "is-favorite" : ""}`}

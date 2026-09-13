@@ -139,6 +139,8 @@ body {
   cursor: pointer;
   background: linear-gradient(145deg, rgba(26, 31, 48, 0.92), rgba(11, 14, 25, 0.96));
   overflow: hidden;
+  transform: perspective(700px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-style: preserve-3d;
   transition:
     transform 160ms ease,
     box-shadow 160ms ease;
@@ -149,13 +151,19 @@ body {
   inset: 0;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 50%), rgba(255,255,255,.32), transparent 24%), linear-gradient(115deg, transparent 25%, rgba(104,218,255,.18) 42%, rgba(255,93,190,.18) 55%, transparent 72%);
+  background:
+    linear-gradient(105deg, transparent 40%, rgba(255, 219, 112, 0.72) 45%, rgba(104, 218, 255, 0.28) 50%, rgba(255, 93, 190, 0.34) 54%, transparent 60%),
+    radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 50%), rgba(255, 255, 255, 0.32), transparent 24%);
   mix-blend-mode: screen;
+  background-size: 180% 180%, 100% 100%;
+  background-position: calc(var(--pointer-x, 50%) / 2 + var(--pointer-y, 50%) / 2) var(--pointer-y, 50%), center;
   transition: opacity 180ms ease;
 }
-.card-result:hover::after { opacity: 1; }
+.card-result:hover::after {
+  opacity: 1;
+}
 .card-result:hover {
-  transform: translateY(-3px);
+  transform: perspective(700px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateY(-3px);
   box-shadow: var(--shadow);
 }
 .view-expanded {
@@ -175,8 +183,13 @@ body {
   grid-row: span 2;
   min-height: 190px;
 }
-.card-result-list .carousel-image { max-height: 250px; object-fit: contain; }
-.card-result-list .card-summary { min-width: 0; }
+.card-result-list .carousel-image {
+  max-height: 250px;
+  object-fit: contain;
+}
+.card-result-list .card-summary {
+  min-width: 0;
+}
 .card-result-list .card-summary {
   margin: 0;
 }
@@ -310,7 +323,9 @@ body {
   .detail-images img {
     max-height: 220px;
   }
-  .detail-layout { grid-template-columns: 1fr; }
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
   .results-toolbar {
     align-items: flex-start;
     gap: 8px;
@@ -324,7 +339,7 @@ body {
   text-align: left;
   margin: 10px 0;
   padding: 10px;
-  background: rgba(255,255,255,.06);
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 4px;
 }
 .card-summary p,
@@ -373,15 +388,27 @@ body {
   margin-top: 24px;
   padding: 20px;
   border: 1px solid var(--border);
-  background: rgba(20,25,40,.96);
-  box-shadow: 0 24px 80px rgba(0,0,0,.35);
+  background: rgba(20, 25, 40, 0.96);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
   border-radius: 8px;
   text-align: left;
 }
-.detail-layout { display: grid; grid-template-columns: minmax(0, 280px) minmax(0, 1fr); gap: 24px; }
-.detail-images { max-height: 330px; }
-.detail-images img { max-height: 270px; }
-.eyebrow { color: #66e3ff; font-size: 11px; letter-spacing: .16em; }
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+  gap: 24px;
+}
+.detail-images {
+  max-height: 330px;
+}
+.detail-images img {
+  max-height: 270px;
+}
+.eyebrow {
+  color: #66e3ff;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+}
 .card-detail > header {
   display: flex;
   justify-content: space-between;
