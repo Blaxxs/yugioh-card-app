@@ -51,23 +51,22 @@ export default function ManagementTabs({
           onClick={() => onTabChange("inventory")}
           disabled={!session}
         >
-          내 재고 ({inventoryItems.length})
+          재고 ({inventoryItems.length})
         </button>
         <button
           className={activeTab === "favorites" ? "active" : ""}
           onClick={() => onTabChange("favorites")}
           disabled={!session}
         >
-          찜 관리 ({favoriteCards.length})
+          찜 ({favoriteCards.length})
         </button>
       </nav>
       {activeTab !== "search" && session && (
         <section className="management-panel">
           <div className="management-heading">
-            <h2>{activeTab === "inventory" ? "내 재고 관리" : "찜 관리"}</h2>
             <ViewFilters value={viewMode} onChange={onViewModeChange} />
           </div>
-          <div className={`card-grid view-${viewMode}`}>
+          <div className={`card-grid management-results view-${viewMode}`}>
             {cards.length ? (
               cards.map((card) => (
                 <CardResult
@@ -77,6 +76,7 @@ export default function ManagementTabs({
                   onFavorite={onFavorite}
                   onOpen={onOpenCard}
                   viewMode={viewMode}
+                  showCardName={false}
                 />
               ))
             ) : (

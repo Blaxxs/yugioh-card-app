@@ -319,7 +319,7 @@ export default function App() {
               </button>
             </div>
           </div>
-          <section className={`card-grid view-${viewModes.search}`}>
+          <section className={`card-grid search-results view-${viewModes.search}`}>
             {cards.map((card) => (
               <CardResult
                 key={card.id}
@@ -327,6 +327,7 @@ export default function App() {
                 onOpen={openCardWindow}
                 viewMode={viewModes.search}
                 showFavorite={false}
+                showCardName={false}
               />
             ))}
           </section>

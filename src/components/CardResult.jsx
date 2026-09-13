@@ -1,6 +1,14 @@
 import { useRef, useState } from "react";
 
-export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewMode, showFavorite = true }) {
+export default function CardResult({
+  card,
+  isFavorite,
+  onFavorite,
+  onOpen,
+  viewMode,
+  showFavorite = true,
+  showCardName = true,
+}) {
   const [imageIndex, setImageIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState("next");
   const [nameCopied, setNameCopied] = useState(false);
@@ -117,18 +125,20 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewM
           </span>
         )}
       </div>
-      <h3
-        className="card-name-copy"
-        role="button"
-        tabIndex="0"
-        onClick={copyCardName}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") copyCardName(event);
-        }}
-        title="카드 이름 복사"
-      >
-        {nameCopied ? "복사됨" : card.koreanData.cardName}
-      </h3>
+      {showCardName && (
+        <h3
+          className="card-name-copy"
+          role="button"
+          tabIndex="0"
+          onClick={copyCardName}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") copyCardName(event);
+          }}
+          title="카드 이름 복사"
+        >
+          {nameCopied ? "복사됨" : card.koreanData.cardName}
+        </h3>
+      )}
       <div className="card-summary">
         <p>
           <strong>종류:</strong> {card.koreanData.cardOther || "-"}
