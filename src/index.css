@@ -23,6 +23,11 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
+#root {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
 .detail-images {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 180px));
@@ -402,6 +407,9 @@
   width: 100%;
   border-radius: 4px;
   backface-visibility: hidden;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
 .carousel-image.slide-next {
   animation: carousel-next 280ms ease both;
@@ -788,6 +796,9 @@
   max-height: 520px;
   object-fit: contain;
   border-radius: 6px;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
 .detail-card-art {
   display: block;
@@ -1176,11 +1187,13 @@ code {
     width: 100%;
     max-width: 100%;
     overflow-x: hidden;
+    overscroll-behavior-x: none;
   }
   .app-shell {
     width: 100%;
-    max-width: 100%;
+    max-width: 100vw;
     box-sizing: border-box;
+    overflow-x: clip;
     padding: 12px 10px 24px;
   }
   .search-bar {

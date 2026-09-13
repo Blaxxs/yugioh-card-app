@@ -113,6 +113,7 @@ export default function CardResult({
       )}
       <div
         className="card-carousel"
+        onContextMenu={(event) => event.preventDefault()}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}

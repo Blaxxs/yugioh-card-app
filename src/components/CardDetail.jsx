@@ -168,6 +168,7 @@ export default function CardDetail({
         <div className="detail-image-viewer">
           <div
             className="detail-main-image"
+            onContextMenu={(event) => event.preventDefault()}
             onPointerDown={handleMainImageDown}
             onPointerMove={handleMainImageMove}
             onPointerUp={handleMainImageUp}
@@ -193,7 +194,12 @@ export default function CardDetail({
                     <span className="gmr-noise-layer gmr-noise-layer-b" />
                   </>
                 )}
-                <img className="detail-card-art" src={selectedImage.image_url_small} alt={`${card.name} 대표 이미지`} />
+                <img
+                  className="detail-card-art"
+                  src={selectedImage.image_url_small}
+                  alt={`${card.name} 대표 이미지`}
+                  draggable="false"
+                />
                 {selectedImage.isGmrComposite && (
                   <img className="detail-card-frame" src="/gmr-frame.png" alt="" aria-hidden="true" />
                 )}
