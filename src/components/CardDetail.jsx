@@ -16,6 +16,7 @@ export default function CardDetail({
   onUpdateTransaction,
 }) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [copiedCode, setCopiedCode] = useState("");
   const pendingImageIndex = useRef(null);
   const frameRequest = useRef(null);
   const selectedImage = card.card_images?.[selectedImageIndex] || card.card_images?.[0];
@@ -43,6 +44,16 @@ export default function CardDetail({
       pendingImageIndex.current = null;
       frameRequest.current = null;
     });
+  };
+
+  const copyCode = async (code, rowKey) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(rowKey);
+      window.setTimeout(() => setCopiedCode(""), 1400);
+    } catch {
+      setCopiedCode("");
+    }
   };
 
   useEffect(() => {
@@ -116,7 +127,7 @@ export default function CardDetail({
               {card.koreanData.cardText || "-"}
             </p>
           </div>
-          <h3>수록 팩과 레어도</h3>
+          <div className="section-heading"><h3>수록 팩과 레어도</h3><details className="rarity-guide"><summary>레어도</summary><div className="rarity-guide-grid">{[["N","노멀"],["P","패러렐 노멀"],["R","레어"],["SR","슈퍼 레어"],["UR","울트라 레어"],["SE","시크릿 레어"],["HR","홀로그래픽 레어"],["PG","프리미엄 골드 레어"],["P+UR","패러렐 울트라 레어"],["QCSE","쿼터 센추리 시크릿 레어"],["PSE","프리즈마틱 시크릿 레어"],["EXSE","엑스트라 시크릿 레어"]].map(([code, name]) => <span key={code}><b className={`rarity-chip rarity-${code.toLowerCase().replace("+", "")}`}>{code}</b>{name}</span>)}</div></details></div>
           <div className="set-table-wrap">
             <table className="set-table">
               <thead>
@@ -129,9 +140,9 @@ export default function CardDetail({
               </thead>
               <tbody>
                 {card.card_sets?.map((set, index) => (
-                  <tr key={`${set.set_code}-${index}`}>
+                  <tr key={`${set.set_code}-${index}`} className="set-row-copy" tabIndex="0" onClick={() => copyCode(set.set_code, `${set.set_code}-${index}`)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") copyCode(set.set_code, `${set.set_code}-${index}`); }}>
                     <td>{set.set_date || "-"}</td>
-                    <td className="set-code">{set.set_code}</td>
+                    <td className="set-code">{copiedCode === `${set.set_code}-${index}` ? "복사됨" : set.set_code}</td>
                     <td>{set.set_name}</td>
                     <td>
                       <span
@@ -145,30 +156,6 @@ export default function CardDetail({
               </tbody>
             </table>
           </div>
-          <details className="rarity-guide">
-            <summary>레어도 안내</summary>
-            <div className="rarity-guide-grid">
-              {[
-                ["N", "노멀"],
-                ["P", "패러렐 노멀"],
-                ["R", "레어"],
-                ["SR", "슈퍼 레어"],
-                ["UR", "울트라 레어"],
-                ["SE", "시크릿 레어"],
-                ["HR", "홀로그래픽 레어"],
-                ["PG", "프리미엄 골드 레어"],
-                ["P+UR", "패러렐 울트라 레어"],
-                ["QCSE", "쿼터 센추리 시크릿 레어"],
-                ["PSE", "프리즈마틱 시크릿 레어"],
-                ["EXSE", "엑스트라 시크릿 레어"],
-              ].map(([code, name]) => (
-                <span key={code}>
-                  <b className={`rarity-chip rarity-${code.toLowerCase().replace("+", "")}`}>{code}</b>
-                  {name}
-                </span>
-              ))}
-            </div>
-          </details>
         </div>
       </div>
       <h3>내 재고</h3>

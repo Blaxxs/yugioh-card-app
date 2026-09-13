@@ -245,6 +245,8 @@ body {
 .set-table tbody tr:hover {
   background: rgba(102, 227, 255, 0.08);
 }
+.set-row-copy { cursor: copy; }
+.set-row-copy:focus { outline: 2px solid #66e3ff; outline-offset: -2px; }
 .set-table td:first-child {
   color: var(--text);
   white-space: nowrap;
@@ -279,7 +281,7 @@ body {
 .rarity-qcse,
 .rarity-pse { background: #c43f4c; }
 .rarity-exse { background: #c43f4c; }
-.rarity-qcse::before { content: "25"; position: absolute; inset: 1px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.7); border-radius: 50%; font-size: 8px; font-weight: 900; }
+.rarity-qcse::before { content: "25th"; position: absolute; inset: 1px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.7); border-radius: 50%; font-size: 7px; font-weight: 900; letter-spacing: -.04em; }
 .rarity-qcse::after,
 .rarity-pse::after { content: ""; position: absolute; inset: -25%; background: linear-gradient(90deg, transparent 43%, rgba(255,255,255,.95) 49%, transparent 55%), linear-gradient(0deg, transparent 43%, rgba(255,255,255,.8) 49%, transparent 55%); animation: rarity-cross-shine 1.8s linear infinite; }
 .rarity-exse::after { content: ""; position: absolute; inset: -40%; background: linear-gradient(135deg, transparent 43%, rgba(255,255,255,.95) 49%, transparent 55%); animation: rarity-diagonal-shine 1.6s linear infinite; }
@@ -638,15 +640,37 @@ body {
 .transaction-controls input { width: 84px; padding: 4px 6px; }
 .inventory-help { color: var(--text); font-size: 12px; margin: 2px 0 8px; }
 .rarity-guide {
-  margin: 12px 0 20px;
+  position: relative;
+  margin: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 0;
+  border: 0;
 }
 .rarity-guide summary {
   cursor: pointer;
   color: #66e3ff;
   font-weight: 700;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.rarity-guide summary::-webkit-details-marker { display: none; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.section-heading h3 { margin: 0; }
+.rarity-guide[open] { z-index: 4; }
+.rarity-guide[open] .rarity-guide-grid {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: min(360px, 80vw);
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #111827;
+  box-shadow: 0 16px 40px rgba(0,0,0,.35);
 }
 .rarity-guide-grid {
   display: grid;
