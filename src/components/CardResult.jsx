@@ -13,6 +13,8 @@ export default function CardResult({
   const [slideDirection, setSlideDirection] = useState("next");
   const [nameCopied, setNameCopied] = useState(false);
   const pointerStart = useRef(null);
+  const touchStartY = useRef(null);
+  const touchGesture = useRef("idle");
   const images = card.card_images || [];
 
   const changeImage = (direction) => {
@@ -23,31 +25,25 @@ export default function CardResult({
 
   const handlePointerDown = (event) => {
     pointerStart.current = event.clientX;
-    if (event.pointerType === "touch") event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handlePointerUp = (event) => {
-    if (pointerStart.current === null) return;
-    const distance = event.clientX - pointerStart.current;
-    pointerStart.current = null;
-    if (event.pointerType === "touch" && event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.pointerType === "touch") {
+      touchStartY.current = event.clientY;
+      touchGesture.current = "pending";
     }
-    if (Math.abs(distance) > 35) {
-      event.stopPropagation();
-      changeImage(distance < 0 ? "next" : "previous");
-    }
-  };
-
-  const handlePointerCancel = (event) => {
-    pointerStart.current = null;
-    if (event.pointerType === "touch" && event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    resetPointer(event);
   };
 
   const handlePointerMove = (event) => {
+    if (event.pointerType === "touch" && pointerStart.current !== null) {
+      const deltaX = event.clientX - pointerStart.current;
+      const deltaY = event.clientY - (touchStartY.current ?? event.clientY);
+      if (touchGesture.current === "pending" && Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 8) {
+        touchGesture.current = Math.abs(deltaY) > Math.abs(deltaX) * 1.15 ? "scroll" : "tilt";
+        if (touchGesture.current === "tilt") event.currentTarget.setPointerCapture(event.pointerId);
+      }
+      if (touchGesture.current === "scroll") {
+        resetPointer(event);
+        return;
+      }
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     const pointerX = (event.clientX - rect.left) / rect.width;
     const pointerY = (event.clientY - rect.top) / rect.height;
@@ -55,6 +51,32 @@ export default function CardResult({
     event.currentTarget.style.setProperty("--pointer-y", `${pointerY * 100}%`);
     event.currentTarget.style.setProperty("--tilt-x", `${(0.5 - pointerY) * 12}deg`);
     event.currentTarget.style.setProperty("--tilt-y", `${(pointerX - 0.5) * 16}deg`);
+  };
+
+  const handlePointerUp = (event) => {
+    if (pointerStart.current === null) return;
+    const distance = event.clientX - pointerStart.current;
+    const gesture = touchGesture.current;
+    pointerStart.current = null;
+    touchStartY.current = null;
+    touchGesture.current = "idle";
+    if (event.pointerType === "touch" && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (gesture !== "scroll" && Math.abs(distance) > 35) {
+      event.stopPropagation();
+      changeImage(distance < 0 ? "next" : "previous");
+    }
+  };
+
+  const handlePointerCancel = (event) => {
+    pointerStart.current = null;
+    touchStartY.current = null;
+    touchGesture.current = "idle";
+    if (event.pointerType === "touch" && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    resetPointer(event);
   };
 
   const resetPointer = (event) => {

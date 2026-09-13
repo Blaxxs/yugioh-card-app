@@ -5,10 +5,7 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [react()],
   server: {
-    watch: {
-      usePolling: true,
-      interval: 300,
-    },
+    watch: { usePolling: true, interval: 300 },
     proxy: {
       "/official-ygo": {
         target: "https://www.db.yugioh-card.com",

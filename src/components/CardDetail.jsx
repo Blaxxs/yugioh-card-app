@@ -21,15 +21,27 @@ export default function CardDetail({
   const frameRequest = useRef(null);
   const pointerFrameRequest = useRef(null);
   const pointerPosition = useRef(null);
+  const touchStart = useRef(null);
+  const touchGesture = useRef("idle");
   const hasGmr = card.card_sets?.some((set) => set.rarity_code === "GMR");
   const gmrBaseImage = card.card_images?.[card.card_images.length - 1];
   const sourceImages = card.card_images || [];
-  const detailImages = hasGmr && gmrBaseImage
-    ? [...sourceImages, { ...gmrBaseImage, id: `${gmrBaseImage.id}-gmr`, isGmrComposite: true }]
-    : sourceImages;
+  const detailImages =
+    hasGmr && gmrBaseImage
+      ? [...sourceImages, { ...gmrBaseImage, id: `${gmrBaseImage.id}-gmr`, isGmrComposite: true }]
+      : sourceImages;
   const selectedImage = detailImages[selectedImageIndex] || detailImages[0];
 
   const handleMainImageMove = (event) => {
+    if (event.pointerType === "touch" && touchStart.current) {
+      const deltaX = event.clientX - touchStart.current.x;
+      const deltaY = event.clientY - touchStart.current.y;
+      if (touchGesture.current === "pending" && Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 8) {
+        touchGesture.current = Math.abs(deltaY) > Math.abs(deltaX) * 1.15 ? "scroll" : "tilt";
+        if (touchGesture.current === "tilt") event.currentTarget.setPointerCapture(event.pointerId);
+      }
+      if (touchGesture.current === "scroll") return;
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     pointerPosition.current = {
       x: (event.clientX - rect.left) / rect.width,
@@ -50,13 +62,18 @@ export default function CardDetail({
   };
 
   const handleMainImageDown = (event) => {
-    if (event.pointerType === "touch") event.currentTarget.setPointerCapture(event.pointerId);
+    if (event.pointerType === "touch") {
+      touchStart.current = { x: event.clientX, y: event.clientY };
+      touchGesture.current = "pending";
+    }
   };
 
   const handleMainImageUp = (event) => {
     if (event.pointerType === "touch" && event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    touchStart.current = null;
+    touchGesture.current = "idle";
     resetMainImage(event);
   };
 
@@ -112,9 +129,10 @@ export default function CardDetail({
       preload.src = image.image_url_small;
       return preload;
     });
-    return () => preloadedImages?.forEach((image) => {
-      image.src = "";
-    });
+    return () =>
+      preloadedImages?.forEach((image) => {
+        image.src = "";
+      });
   }, [card.card_images]);
 
   return (
@@ -157,13 +175,7 @@ export default function CardDetail({
             onPointerLeave={resetMainImage}
           >
             {selectedImage && (
-              <div
-                className={`detail-card-stage ${
-                  selectedImage.isGmrComposite
-                    ? "detail-card-stage-gmr"
-                    : ""
-                }`}
-              >
+              <div className={`detail-card-stage ${selectedImage.isGmrComposite ? "detail-card-stage-gmr" : ""}`}>
                 {selectedImage.isGmrComposite && (
                   <>
                     <svg className="gmr-filter-defs" aria-hidden="true" focusable="false">
@@ -181,11 +193,7 @@ export default function CardDetail({
                     <span className="gmr-noise-layer gmr-noise-layer-b" />
                   </>
                 )}
-                <img
-                  className="detail-card-art"
-                  src={selectedImage.image_url_small}
-                  alt={`${card.name} 대표 이미지`}
-                />
+                <img className="detail-card-art" src={selectedImage.image_url_small} alt={`${card.name} 대표 이미지`} />
                 {selectedImage.isGmrComposite && (
                   <img className="detail-card-frame" src="/gmr-frame.png" alt="" aria-hidden="true" />
                 )}
@@ -209,7 +217,11 @@ export default function CardDetail({
                   decoding="async"
                   draggable="false"
                   src={image.image_url_small}
-                  alt={image.isGmrComposite ? `${card.name} 그랜드마스터 레어 일러스트` : `${card.name} 일러스트 ${index + 1}`}
+                  alt={
+                    image.isGmrComposite
+                      ? `${card.name} 그랜드마스터 레어 일러스트`
+                      : `${card.name} 일러스트 ${index + 1}`
+                  }
                 />
               </button>
             ))}

@@ -182,8 +182,7 @@
   background: #c43f4c;
 }
 .rarity-gmr {
-  background:
-    linear-gradient(135deg, #17130e 0%, #594522 48%, #17130e 100%);
+  background: linear-gradient(135deg, #17130e 0%, #594522 48%, #17130e 100%);
   color: #f5d986;
   border: 1px solid #b99548;
   box-shadow:
@@ -198,10 +197,14 @@
   inset: 1px;
   border: 1px solid rgba(236, 204, 115, 0.8);
   background:
-    repeating-linear-gradient(90deg, transparent 0 3px, rgba(236, 204, 115, 0.72) 3px 4px, transparent 4px 7px) top / 100% 2px no-repeat,
-    repeating-linear-gradient(90deg, transparent 0 3px, rgba(236, 204, 115, 0.72) 3px 4px, transparent 4px 7px) bottom / 100% 2px no-repeat,
-    repeating-linear-gradient(0deg, transparent 0 3px, rgba(236, 204, 115, 0.72) 3px 4px, transparent 4px 7px) left / 2px 100% no-repeat,
-    repeating-linear-gradient(0deg, transparent 0 3px, rgba(236, 204, 115, 0.72) 3px 4px, transparent 4px 7px) right / 2px 100% no-repeat;
+    repeating-linear-gradient(90deg, transparent 0 3px, rgba(236, 204, 115, 0.72) 3px 4px, transparent 4px 7px) top /
+      100% 2px no-repeat,
+    repeating-linear-gradient(90deg, transparent 0 3px, rgba(236, 204, 115, 0.72) 3px 4px, transparent 4px 7px) bottom /
+      100% 2px no-repeat,
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(236, 204, 115, 0.72) 3px 4px, transparent 4px 7px) left /
+      2px 100% no-repeat,
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(236, 204, 115, 0.72) 3px 4px, transparent 4px 7px) right /
+      2px 100% no-repeat;
   pointer-events: none;
 }
 .rarity-gmr::after {
@@ -211,7 +214,9 @@
   background:
     linear-gradient(90deg, transparent 42%, rgba(255, 239, 170, 0.85) 49%, transparent 56%),
     linear-gradient(0deg, transparent 38%, rgba(236, 204, 115, 0.7) 49%, transparent 60%);
-  background-size: 180% 100%, 100% 180%;
+  background-size:
+    180% 100%,
+    100% 180%;
   animation: rarity-gmr-cross 2.8s ease-in-out infinite;
   pointer-events: none;
 }
@@ -247,7 +252,9 @@
   background:
     linear-gradient(90deg, transparent 42%, rgba(255, 255, 255, 0.85) 49%, transparent 56%),
     linear-gradient(0deg, transparent 38%, rgba(255, 235, 166, 0.75) 49%, transparent 60%);
-  background-size: 180% 100%, 100% 180%;
+  background-size:
+    180% 100%,
+    100% 180%;
   animation: rarity-qcse-cross 2.4s ease-in-out infinite;
   pointer-events: none;
 }
@@ -283,21 +290,55 @@
 }
 @keyframes rarity-qcse-cross {
   0%,
-  35% { background-position: -80% 0, 0 80%; }
+  35% {
+    background-position:
+      -80% 0,
+      0 80%;
+  }
   70%,
-  100% { background-position: 80% 0, 0 -80%; }
+  100% {
+    background-position:
+      80% 0,
+      0 -80%;
+  }
 }
 @keyframes rarity-gmr-cross {
   0%,
-  35% { background-position: -80% 0, 0 80%; }
+  35% {
+    background-position:
+      -80% 0,
+      0 80%;
+  }
   70%,
-  100% { background-position: 80% 0, 0 -80%; }
+  100% {
+    background-position:
+      80% 0,
+      0 -80%;
+  }
 }
 @keyframes detail-sparkle-drift {
   0%,
-  25% { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, -90% 0, 0 90%; }
+  25% {
+    background-position:
+      0 0,
+      0 0,
+      0 0,
+      0 0,
+      0 0,
+      -90% 0,
+      0 90%;
+  }
   60%,
-  100% { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 90% 0, 0 -90%; }
+  100% {
+    background-position:
+      0 0,
+      0 0,
+      0 0,
+      0 0,
+      0 0,
+      90% 0,
+      0 -90%;
+  }
 }
 @keyframes rarity-diagonal-shine {
   from {
@@ -613,8 +654,12 @@
       rgba(255, 93, 190, 0.18) 54%,
       transparent 60%
     );
-  background-size: 100% 100%, 180% 180%;
-  background-position: center, var(--pointer-x, 50%) var(--pointer-y, 50%);
+  background-size:
+    100% 100%,
+    180% 180%;
+  background-position:
+    center,
+    var(--pointer-x, 50%) var(--pointer-y, 50%);
   mix-blend-mode: screen;
 }
 .gmr-filter-defs {
@@ -632,8 +677,18 @@
   filter: url("#gmr-turbulence-filter");
   mix-blend-mode: overlay;
   opacity: 0.035;
-  -webkit-mask-image: radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 50%), #000 0 10%, rgba(0, 0, 0, 0.7) 28%, transparent 74%);
-  mask-image: radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 50%), #000 0 10%, rgba(0, 0, 0, 0.7) 28%, transparent 74%);
+  -webkit-mask-image: radial-gradient(
+    circle at var(--pointer-x, 50%) var(--pointer-y, 50%),
+    #000 0 10%,
+    rgba(0, 0, 0, 0.7) 28%,
+    transparent 74%
+  );
+  mask-image: radial-gradient(
+    circle at var(--pointer-x, 50%) var(--pointer-y, 50%),
+    #000 0 10%,
+    rgba(0, 0, 0, 0.7) 28%,
+    transparent 74%
+  );
   pointer-events: none;
 }
 .gmr-noise-layer-a {
@@ -690,17 +745,41 @@
       rgba(0, 255, 200, 0.16) calc(100% - var(--pointer-y, 50%) + 12%),
       transparent 100%
     );
-  background-size: 3px 3px, 240% 240%, 100% 100%, 100% 100%;
-  background-position: 0 0, var(--pointer-x, 50%) var(--pointer-y, 50%), 0 0, 0 0;
+  background-size:
+    3px 3px,
+    240% 240%,
+    100% 100%,
+    100% 100%;
+  background-position:
+    0 0,
+    var(--pointer-x, 50%) var(--pointer-y, 50%),
+    0 0,
+    0 0;
   mix-blend-mode: screen;
-  -webkit-mask-image: radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 50%), #000 0 12%, rgba(0, 0, 0, 0.7) 30%, transparent 78%);
-  mask-image: radial-gradient(circle at var(--pointer-x, 50%) var(--pointer-y, 50%), #000 0 12%, rgba(0, 0, 0, 0.7) 30%, transparent 78%);
-  transition: opacity 120ms ease, background-position 120ms ease;
+  -webkit-mask-image: radial-gradient(
+    circle at var(--pointer-x, 50%) var(--pointer-y, 50%),
+    #000 0 12%,
+    rgba(0, 0, 0, 0.7) 30%,
+    transparent 78%
+  );
+  mask-image: radial-gradient(
+    circle at var(--pointer-x, 50%) var(--pointer-y, 50%),
+    #000 0 12%,
+    rgba(0, 0, 0, 0.7) 30%,
+    transparent 78%
+  );
+  transition:
+    opacity 120ms ease,
+    background-position 120ms ease;
 }
 .detail-card-stage-gmr:hover::after,
 .detail-card-stage-gmr:active::after {
   opacity: 0.68;
-  background-position: 0 0, calc(100% - var(--pointer-x, 50%)) calc(100% - var(--pointer-y, 50%)), 0 0, 0 0;
+  background-position:
+    0 0,
+    calc(100% - var(--pointer-x, 50%)) calc(100% - var(--pointer-y, 50%)),
+    0 0,
+    0 0;
 }
 .detail-main-image img {
   position: relative;
@@ -1147,7 +1226,7 @@ code {
   }
   .card-grid .card-result .card-carousel {
     min-height: 0;
-    touch-action: none;
+    touch-action: pan-y;
   }
   .card-result {
     position: relative;
@@ -1218,7 +1297,11 @@ code {
     max-width: 100%;
   }
   .detail-main-image {
-    touch-action: none;
+    touch-action: pan-y;
+    will-change: transform;
+  }
+  .detail-card-stage-gmr .gmr-noise-layer {
+    display: none;
   }
   .detail-card-stage {
     height: auto;
