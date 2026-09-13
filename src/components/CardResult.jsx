@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 
-export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewMode }) {
+export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewMode, showFavorite = true }) {
   const [imageIndex, setImageIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState("next");
+  const [nameCopied, setNameCopied] = useState(false);
   const pointerStart = useRef(null);
   const images = card.card_images || [];
 
@@ -20,7 +21,10 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewM
     if (pointerStart.current === null) return;
     const distance = event.clientX - pointerStart.current;
     pointerStart.current = null;
-    if (Math.abs(distance) > 35) changeImage(distance < 0 ? "next" : "previous");
+    if (Math.abs(distance) > 35) {
+      event.stopPropagation();
+      changeImage(distance < 0 ? "next" : "previous");
+    }
   };
 
   const handlePointerMove = (event) => {
@@ -38,20 +42,33 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewM
     event.currentTarget.style.setProperty("--tilt-y", "0deg");
   };
 
+  const copyCardName = async (event) => {
+    event.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(card.koreanData.cardName);
+      setNameCopied(true);
+      window.setTimeout(() => setNameCopied(false), 1400);
+    } catch {
+      setNameCopied(false);
+    }
+  };
+
   return (
     <article className={`card-result card-result-${viewMode}`} onClick={() => onOpen(card)}>
-      <div className="card-actions">
-        <button
-          className={`heart-button ${isFavorite ? "is-favorite" : ""}`}
-          aria-label={isFavorite ? "찜 취소" : "찜하기"}
-          onClick={(event) => {
-            event.stopPropagation();
-            onFavorite(card);
-          }}
-        >
-          {isFavorite ? "♥" : "♡"}
-        </button>
-      </div>
+      {showFavorite && (
+        <div className="card-actions">
+          <button
+            className={`heart-button ${isFavorite ? "is-favorite" : ""}`}
+            aria-label={isFavorite ? "찜 취소" : "찜하기"}
+            onClick={(event) => {
+              event.stopPropagation();
+              onFavorite(card);
+            }}
+          >
+            {isFavorite ? "♥" : "♡"}
+          </button>
+        </div>
+      )}
       <div
         className="card-carousel"
         onPointerDown={handlePointerDown}
@@ -100,7 +117,18 @@ export default function CardResult({ card, isFavorite, onFavorite, onOpen, viewM
           </span>
         )}
       </div>
-      <h3>{card.koreanData.cardName}</h3>
+      <h3
+        className="card-name-copy"
+        role="button"
+        tabIndex="0"
+        onClick={copyCardName}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") copyCardName(event);
+        }}
+        title="카드 이름 복사"
+      >
+        {nameCopied ? "복사됨" : card.koreanData.cardName}
+      </h3>
       <div className="card-summary">
         <p>
           <strong>종류:</strong> {card.koreanData.cardOther || "-"}

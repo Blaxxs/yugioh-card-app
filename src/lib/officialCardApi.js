@@ -41,9 +41,25 @@ const RARITY_ENGLISH = new Map([
   ["쿼터 센추리 시크릿 레어", "Quarter Century Secret Rare"],
   ["그랜드마스터 레어", "Grandmaster Rare"],
 ]);
+const RARITY_KOREAN_BY_CODE = new Map([...RARITY_CODES.entries()].map(([name, code]) => [code.toLowerCase(), name]));
+const RARITY_KOREAN_BY_ENGLISH = new Map(
+  [...RARITY_ENGLISH.entries()].map(([name, english]) => [english.toLowerCase(), name]),
+);
 
-const getRarityCode = (rarity) => {
-  const normalized = rarity.replace(/\s+/g, " ").trim();
+export const getRarityLabel = (rarity) => {
+  if (!rarity) return "레어도 미상";
+  const normalized = String(rarity).replace(/\s+/g, " ").trim();
+  if (RARITY_CODES.has(normalized)) return normalized;
+  return (
+    RARITY_KOREAN_BY_CODE.get(normalized.toLowerCase()) ||
+    RARITY_KOREAN_BY_ENGLISH.get(normalized.toLowerCase()) ||
+    "레어도 미상"
+  );
+};
+
+export const getRarityCode = (rarity) => {
+  if (!rarity) return "";
+  const normalized = String(rarity).replace(/\s+/g, " ").trim();
   return RARITY_CODES.get(normalized) || normalized;
 };
 
@@ -188,6 +204,15 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
     card_sets: cardSets,
   };
 };
+
+export async function fetchOfficialCardById(cardId, fallbackName = "", imageUrl = "") {
+  if (!cardId) return null;
+  const href = new URL(
+    `/yugiohdb/card_search.action?request_locale=ko&ope=2&cid=${encodeURIComponent(cardId)}`,
+    OFFICIAL_SITE_ORIGIN,
+  );
+  return parseOfficialCard(await fetchOfficialHtml(href), fallbackName, imageUrl, String(cardId));
+}
 
 export async function searchOfficialCards(searchTerm) {
   const term = normalizeCardName(searchTerm);

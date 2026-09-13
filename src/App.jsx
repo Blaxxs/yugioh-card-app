@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
-import { searchOfficialCards } from "./lib/officialCardApi";
+import { fetchOfficialCardById, searchOfficialCards } from "./lib/officialCardApi";
 import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
@@ -24,8 +24,6 @@ export default function App() {
   const [inventory, setInventory] = useState(null);
   const [inventoryTransactions, setInventoryTransactions] = useState([]);
   const [inventoryBusy, setInventoryBusy] = useState(false);
-  const [purchasePrice, setPurchasePrice] = useState("");
-  const [condition, setCondition] = useState("미등록");
   const [activeTab, setActiveTab] = useState(savedView.activeTab || "search");
   const [viewModes, setViewModes] = useState(
     savedView.viewModes || { search: "album", inventory: "album", favorites: "album" },
@@ -54,11 +52,29 @@ export default function App() {
     Promise.all([
       supabase.from("favorites").select("card_id, card_snapshot"),
       supabase.from("inventory_items").select("*").gt("quantity", 0).order("updated_at", { ascending: false }),
-    ]).then(([favoritesResult, inventoryResult]) => {
+    ]).then(async ([favoritesResult, inventoryResult]) => {
       if (favoritesResult.error) setActionError(`찜 목록 오류: ${favoritesResult.error.message}`);
       if (inventoryResult.error) setActionError(`재고 목록 오류: ${inventoryResult.error.message}`);
       setFavoriteIds(new Set((favoritesResult.data || []).map((item) => item.card_id)));
-      setFavoriteCards((favoritesResult.data || []).map((item) => item.card_snapshot).filter(Boolean));
+      const savedCards = (favoritesResult.data || [])
+        .map((item) => ({ snapshot: item.card_snapshot, cardId: item.card_id }))
+        .filter(({ snapshot }) => snapshot);
+      const refreshedCards = await Promise.all(
+        savedCards.map(async ({ snapshot, cardId }) => {
+          const savedName = snapshot.name || snapshot.koreanData?.cardName;
+          try {
+            const freshCard = await fetchOfficialCardById(
+              cardId,
+              savedName,
+              snapshot.card_images?.[0]?.image_url_small,
+            );
+            return freshCard || snapshot;
+          } catch {
+            return snapshot;
+          }
+        }),
+      );
+      setFavoriteCards(refreshedCards);
       setInventoryItems(inventoryResult.data || []);
     });
     return undefined;
@@ -75,8 +91,6 @@ export default function App() {
       .then(({ data, error }) => {
         if (error) setActionError(`재고 조회 오류: ${error.message}`);
         setInventory(data);
-        setPurchasePrice(data?.purchase_price ?? "");
-        setCondition(data?.condition || "미등록");
         if (data)
           supabase
             .from("inventory_transactions")
@@ -97,7 +111,7 @@ export default function App() {
 
   const openCardWindow = (card) => {
     if (!card) return;
-    setSelectedCard(card);
+    setSelectedCard((current) => (current?.cardId === card.cardId ? current : card));
   };
 
   const toggleFavorite = async (card) => {
@@ -132,9 +146,7 @@ export default function App() {
       card_name: selectedCard.name,
       card_snapshot: selectedCard,
       rarity: selectedCard.card_sets?.[0]?.set_rarity || null,
-      condition,
       quantity,
-      purchase_price: purchasePrice === "" ? null : Number(purchasePrice),
       memo: null,
     };
     const { data, error } = await supabase
@@ -157,7 +169,7 @@ export default function App() {
             inventory_item_id: data.id,
             type: quantityDelta > 0 ? "purchase" : "sale",
             quantity: Math.abs(quantityDelta),
-            unit_price: purchasePrice === "" ? null : Number(purchasePrice),
+            unit_price: null,
           });
         if (transactionError) setActionError(`거래 이력 저장 오류: ${transactionError.message}`);
         const { data: transactions } = await supabase
@@ -174,7 +186,10 @@ export default function App() {
 
   const cancelTransaction = async (transaction) => {
     if (!supabase || !session) return;
-    const nextQuantity = Math.max(0, (inventory?.quantity || 0) + (transaction.type === "purchase" ? -transaction.quantity : transaction.quantity));
+    const nextQuantity = Math.max(
+      0,
+      (inventory?.quantity || 0) + (transaction.type === "purchase" ? -transaction.quantity : transaction.quantity),
+    );
     const { error: inventoryError } = await supabase
       .from("inventory_items")
       .update({ quantity: nextQuantity, updated_at: new Date().toISOString() })
@@ -196,14 +211,21 @@ export default function App() {
   const updateTransaction = async (transaction, unitPrice) => {
     if (!supabase || !session) return;
     const value = unitPrice === "" ? null : Number(unitPrice);
-    const { error } = await supabase.from("inventory_transactions").update({ unit_price: value }).eq("id", transaction.id).eq("user_id", session.user.id);
+    const { error } = await supabase
+      .from("inventory_transactions")
+      .update({ unit_price: value })
+      .eq("id", transaction.id)
+      .eq("user_id", session.user.id);
     if (error) return setActionError(`거래 금액 수정 오류: ${error.message}`);
-    setInventoryTransactions((items) => items.map((item) => item.id === transaction.id ? { ...item, unit_price: value } : item));
+    setInventoryTransactions((items) =>
+      items.map((item) => (item.id === transaction.id ? { ...item, unit_price: value } : item)),
+    );
   };
 
   const searchCard = async () => {
-    if (!searchTerm.trim()) return;
+    setSelectedCard(null);
     setActiveTab("search");
+    if (!searchTerm.trim()) return;
     setLoading(true);
     setActionError("");
     try {
@@ -232,27 +254,34 @@ export default function App() {
       {!isSupabaseConfigured && (
         <p className="setup-message">Supabase 환경변수를 설정하면 로그인을 사용할 수 있습니다.</p>
       )}
-      <div className="search-bar">
+      <form
+        className="search-bar"
+        onSubmit={(event) => {
+          event.preventDefault();
+          searchCard();
+        }}
+      >
         <input
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && searchCard()}
           placeholder="카드 이름을 입력하세요 (예: 푸른 눈의 백룡)"
         />
-        <button onClick={searchCard}>검색</button>
-      </div>
-      {!selectedCard && <ManagementTabs
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        session={session}
-        inventoryItems={inventoryItems}
-        favoriteCards={favoriteCards}
-        onOpenCard={openCardWindow}
-        viewMode={viewModes[activeTab]}
-        onViewModeChange={(mode) => setViewModes((current) => ({ ...current, [activeTab]: mode }))}
-        favoriteIds={favoriteIds}
-        onFavorite={toggleFavorite}
-      />}
+        <button type="submit">검색</button>
+      </form>
+      {!selectedCard && (
+        <ManagementTabs
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          session={session}
+          inventoryItems={inventoryItems}
+          favoriteCards={favoriteCards}
+          onOpenCard={openCardWindow}
+          viewMode={viewModes[activeTab]}
+          onViewModeChange={(mode) => setViewModes((current) => ({ ...current, [activeTab]: mode }))}
+          favoriteIds={favoriteIds}
+          onFavorite={toggleFavorite}
+        />
+      )}
       {loading && <p>카드를 검색하고 있습니다...</p>}
       {actionError && (
         <p className="action-error" role="alert">
@@ -295,10 +324,9 @@ export default function App() {
               <CardResult
                 key={card.id}
                 card={card}
-                isFavorite={favoriteIds.has(card.cardId)}
-                onFavorite={toggleFavorite}
                 onOpen={openCardWindow}
                 viewMode={viewModes.search}
+                showFavorite={false}
               />
             ))}
           </section>
@@ -306,15 +334,14 @@ export default function App() {
       )}
       {selectedCard && (
         <CardDetail
+          key={selectedCard.cardId}
           card={selectedCard}
           session={session}
           inventory={inventory}
-          condition={condition}
-          purchasePrice={purchasePrice}
           inventoryBusy={inventoryBusy}
+          isFavorite={favoriteIds.has(selectedCard.cardId)}
+          onFavorite={toggleFavorite}
           onClose={closeCardDetail}
-          onConditionChange={setCondition}
-          onPurchasePriceChange={setPurchasePrice}
           onInventory={saveInventory}
           inventoryTransactions={inventoryTransactions}
           onCancelTransaction={cancelTransaction}
