@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, LogIn, LogOut, Search, X } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
-import { fetchOfficialCardById, fetchReleaseCards, fetchReleaseList, searchOfficialCards } from "./lib/officialCardApi";
+import {
+  fetchOfficialCardById,
+  fetchReleaseCards,
+  fetchReleaseList,
+  hydrateCardPreviews,
+  searchOfficialCards,
+} from "./lib/officialCardApi";
 import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
@@ -18,6 +24,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState(savedView.searchTerm || "");
   const [cards, setCards] = useState(savedView.cards || []);
   const [loading, setLoading] = useState(false);
+  const [cardDetailLoading, setCardDetailLoading] = useState(false);
   const [session, setSession] = useState(null);
   const [selectedCard, setSelectedCard] = useState(savedHistory?.selectedCard || savedView.selectedCard || null);
   const [favoriteIds, setFavoriteIds] = useState(new Set());
@@ -38,6 +45,15 @@ export default function App() {
   const [releaseLoading, setReleaseLoading] = useState(false);
   const historyIndex = useRef(savedHistory?.index || 0);
   const viewRef = useRef({ activeTab, selectedCard, selectedRelease });
+  const loadedReleasePath = useRef(null);
+
+  const hydratePreviews = (previews, setPreviewCards) => {
+    hydrateCardPreviews(previews, (detailedCard) => {
+      setPreviewCards((currentCards) =>
+        currentCards.map((card) => (card.cardId === detailedCard.cardId ? detailedCard : card)),
+      );
+    });
+  };
 
   useEffect(() => {
     sessionStorage.setItem("ygo-view-state", JSON.stringify({ searchTerm, cards, selectedCard, activeTab, viewModes }));
@@ -150,14 +166,18 @@ export default function App() {
   }, [activeTab, releaseLoading, releases.length]);
 
   useEffect(() => {
-    if (!selectedRelease) return;
+    if (!selectedRelease || loadedReleasePath.current === selectedRelease.path) return;
     const loadReleaseCards = async () => {
       await Promise.resolve();
+      loadedReleasePath.current = selectedRelease.path;
       setReleaseCards([]);
       setReleaseLoading(true);
       try {
-        setReleaseCards(await fetchReleaseCards(selectedRelease.path));
+        const previews = await fetchReleaseCards(selectedRelease.path);
+        setReleaseCards(previews);
+        hydratePreviews(previews, setReleaseCards);
       } catch (error) {
+        loadedReleasePath.current = null;
         setActionError(error.message);
       } finally {
         setReleaseLoading(false);
@@ -203,9 +223,42 @@ export default function App() {
     pushView({ activeTab: "releases", selectedCard: null, selectedRelease: release });
   };
 
-  const openCardWindow = (card) => {
+  const openReleaseByName = async (releaseName) => {
+    let release = releases.find((item) => item.name === releaseName);
+    if (!release) {
+      try {
+        const fetchedReleases = await fetchReleaseList();
+        setReleases(fetchedReleases);
+        release = fetchedReleases.find((item) => item.name === releaseName);
+      } catch (error) {
+        setActionError(error.message);
+        return;
+      }
+    }
+    if (!release) {
+      setActionError("해당 수록 팩 정보를 찾을 수 없습니다.");
+      return;
+    }
+    openRelease(release);
+  };
+
+  const openCardWindow = async (card) => {
     if (!card) return;
-    if (selectedCard?.cardId !== card.cardId) pushView({ selectedCard: card });
+    if (selectedCard?.cardId === card.cardId || cardDetailLoading) return;
+    if (card.isDetailLoaded) {
+      pushView({ selectedCard: card });
+      return;
+    }
+    setCardDetailLoading(true);
+    setActionError("");
+    try {
+      const detailedCard = await fetchOfficialCardById(card.cardId, card.name, card.card_images?.[0]?.image_url_small);
+      if (detailedCard) pushView({ selectedCard: detailedCard });
+    } catch (error) {
+      setActionError(error.message);
+    } finally {
+      setCardDetailLoading(false);
+    }
   };
 
   const toggleFavorite = async (card) => {
@@ -325,6 +378,7 @@ export default function App() {
     try {
       const results = await searchOfficialCards(searchTerm);
       setCards(results);
+      hydratePreviews(results, setCards);
     } catch (error) {
       setActionError(error.message);
       setCards([]);
@@ -393,6 +447,7 @@ export default function App() {
         showContent={!selectedCard}
       />
       {loading && <p>카드를 검색하고 있습니다...</p>}
+      {cardDetailLoading && <p>카드 상세를 불러오는 중입니다...</p>}
       {actionError && (
         <p className="action-error" role="alert">
           {actionError}
@@ -545,6 +600,7 @@ export default function App() {
           inventoryTransactions={inventoryTransactions}
           onCancelTransaction={cancelTransaction}
           onUpdateTransaction={updateTransaction}
+          onOpenRelease={openReleaseByName}
         />
       )}
     </main>

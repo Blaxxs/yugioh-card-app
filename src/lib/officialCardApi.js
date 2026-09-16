@@ -114,18 +114,32 @@ const findCardEntries = (document, term) => {
   const seen = new Set();
   return [...document.querySelectorAll(".t_row.c_normal")]
     .filter((row) => normalizeCardName(row.querySelector(".card_name")?.textContent || "").includes(term))
-    .map((row) => ({ row, cardId: row.querySelector("input.cid")?.value }))
-    .filter(
-      ({ row, cardId }) =>
-        row.querySelector("img[id^='card_image']") && cardId && !seen.has(cardId) && seen.add(cardId),
-    )
-    .map(({ row, cardId }) => ({
+    .map((row) => ({
+      row,
+      cardId: row.querySelector("input.cid")?.value,
+      image: row.querySelector("img[id^='card_image']"),
+    }))
+    .filter(({ cardId, image }) => image && cardId && !seen.has(cardId) && seen.add(cardId))
+    .map(({ row, cardId, image }) => ({
       cardId,
       href: new URL(`/yugiohdb/card_search.action?request_locale=ko&ope=2&cid=${cardId}`, OFFICIAL_SITE_ORIGIN),
-      imageUrl: `${OFFICIAL_SITE_ORIGIN}/yugiohdb/get_image.action?type=2&cid=${cardId}&ciid=1`,
+      imageUrl:
+        image.getAttribute("src") && image.getAttribute("src") !== "null"
+          ? new URL(image.getAttribute("src"), OFFICIAL_SITE_ORIGIN).href
+          : null,
       name: row.querySelector(".card_name")?.textContent.trim() || "",
     }));
 };
+
+const createCardPreview = ({ cardId, name, imageUrl }) => ({
+  id: cardId,
+  cardId,
+  name,
+  card_images: imageUrl ? [{ id: imageUrl, image_url_small: imageUrl }] : [],
+  koreanData: { cardName: name },
+  card_sets: [],
+  isDetailLoaded: false,
+});
 
 export async function fetchReleaseList() {
   const url = new URL(`${OFFICIAL_SITE_ORIGIN}/yugiohdb/card_list.action`);
@@ -229,6 +243,7 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
       cardText: readCardText(root, ".top .CardText .text_linebreak"),
     },
     card_sets: cardSets,
+    isDetailLoaded: true,
   };
 };
 
@@ -239,6 +254,23 @@ export async function fetchOfficialCardById(cardId, fallbackName = "", imageUrl 
     OFFICIAL_SITE_ORIGIN,
   );
   return parseOfficialCard(await fetchOfficialHtml(href), fallbackName, imageUrl, String(cardId));
+}
+
+export async function hydrateCardPreviews(cards, onHydrated) {
+  const pendingCards = cards.filter((card) => !card.isDetailLoaded && !card.card_images?.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < pendingCards.length) {
+      const card = pendingCards[nextIndex++];
+      try {
+        const detailedCard = await fetchOfficialCardById(card.cardId, card.name);
+        if (detailedCard) onHydrated(detailedCard);
+      } catch {
+        // Leave the preview empty if the official detail page is temporarily unavailable.
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(6, pendingCards.length) }, worker));
 }
 
 export async function searchOfficialCards(searchTerm) {
@@ -252,11 +284,7 @@ export async function searchOfficialCards(searchTerm) {
     document = await fetchOfficialHtml(createSearchUrl(term.slice(0, 2)));
     entries = findCardEntries(document, term);
   }
-  return Promise.all(
-    entries.map(async (entry) =>
-      parseOfficialCard(await fetchOfficialHtml(entry.href), entry.name, entry.imageUrl, entry.cardId),
-    ),
-  );
+  return entries.map(createCardPreview);
 }
 
 export async function fetchReleaseCards(path) {
@@ -265,11 +293,7 @@ export async function fetchReleaseCards(path) {
   url.searchParams.set("request_locale", "ko");
   const document = await fetchOfficialHtml(url);
   const entries = findCardEntries(document, "");
-  return Promise.all(
-    entries.map(async (entry) =>
-      parseOfficialCard(await fetchOfficialHtml(entry.href), entry.name, entry.imageUrl, entry.cardId),
-    ),
-  );
+  return entries.map(createCardPreview);
 }
 
 const searchCardsByReleaseCode = async (searchTerm) => {

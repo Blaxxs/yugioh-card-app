@@ -112,7 +112,7 @@ export default function CardResult({
         </div>
       )}
       <div
-        className="card-carousel"
+        className={`card-carousel ${images[imageIndex] ? "" : "card-image-pending"}`}
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}

@@ -14,6 +14,7 @@ export default function CardDetail({
   inventoryTransactions = [],
   onCancelTransaction,
   onUpdateTransaction,
+  onOpenRelease,
 }) {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [copiedCode, setCopiedCode] = useState("");
@@ -130,8 +131,14 @@ export default function CardDetail({
     ? [
         ["카드모아", `http://cardmoa.com/shop/search.php?search_str=${encodeURIComponent(priceSearch.query)}`],
         ["카드디씨", `https://carddc.co.kr/product_list.html?search_word=${encodeURIComponent(priceSearch.query)}`],
-        ["카드공구", `https://www.card09.com/search_result.php?search=total&searchstring=${encodeURIComponent(priceSearch.query)}`],
-        ["티씨지샵", `http://www.tcgshop.co.kr/search_result.php?search=meta_str&searchstring=${encodeURIComponent(priceSearch.query)}`],
+        [
+          "카드공구",
+          `https://www.card09.com/search_result.php?search=total&searchstring=${encodeURIComponent(priceSearch.query)}`,
+        ],
+        [
+          "티씨지샵",
+          `http://www.tcgshop.co.kr/search_result.php?search=meta_str&searchstring=${encodeURIComponent(priceSearch.query)}`,
+        ],
       ]
     : [];
 
@@ -334,19 +341,23 @@ export default function CardDetail({
               </thead>
               <tbody>
                 {card.card_sets?.map((set, index) => (
-                  <tr
-                    key={`${set.set_code}-${index}`}
-                    className="set-row-copy"
-                    tabIndex="0"
-                    onClick={() => copyCode(set.set_code, `${set.set_code}-${index}`)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ")
-                        copyCode(set.set_code, `${set.set_code}-${index}`);
-                    }}
-                  >
+                  <tr key={`${set.set_code}-${index}`}>
                     <td>{set.set_date || "-"}</td>
-                    <td className="set-code">{copiedCode === `${set.set_code}-${index}` ? "복사됨" : set.set_code}</td>
-                    <td>{set.set_name}</td>
+                    <td>
+                      <button
+                        className="set-code"
+                        type="button"
+                        title="수록 코드 복사"
+                        onClick={() => copyCode(set.set_code, `${set.set_code}-${index}`)}
+                      >
+                        {copiedCode === `${set.set_code}-${index}` ? "복사됨" : set.set_code}
+                      </button>
+                    </td>
+                    <td>
+                      <button className="set-pack-button" type="button" onClick={() => onOpenRelease(set.set_name)}>
+                        {set.set_name}
+                      </button>
+                    </td>
                     <td>
                       <span
                         className="rarity-tooltip"
@@ -386,7 +397,12 @@ export default function CardDetail({
           </div>
           {priceSearch && (
             <div className="price-search-modal" role="dialog" aria-modal="true" aria-label="판매처 가격 검색">
-              <button className="price-search-backdrop" type="button" aria-label="가격 검색 닫기" onClick={() => setPriceSearch(null)} />
+              <button
+                className="price-search-backdrop"
+                type="button"
+                aria-label="가격 검색 닫기"
+                onClick={() => setPriceSearch(null)}
+              />
               <section className="price-search-sheet">
                 <header>
                   <div>
