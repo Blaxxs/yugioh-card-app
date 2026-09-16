@@ -87,7 +87,7 @@ export default function ManagementTabs({
                   onFavorite={onFavorite}
                   onOpen={onOpenCard}
                   viewMode={viewMode}
-                  showCardName={false}
+                  showCardName={viewMode !== "album"}
                 />
               ))
             ) : (

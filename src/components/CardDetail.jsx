@@ -1,4 +1,4 @@
-import { CircleHelp, X } from "lucide-react";
+import { CircleDollarSign, CircleHelp, ExternalLink, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getRarityCode, getRarityLabel } from "../lib/officialCardApi";
 
@@ -19,6 +19,7 @@ export default function CardDetail({
   const [copiedCode, setCopiedCode] = useState("");
   const [nameCopied, setNameCopied] = useState(false);
   const [isRarityGuideOpen, setIsRarityGuideOpen] = useState(false);
+  const [priceSearch, setPriceSearch] = useState(null);
   const pendingImageIndex = useRef(null);
   const frameRequest = useRef(null);
   const pointerFrameRequest = useRef(null);
@@ -124,6 +125,15 @@ export default function CardDetail({
       setNameCopied(false);
     }
   };
+
+  const priceSearchLinks = priceSearch
+    ? [
+        ["카드모아", `http://cardmoa.com/shop/search.php?search_str=${encodeURIComponent(priceSearch.query)}`],
+        ["카드디씨", `https://carddc.co.kr/product_list.html?search_word=${encodeURIComponent(priceSearch.query)}`],
+        ["카드공구", `https://www.card09.com/search_result.php?search=total&searchstring=${encodeURIComponent(priceSearch.query)}`],
+        ["티씨지샵", `http://www.tcgshop.co.kr/search_result.php?search=meta_str&searchstring=${encodeURIComponent(priceSearch.query)}`],
+      ]
+    : [];
 
   useEffect(() => {
     const preloadedImages = card.card_images?.map((image) => {
@@ -351,12 +361,55 @@ export default function CardDetail({
                           {set.rarity_code || getRarityCode(set.set_rarity) || "-"}
                         </span>
                       </span>
+                      <button
+                        className="price-search-button"
+                        type="button"
+                        aria-label={`${set.set_code} ${getRarityLabel(set.set_rarity || set.rarity_code)} 가격 보기`}
+                        title="판매처 가격 보기"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setPriceSearch({
+                            code: set.set_code,
+                            rarity: getRarityLabel(set.set_rarity || set.rarity_code),
+                            query: set.set_code,
+                          });
+                        }}
+                      >
+                        <CircleDollarSign size={15} aria-hidden="true" />
+                        가격
+                      </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {priceSearch && (
+            <div className="price-search-modal" role="dialog" aria-modal="true" aria-label="판매처 가격 검색">
+              <button className="price-search-backdrop" type="button" aria-label="가격 검색 닫기" onClick={() => setPriceSearch(null)} />
+              <section className="price-search-sheet">
+                <header>
+                  <div>
+                    <span>판매처 검색</span>
+                    <h3>{priceSearch.code}</h3>
+                    <p>{priceSearch.rarity}</p>
+                  </div>
+                  <button type="button" aria-label="가격 검색 닫기" onClick={() => setPriceSearch(null)}>
+                    <X size={20} aria-hidden="true" />
+                  </button>
+                </header>
+                <p className="price-search-query">{priceSearch.query}</p>
+                <div className="price-search-links">
+                  {priceSearchLinks.map(([shop, href]) => (
+                    <a key={shop} href={href} target="_blank" rel="noreferrer">
+                      {shop}
+                      <ExternalLink size={17} aria-hidden="true" />
+                    </a>
+                  ))}
+                </div>
+              </section>
+            </div>
+          )}
         </div>
       </div>
       <h3>내 재고</h3>

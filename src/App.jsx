@@ -437,7 +437,7 @@ export default function App() {
                 onOpen={openCardWindow}
                 viewMode={viewModes.search}
                 showFavorite={false}
-                showCardName={false}
+                showCardName={viewModes.search !== "album"}
               />
             ))}
           </section>
@@ -453,7 +453,13 @@ export default function App() {
                   <h2>{selectedRelease.name}</h2>
                   <p>{selectedRelease.date} 발매</p>
                 </div>
-                <button className="release-back" type="button" aria-label="상품 목록으로 닫기" title="상품 목록으로 닫기" onClick={closeRelease}>
+                <button
+                  className="release-back"
+                  type="button"
+                  aria-label="상품 목록으로 닫기"
+                  title="상품 목록으로 닫기"
+                  onClick={closeRelease}
+                >
                   <X size={18} aria-hidden="true" />
                 </button>
               </div>
