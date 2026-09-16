@@ -256,6 +256,12 @@ export async function fetchOfficialCardById(cardId, fallbackName = "", imageUrl 
   return parseOfficialCard(await fetchOfficialHtml(href), fallbackName, imageUrl, String(cardId));
 }
 
+export async function fetchOfficialCardBySetCode(setCode) {
+  const document = await fetchOfficialHtml(createCardNumberSearchUrl(setCode.trim().toUpperCase()));
+  const [entry] = findCardEntries(document, "");
+  return entry ? fetchOfficialCardById(entry.cardId, entry.name, entry.imageUrl) : null;
+}
+
 export async function hydrateCardPreviews(cards, onHydrated) {
   const pendingCards = cards.filter((card) => !card.isDetailLoaded && !card.card_images?.length);
   let nextIndex = 0;
@@ -298,9 +304,9 @@ export async function fetchReleaseCards(path) {
 
 const searchCardsByReleaseCode = async (searchTerm) => {
   const rawTerm = searchTerm.trim();
-  if (!/^[A-Z0-9-]+$/.test(rawTerm)) return null;
-  const normalized = rawTerm.replace(/\s+/g, "");
-  const match = normalized.match(/^([A-Z0-9]{2,8})(?:-?KR)?(?:-?(\d{3}))?$/);
+  if (!/^[a-z0-9-]+$/i.test(rawTerm)) return null;
+  const normalized = rawTerm.replace(/\s+/g, "").toUpperCase();
+  const match = normalized.match(/^([A-Z0-9]{4,8})(?:-?KR)?(?:-?(\d{3}))?$/);
   if (!match) return null;
 
   const [, prefix, number] = match;

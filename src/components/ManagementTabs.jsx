@@ -1,4 +1,5 @@
 import CardResult from "./CardResult";
+import InventoryConsole from "./InventoryConsole";
 import { Boxes, Heart, LibraryBig, Search } from "lucide-react";
 
 const modes = [
@@ -37,6 +38,9 @@ export default function ManagementTabs({
   favoriteIds,
   onFavorite,
   showContent = true,
+  inventoryBusy,
+  onBulkIntake,
+  onBatchIntake,
 }) {
   const cards =
     activeTab === "inventory" ? inventoryItems.map((item) => item.card_snapshot).filter(Boolean) : favoriteCards;
@@ -74,6 +78,14 @@ export default function ManagementTabs({
       </nav>
       {showContent && ["inventory", "favorites"].includes(activeTab) && session && (
         <section className="management-panel">
+          {activeTab === "inventory" && (
+            <InventoryConsole
+              inventoryItems={inventoryItems}
+              busy={inventoryBusy}
+              onBulkIntake={onBulkIntake}
+              onBatchIntake={onBatchIntake}
+            />
+          )}
           <div className="management-heading">
             <ViewFilters value={viewMode} onChange={onViewModeChange} />
           </div>

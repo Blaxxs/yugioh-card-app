@@ -129,6 +129,7 @@ export default function CardDetail({
 
   const priceSearchLinks = priceSearch
     ? [
+        ["번개장터", `https://m.bunjang.co.kr/search/products?q=${encodeURIComponent(priceSearch.query)}`],
         ["카드모아", `http://cardmoa.com/shop/search.php?search_str=${encodeURIComponent(priceSearch.query)}`],
         ["카드디씨", `https://carddc.co.kr/product_list.html?search_word=${encodeURIComponent(priceSearch.query)}`],
         [
@@ -359,36 +360,38 @@ export default function CardDetail({
                       </button>
                     </td>
                     <td>
-                      <span
-                        className="rarity-tooltip"
-                        data-tooltip={getRarityLabel(set.set_rarity || set.rarity_code)}
-                        aria-label={getRarityLabel(set.set_rarity || set.rarity_code)}
-                      >
+                      <div className="set-rarity-actions">
                         <span
-                          className={`rarity-chip rarity-${getRarityCode(set.rarity_code || set.set_rarity)
-                            .replace(/[^a-z0-9+]/gi, "")
-                            .toLowerCase()}`}
+                          className="rarity-tooltip"
+                          data-tooltip={getRarityLabel(set.set_rarity || set.rarity_code)}
+                          aria-label={getRarityLabel(set.set_rarity || set.rarity_code)}
                         >
-                          {set.rarity_code || getRarityCode(set.set_rarity) || "-"}
+                          <span
+                            className={`rarity-chip rarity-${getRarityCode(set.rarity_code || set.set_rarity)
+                              .replace(/[^a-z0-9+]/gi, "")
+                              .toLowerCase()}`}
+                          >
+                            {set.rarity_code || getRarityCode(set.set_rarity) || "-"}
+                          </span>
                         </span>
-                      </span>
-                      <button
-                        className="price-search-button"
-                        type="button"
-                        aria-label={`${set.set_code} ${getRarityLabel(set.set_rarity || set.rarity_code)} 가격 보기`}
-                        title="판매처 가격 보기"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setPriceSearch({
-                            code: set.set_code,
-                            rarity: getRarityLabel(set.set_rarity || set.rarity_code),
-                            query: set.set_code,
-                          });
-                        }}
-                      >
-                        <CircleDollarSign size={15} aria-hidden="true" />
-                        가격
-                      </button>
+                        <button
+                          className="price-search-button"
+                          type="button"
+                          aria-label={`${set.set_code} ${getRarityLabel(set.set_rarity || set.rarity_code)} 가격 보기`}
+                          title="판매처 가격 보기"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setPriceSearch({
+                              code: set.set_code,
+                              rarity: getRarityLabel(set.set_rarity || set.rarity_code),
+                              query: set.set_code,
+                            });
+                          }}
+                        >
+                          <CircleDollarSign size={15} aria-hidden="true" />
+                          가격
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

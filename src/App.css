@@ -444,6 +444,110 @@ button:disabled {
   border: 0;
   padding: 0;
 }
+.inventory-console {
+  margin-bottom: 16px;
+  border: 1px solid var(--app-line);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+}
+.inventory-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.inventory-metrics div {
+  border-radius: 9px;
+  padding: 10px;
+  background: #f5f4ff;
+}
+.inventory-metrics span {
+  display: block;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+.inventory-metrics strong {
+  color: var(--app-ink);
+  font-size: 22px;
+}
+.bulk-intake-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+  color: var(--app-primary);
+}
+.bulk-intake-heading div {
+  display: grid;
+  gap: 1px;
+}
+.bulk-intake-heading strong {
+  color: var(--app-ink);
+  font-size: 14px;
+}
+.bulk-intake-heading span {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+.bulk-intake-form textarea {
+  display: block;
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--app-ink);
+  font: 13px/1.5 var(--mono);
+}
+.bulk-intake-actions {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+.bulk-intake-actions label {
+  display: grid;
+  gap: 4px;
+  color: var(--app-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.bulk-intake-actions input {
+  width: 76px;
+  min-height: 36px;
+  border: 1px solid var(--app-line);
+  border-radius: 7px;
+  padding: 0 8px;
+  color: var(--app-ink);
+}
+.bulk-intake-actions button,
+.release-stock-button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--app-primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.bulk-intake-message {
+  margin: 9px 0 0;
+  color: var(--app-primary-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+.release-stock-button {
+  margin: -4px 0 14px;
+}
 .release-panel {
   margin-top: 2px;
 }
@@ -1039,6 +1143,15 @@ button:disabled {
     border-radius: 16px;
     padding: 20px;
     box-shadow: 0 18px 48px rgba(47, 42, 112, 0.2);
+  }
+  .set-rarity-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .set-rarity-actions .price-search-button {
+    margin-left: 0;
   }
 }
 

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { LoaderCircle, LogIn, LogOut, Search, X } from "lucide-react";
+import { LoaderCircle, LogIn, LogOut, PackagePlus, Search, X } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import {
   fetchOfficialCardById,
+  fetchOfficialCardBySetCode,
   fetchReleaseCards,
   fetchReleaseList,
   hydrateCardPreviews,
@@ -287,27 +288,27 @@ export default function App() {
       return setActionError("재고 기능은 로그인 후 사용할 수 있습니다.");
     setInventoryBusy(true);
     const quantity = Math.max(0, (inventory?.quantity || 0) + quantityDelta);
+    const set = selectedCard.card_sets?.[0];
     const payload = {
       user_id: session.user.id,
       card_id: selectedCard.cardId,
       card_name: selectedCard.name,
       card_snapshot: selectedCard,
-      rarity: selectedCard.card_sets?.[0]?.set_rarity || null,
+      rarity: set?.set_rarity || null,
+      set_code: set?.set_code || "",
+      rarity_code: set?.rarity_code || "",
       quantity,
       memo: null,
     };
     const { data, error } = await supabase
       .from("inventory_items")
-      .upsert(payload, { onConflict: "user_id,card_id" })
+      .upsert(payload, { onConflict: "user_id,card_id,set_code,rarity_code" })
       .select()
       .single();
     if (error) setActionError(`재고 저장 오류: ${error.message}`);
     else {
       setInventory(data);
-      setInventoryItems((items) => [
-        data,
-        ...items.filter((item) => item.card_id !== selectedCard.cardId && data.quantity > 0),
-      ]);
+      setInventoryItems((items) => [data, ...items.filter((item) => item.id !== data.id && data.quantity > 0)]);
       if (quantityDelta !== 0) {
         const { error: transactionError } = await supabase
           .from("inventory_transactions")
@@ -329,6 +330,96 @@ export default function App() {
       }
     }
     setInventoryBusy(false);
+  };
+
+  const addInventoryCards = async (cardsToAdd, quantity) => {
+    if (!supabase || !session || inventoryBusy) throw new Error("재고 기능은 로그인 후 사용할 수 있습니다.");
+    const uniqueCards = [...new Map(cardsToAdd.filter(Boolean).map((card) => [card.cardId, card])).values()];
+    setInventoryBusy(true);
+    try {
+      const currentByVariant = new Map(
+        inventoryItems.map((item) => [`${item.card_id}:${item.set_code}:${item.rarity_code}`, item]),
+      );
+      const savedItems = [];
+      for (const card of uniqueCards) {
+        const set = card.card_sets?.[0];
+        const setCode = set?.set_code || "";
+        const rarityCode = set?.rarity_code || "";
+        const current = currentByVariant.get(`${card.cardId}:${setCode}:${rarityCode}`);
+        const { data, error } = await supabase
+          .from("inventory_items")
+          .upsert(
+            {
+              user_id: session.user.id,
+              card_id: card.cardId,
+              card_name: card.name,
+              card_snapshot: card,
+              rarity: set?.set_rarity || null,
+              set_code: setCode,
+              rarity_code: rarityCode,
+              quantity: (current?.quantity || 0) + quantity,
+            },
+            { onConflict: "user_id,card_id,set_code,rarity_code" },
+          )
+          .select()
+          .single();
+        if (error) throw error;
+        savedItems.push(data);
+      }
+      if (savedItems.length) {
+        const { error } = await supabase
+          .from("inventory_transactions")
+          .insert(
+            savedItems.map((item) => ({
+              user_id: session.user.id,
+              inventory_item_id: item.id,
+              type: "purchase",
+              quantity,
+            })),
+          );
+        if (error) throw error;
+      }
+      setInventoryItems((items) => [
+        ...savedItems,
+        ...items.filter((item) => !savedItems.some((saved) => saved.id === item.id)),
+      ]);
+      return savedItems.length;
+    } finally {
+      setInventoryBusy(false);
+    }
+  };
+
+  const bulkIntakeByCode = async (rawCodes, quantity) => {
+    const codes = [
+      ...new Set(
+        rawCodes
+          .split(/\r?\n|,/)
+          .map((code) => code.trim())
+          .filter(Boolean),
+      ),
+    ];
+    const cardsToAdd = [];
+    for (const code of codes) {
+      const card = await fetchOfficialCardBySetCode(code);
+      if (card) cardsToAdd.push(card);
+    }
+    const added = await addInventoryCards(cardsToAdd, quantity);
+    return { added, missing: codes.length - cardsToAdd.length };
+  };
+
+  const batchIntake = async (items) => {
+    for (const { card, quantity } of items) {
+      await addInventoryCards([card], quantity);
+    }
+  };
+
+  const stockSelectedRelease = async () => {
+    try {
+      await addInventoryCards(releaseCards, 1);
+      setActionError("");
+    } catch (error) {
+      setActionError(`팩 입고 오류: ${error.message}`);
+    }
   };
 
   const cancelTransaction = async (transaction) => {
@@ -445,6 +536,9 @@ export default function App() {
         favoriteIds={favoriteIds}
         onFavorite={toggleFavorite}
         showContent={!selectedCard}
+        inventoryBusy={inventoryBusy}
+        onBulkIntake={bulkIntakeByCode}
+        onBatchIntake={batchIntake}
       />
       {loading && <p>카드를 검색하고 있습니다...</p>}
       {cardDetailLoading && <p>카드 상세를 불러오는 중입니다...</p>}
@@ -518,6 +612,16 @@ export default function App() {
                   <X size={18} aria-hidden="true" />
                 </button>
               </div>
+              {session && (
+                <button
+                  className="release-stock-button"
+                  type="button"
+                  disabled={releaseLoading || inventoryBusy || !releaseCards.length}
+                  onClick={stockSelectedRelease}
+                >
+                  <PackagePlus size={17} aria-hidden="true" /> 이 팩 전체 +1 입고
+                </button>
+              )}
               {releaseLoading ? (
                 <p className="release-loading">
                   <LoaderCircle size={18} aria-hidden="true" /> 수록 카드를 불러오는 중입니다.
