@@ -1,4 +1,5 @@
 import CardResult from "./CardResult";
+import { Boxes, Heart, LibraryBig, Search } from "lucide-react";
 
 const modes = [
   ["album", "▦", "앨범형 보기"],
@@ -35,6 +36,7 @@ export default function ManagementTabs({
   onViewModeChange,
   favoriteIds,
   onFavorite,
+  showContent = true,
 }) {
   const cards =
     activeTab === "inventory" ? inventoryItems.map((item) => item.card_snapshot).filter(Boolean) : favoriteCards;
@@ -42,26 +44,35 @@ export default function ManagementTabs({
 
   return (
     <>
-      <nav className="app-tabs">
+      <nav className="app-tabs bottom-nav">
         <button className={activeTab === "search" ? "active" : ""} onClick={() => onTabChange("search")}>
-          카드 검색
+          <Search size={20} aria-hidden="true" />
+          <span>검색</span>
+        </button>
+        <button className={activeTab === "releases" ? "active" : ""} onClick={() => onTabChange("releases")}>
+          <LibraryBig size={20} aria-hidden="true" />
+          <span>수록</span>
         </button>
         <button
           className={activeTab === "inventory" ? "active" : ""}
           onClick={() => onTabChange("inventory")}
           disabled={!session}
         >
-          재고 ({inventoryItems.length})
+          <Boxes size={20} aria-hidden="true" />
+          <span>재고</span>
+          <b>{inventoryItems.length}</b>
         </button>
         <button
           className={activeTab === "favorites" ? "active" : ""}
           onClick={() => onTabChange("favorites")}
           disabled={!session}
         >
-          찜 ({favoriteCards.length})
+          <Heart size={20} aria-hidden="true" />
+          <span>찜</span>
+          <b>{favoriteCards.length}</b>
         </button>
       </nav>
-      {activeTab !== "search" && session && (
+      {showContent && ["inventory", "favorites"].includes(activeTab) && session && (
         <section className="management-panel">
           <div className="management-heading">
             <ViewFilters value={viewMode} onChange={onViewModeChange} />

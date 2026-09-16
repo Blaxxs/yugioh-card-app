@@ -1,3 +1,4 @@
+import { CircleHelp, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getRarityCode, getRarityLabel } from "../lib/officialCardApi";
 
@@ -17,6 +18,7 @@ export default function CardDetail({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [copiedCode, setCopiedCode] = useState("");
   const [nameCopied, setNameCopied] = useState(false);
+  const [isRarityGuideOpen, setIsRarityGuideOpen] = useState(false);
   const pendingImageIndex = useRef(null);
   const frameRequest = useRef(null);
   const pointerFrameRequest = useRef(null);
@@ -52,8 +54,8 @@ export default function CardDetail({
     pointerFrameRequest.current = requestAnimationFrame(() => {
       const position = pointerPosition.current;
       if (position) {
-        position.element.style.setProperty("--tilt-x", `${(0.5 - position.y) * 10}deg`);
-        position.element.style.setProperty("--tilt-y", `${(position.x - 0.5) * 14}deg`);
+        position.element.style.setProperty("--tilt-x", `${(0.5 - position.y) * 20}deg`);
+        position.element.style.setProperty("--tilt-y", `${(position.x - 0.5) * 28}deg`);
         position.element.style.setProperty("--pointer-x", `${position.x * 100}%`);
         position.element.style.setProperty("--pointer-y", `${position.y * 100}%`);
       }
@@ -262,32 +264,54 @@ export default function CardDetail({
           </div>
           <div className="section-heading">
             <h3>수록 팩과 레어도</h3>
-            <details className="rarity-guide">
-              <summary>레어도</summary>
-              <div className="rarity-guide-grid">
-                {[
-                  ["N", "노멀"],
-                  ["P", "패러렐 노멀"],
-                  ["R", "레어"],
-                  ["SR", "슈퍼 레어"],
-                  ["UR", "울트라 레어"],
-                  ["P+UR", "패러렐 울트라 레어"],
-                  ["SE", "시크릿 레어"],
-                  ["HR", "홀로그래픽 레어"],
-                  ["PG", "프리미엄 골드 레어"],
-                  ["EXSE", "엑스트라 시크릿 레어"],
-                  ["PSE", "프리즈마틱 시크릿 레어"],
-                  ["QCSE", "쿼터 센추리 시크릿 레어"],
-                  ["GMR", "그랜드마스터 레어"],
-                ].map(([code, name]) => (
-                  <span key={code}>
-                    <b className={`rarity-chip rarity-${code.toLowerCase().replace("+", "")}`}>{code}</b>
-                    {name}
-                  </span>
-                ))}
-              </div>
-            </details>
+            <button className="rarity-guide-button" type="button" onClick={() => setIsRarityGuideOpen(true)}>
+              <CircleHelp size={16} aria-hidden="true" />
+              레어도 안내
+            </button>
           </div>
+          {isRarityGuideOpen && (
+            <div className="rarity-guide-modal" role="dialog" aria-modal="true" aria-label="레어도 가이드">
+              <button
+                className="rarity-guide-backdrop"
+                type="button"
+                aria-label="레어도 가이드 닫기"
+                onClick={() => setIsRarityGuideOpen(false)}
+              />
+              <section className="rarity-guide-sheet">
+                <header>
+                  <div>
+                    <span>카드 정보</span>
+                    <h3>레어도 가이드</h3>
+                  </div>
+                  <button type="button" aria-label="레어도 가이드 닫기" onClick={() => setIsRarityGuideOpen(false)}>
+                    <X size={20} aria-hidden="true" />
+                  </button>
+                </header>
+                <div className="rarity-guide-grid">
+                  {[
+                    ["N", "노멀"],
+                    ["P", "패러렐 노멀"],
+                    ["R", "레어"],
+                    ["SR", "슈퍼 레어"],
+                    ["UR", "울트라 레어"],
+                    ["P+UR", "패러렐 울트라 레어"],
+                    ["SE", "시크릿 레어"],
+                    ["HR", "홀로그래픽 레어"],
+                    ["PG", "프리미엄 골드 레어"],
+                    ["EXSE", "엑스트라 시크릿 레어"],
+                    ["PSE", "프리즈마틱 시크릿 레어"],
+                    ["QCSE", "쿼터 센추리 시크릿 레어"],
+                    ["GMR", "그랜드마스터 레어"],
+                  ].map(([code, name]) => (
+                    <span key={code}>
+                      <b className={`rarity-chip rarity-${code.toLowerCase().replace("+", "")}`}>{code}</b>
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            </div>
+          )}
           <div className="set-table-wrap">
             <table className="set-table">
               <thead>

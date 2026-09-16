@@ -49,8 +49,8 @@ export default function CardResult({
     const pointerY = (event.clientY - rect.top) / rect.height;
     event.currentTarget.style.setProperty("--pointer-x", `${pointerX * 100}%`);
     event.currentTarget.style.setProperty("--pointer-y", `${pointerY * 100}%`);
-    event.currentTarget.style.setProperty("--tilt-x", `${(0.5 - pointerY) * 12}deg`);
-    event.currentTarget.style.setProperty("--tilt-y", `${(pointerX - 0.5) * 16}deg`);
+    event.currentTarget.style.setProperty("--tilt-x", `${(0.5 - pointerY) * 24}deg`);
+    event.currentTarget.style.setProperty("--tilt-y", `${(pointerX - 0.5) * 32}deg`);
   };
 
   const handlePointerUp = (event) => {

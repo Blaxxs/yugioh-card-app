@@ -104,6 +104,12 @@ const createSearchUrl = (keyword) => {
   return url;
 };
 
+const createCardNumberSearchUrl = (code) => {
+  const url = createSearchUrl(code);
+  url.searchParams.set("stype", "4");
+  return url;
+};
+
 const findCardEntries = (document, term) => {
   const seen = new Set();
   return [...document.querySelectorAll(".t_row.c_normal")]
@@ -120,6 +126,27 @@ const findCardEntries = (document, term) => {
       name: row.querySelector(".card_name")?.textContent.trim() || "",
     }));
 };
+
+export async function fetchReleaseList() {
+  const url = new URL(`${OFFICIAL_SITE_ORIGIN}/yugiohdb/card_list.action`);
+  url.searchParams.set("request_locale", "ko");
+  const document = await fetchOfficialHtml(url);
+  const seen = new Set();
+
+  return [...document.querySelectorAll("#CardList .t_row")]
+    .map((row) => {
+      const path = row.querySelector(".link_value")?.value;
+      const name = row.querySelector(".main p")?.textContent.trim();
+      return {
+        id: path,
+        name,
+        date: row.querySelector(".time")?.textContent.trim() || "",
+        category: row.querySelector(".catergory")?.textContent.replace(/\s+/g, " ").trim() || "기타",
+        path,
+      };
+    })
+    .filter((release) => release.path && release.name && !seen.has(release.path) && seen.add(release.path));
+}
 
 const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
   const root = document.querySelector("#CardSet") || document;
@@ -197,8 +224,8 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
       cardAttr: attribute,
       cardLevel: level,
       cardOther: read(".species"),
-      cardAtk: itemValue("ATK") ? `공격력 ${itemValue("ATK")}` : null,
-      cardDef: itemValue("DEF") ? `수비력 ${itemValue("DEF")}` : null,
+      cardAtk: itemValue("ATK"),
+      cardDef: itemValue("DEF"),
       cardText: readCardText(root, ".top .CardText .text_linebreak"),
     },
     card_sets: cardSets,
@@ -215,6 +242,9 @@ export async function fetchOfficialCardById(cardId, fallbackName = "", imageUrl 
 }
 
 export async function searchOfficialCards(searchTerm) {
+  const releaseCodeResults = await searchCardsByReleaseCode(searchTerm);
+  if (releaseCodeResults) return releaseCodeResults;
+
   const term = normalizeCardName(searchTerm);
   let document = await fetchOfficialHtml(createSearchUrl(searchTerm));
   let entries = findCardEntries(document, term);
@@ -228,3 +258,44 @@ export async function searchOfficialCards(searchTerm) {
     ),
   );
 }
+
+export async function fetchReleaseCards(path) {
+  if (!path) return [];
+  const url = new URL(path, OFFICIAL_SITE_ORIGIN);
+  url.searchParams.set("request_locale", "ko");
+  const document = await fetchOfficialHtml(url);
+  const entries = findCardEntries(document, "");
+  return Promise.all(
+    entries.map(async (entry) =>
+      parseOfficialCard(await fetchOfficialHtml(entry.href), entry.name, entry.imageUrl, entry.cardId),
+    ),
+  );
+}
+
+const searchCardsByReleaseCode = async (searchTerm) => {
+  const rawTerm = searchTerm.trim();
+  if (!/^[A-Z0-9-]+$/.test(rawTerm)) return null;
+  const normalized = rawTerm.replace(/\s+/g, "");
+  const match = normalized.match(/^([A-Z0-9]{2,8})(?:-?KR)?(?:-?(\d{3}))?$/);
+  if (!match) return null;
+
+  const [, prefix, number] = match;
+  const cardNumbers = number ? [number] : Array.from({ length: 20 }, (_, index) => String(index + 1).padStart(3, "0"));
+
+  for (const cardNumber of cardNumbers) {
+    const code = `${prefix}-KR${cardNumber}`;
+    const document = await fetchOfficialHtml(createCardNumberSearchUrl(code));
+    const [entry] = findCardEntries(document, "");
+    if (!entry) continue;
+
+    const card = await fetchOfficialCardById(entry.cardId, entry.name, entry.imageUrl);
+    const setName = card?.card_sets?.find((set) => set.set_code?.toUpperCase().startsWith(`${prefix}-`))?.set_name;
+    if (!setName) return card ? [card] : [];
+
+    const releases = await fetchReleaseList();
+    const release = releases.find((item) => item.name === setName);
+    return release ? fetchReleaseCards(release.path) : [card];
+  }
+
+  return [];
+};

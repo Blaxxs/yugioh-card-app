@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { LoaderCircle, LogIn, LogOut, Search, X } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
-import { fetchOfficialCardById, searchOfficialCards } from "./lib/officialCardApi";
+import { fetchOfficialCardById, fetchReleaseCards, fetchReleaseList, searchOfficialCards } from "./lib/officialCardApi";
 import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
 
 export default function App() {
+  const savedHistory = window.history.state?.ygoView;
   const savedView = (() => {
     try {
       return JSON.parse(sessionStorage.getItem("ygo-view-state") || "null") || {};
@@ -17,25 +19,53 @@ export default function App() {
   const [cards, setCards] = useState(savedView.cards || []);
   const [loading, setLoading] = useState(false);
   const [session, setSession] = useState(null);
-  const [selectedCard, setSelectedCard] = useState(savedView.selectedCard || null);
+  const [selectedCard, setSelectedCard] = useState(savedHistory?.selectedCard || savedView.selectedCard || null);
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [favoriteCards, setFavoriteCards] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
   const [inventory, setInventory] = useState(null);
   const [inventoryTransactions, setInventoryTransactions] = useState([]);
   const [inventoryBusy, setInventoryBusy] = useState(false);
-  const [activeTab, setActiveTab] = useState(savedView.activeTab || "search");
+  const [activeTab, setActiveTab] = useState(savedHistory?.activeTab || savedView.activeTab || "search");
   const [viewModes, setViewModes] = useState(
     savedView.viewModes || { search: "album", inventory: "album", favorites: "album" },
   );
   const [actionError, setActionError] = useState("");
+  const [releases, setReleases] = useState([]);
+  const [releaseQuery, setReleaseQuery] = useState("");
+  const [selectedRelease, setSelectedRelease] = useState(savedHistory?.selectedRelease || null);
+  const [releaseCards, setReleaseCards] = useState([]);
+  const [releaseLoading, setReleaseLoading] = useState(false);
+  const historyIndex = useRef(savedHistory?.index || 0);
+  const viewRef = useRef({ activeTab, selectedCard, selectedRelease });
 
   useEffect(() => {
     sessionStorage.setItem("ygo-view-state", JSON.stringify({ searchTerm, cards, selectedCard, activeTab, viewModes }));
   }, [searchTerm, cards, selectedCard, activeTab, viewModes]);
 
   useEffect(() => {
+    viewRef.current = { activeTab, selectedCard, selectedRelease };
+  }, [activeTab, selectedCard, selectedRelease]);
+
+  useEffect(() => {
     if (window.location.search) window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
+  useEffect(() => {
+    if (!window.history.state?.ygoView) {
+      window.history.replaceState({ ...window.history.state, ygoView: { index: 0, ...viewRef.current } }, "");
+    }
+
+    const restoreHistoryView = (event) => {
+      const view = event.state?.ygoView;
+      if (!view) return;
+      historyIndex.current = view.index || 0;
+      setActiveTab(view.activeTab);
+      setSelectedCard(view.selectedCard || null);
+      setSelectedRelease(view.selectedRelease || null);
+    };
+    window.addEventListener("popstate", restoreHistoryView);
+    return () => window.removeEventListener("popstate", restoreHistoryView);
   }, []);
 
   useEffect(() => {
@@ -103,15 +133,79 @@ export default function App() {
     return undefined;
   }, [session, selectedCard]);
 
+  useEffect(() => {
+    if (activeTab !== "releases" || releases.length || releaseLoading) return;
+    const loadReleases = async () => {
+      await Promise.resolve();
+      setReleaseLoading(true);
+      try {
+        setReleases(await fetchReleaseList());
+      } catch (error) {
+        setActionError(error.message);
+      } finally {
+        setReleaseLoading(false);
+      }
+    };
+    loadReleases();
+  }, [activeTab, releaseLoading, releases.length]);
+
+  useEffect(() => {
+    if (!selectedRelease) return;
+    const loadReleaseCards = async () => {
+      await Promise.resolve();
+      setReleaseCards([]);
+      setReleaseLoading(true);
+      try {
+        setReleaseCards(await fetchReleaseCards(selectedRelease.path));
+      } catch (error) {
+        setActionError(error.message);
+      } finally {
+        setReleaseLoading(false);
+      }
+    };
+    loadReleaseCards();
+  }, [selectedRelease]);
+
   const loginWithGoogle = () =>
     supabase?.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
   const logout = () => supabase?.auth.signOut();
 
-  const closeCardDetail = () => setSelectedCard(null);
+  const pushView = (nextView) => {
+    const view = { ...viewRef.current, ...nextView };
+    historyIndex.current += 1;
+    window.history.pushState({ ...window.history.state, ygoView: { index: historyIndex.current, ...view } }, "");
+    setActiveTab(view.activeTab);
+    setSelectedCard(view.selectedCard || null);
+    setSelectedRelease(view.selectedRelease || null);
+  };
+
+  const goBack = (fallback) => {
+    if (historyIndex.current > 0) {
+      window.history.back();
+      return;
+    }
+    setSelectedCard(fallback.selectedCard || null);
+    setSelectedRelease(fallback.selectedRelease || null);
+    setActiveTab(fallback.activeTab || activeTab);
+  };
+
+  const closeCardDetail = () => goBack({ selectedCard: null });
+
+  const closeRelease = () => goBack({ selectedRelease: null });
+
+  const changeTab = (tab) => {
+    if (tab === activeTab && !selectedCard && !selectedRelease) return;
+    pushView({ activeTab: tab, selectedCard: null, selectedRelease: null });
+  };
+
+  const openRelease = (release) => {
+    setActionError("");
+    pushView({ activeTab: "releases", selectedCard: null, selectedRelease: release });
+  };
 
   const openCardWindow = (card) => {
     if (!card) return;
-    setSelectedCard((current) => (current?.cardId === card.cardId ? current : card));
+    if (selectedCard?.cardId !== card.cardId) pushView({ selectedCard: card });
   };
 
   const toggleFavorite = async (card) => {
@@ -240,48 +334,64 @@ export default function App() {
   };
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell auth-state ${session ? "logged-in" : "logged-out"}`}>
       <header className="app-header">
-        <h1>🃏 유희왕 카드 & 시세 검색</h1>
+        <div className="app-title">
+          <span className="app-mark" aria-hidden="true">
+            YG
+          </span>
+          <h1>카드 도감</h1>
+        </div>
         {session ? (
-          <button onClick={logout}>로그아웃 ({session.user.email})</button>
+          <button className="auth-button logout-button" onClick={logout} title="로그아웃">
+            <LogOut size={18} aria-hidden="true" />
+            <span>로그아웃</span>
+          </button>
         ) : (
-          <button onClick={loginWithGoogle} disabled={!isSupabaseConfigured}>
-            Google 로그인
+          <button className="auth-button login-btn" onClick={loginWithGoogle} disabled={!isSupabaseConfigured}>
+            <LogIn size={18} aria-hidden="true" />
+            <span>로그인</span>
           </button>
         )}
       </header>
       {!isSupabaseConfigured && (
         <p className="setup-message">Supabase 환경변수를 설정하면 로그인을 사용할 수 있습니다.</p>
       )}
-      <form
-        className="search-bar"
-        onSubmit={(event) => {
-          event.preventDefault();
-          searchCard();
-        }}
-      >
-        <input
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
-          placeholder="카드 이름을 입력하세요 (예: 푸른 눈의 백룡)"
-        />
-        <button type="submit">검색</button>
-      </form>
-      {!selectedCard && (
-        <ManagementTabs
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          session={session}
-          inventoryItems={inventoryItems}
-          favoriteCards={favoriteCards}
-          onOpenCard={openCardWindow}
-          viewMode={viewModes[activeTab]}
-          onViewModeChange={(mode) => setViewModes((current) => ({ ...current, [activeTab]: mode }))}
-          favoriteIds={favoriteIds}
-          onFavorite={toggleFavorite}
-        />
+      {activeTab === "search" && (
+        <form
+          className="search-bar"
+          onSubmit={(event) => {
+            event.preventDefault();
+            searchCard();
+          }}
+        >
+          <label className="search-input-wrap">
+            <Search size={20} aria-hidden="true" />
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="카드 이름을 검색하세요"
+              aria-label="카드 이름 검색"
+            />
+          </label>
+          <button className="search-submit" type="submit">
+            검색
+          </button>
+        </form>
       )}
+      <ManagementTabs
+        activeTab={activeTab}
+        onTabChange={changeTab}
+        session={session}
+        inventoryItems={inventoryItems}
+        favoriteCards={favoriteCards}
+        onOpenCard={openCardWindow}
+        viewMode={viewModes[activeTab]}
+        onViewModeChange={(mode) => setViewModes((current) => ({ ...current, [activeTab]: mode }))}
+        favoriteIds={favoriteIds}
+        onFavorite={toggleFavorite}
+        showContent={!selectedCard}
+      />
       {loading && <p>카드를 검색하고 있습니다...</p>}
       {actionError && (
         <p className="action-error" role="alert">
@@ -332,6 +442,88 @@ export default function App() {
             ))}
           </section>
         </>
+      )}
+      {activeTab === "releases" && !selectedCard && (
+        <section className="release-panel">
+          {selectedRelease ? (
+            <>
+              <div className="release-heading">
+                <div>
+                  <span>{selectedRelease.category}</span>
+                  <h2>{selectedRelease.name}</h2>
+                  <p>{selectedRelease.date} 발매</p>
+                </div>
+                <button className="release-back" type="button" aria-label="상품 목록으로 닫기" title="상품 목록으로 닫기" onClick={closeRelease}>
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </div>
+              {releaseLoading ? (
+                <p className="release-loading">
+                  <LoaderCircle size={18} aria-hidden="true" /> 수록 카드를 불러오는 중입니다.
+                </p>
+              ) : (
+                <>
+                  <div className="results-toolbar">
+                    <strong>수록 카드 {releaseCards.length}장</strong>
+                  </div>
+                  <div className="card-grid release-results view-album">
+                    {releaseCards.map((card) => (
+                      <CardResult
+                        key={card.cardId}
+                        card={card}
+                        isFavorite={favoriteIds.has(card.cardId)}
+                        onFavorite={toggleFavorite}
+                        onOpen={openCardWindow}
+                        viewMode="album"
+                        showCardName={false}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="release-heading">
+                <div>
+                  <span>OFFICIAL DATABASE</span>
+                  <h2>수록 카드</h2>
+                  <p>상품을 선택해 수록 카드를 확인하세요.</p>
+                </div>
+              </div>
+              <label className="release-search">
+                <Search size={18} aria-hidden="true" />
+                <input
+                  value={releaseQuery}
+                  onChange={(event) => setReleaseQuery(event.target.value)}
+                  placeholder="상품명 검색"
+                />
+              </label>
+              {releaseLoading ? (
+                <p className="release-loading">
+                  <LoaderCircle size={18} aria-hidden="true" /> 상품 목록을 불러오는 중입니다.
+                </p>
+              ) : (
+                <div className="release-list">
+                  {releases
+                    .filter((release) => release.name.includes(releaseQuery.trim()))
+                    .map((release) => (
+                      <button
+                        className="release-item"
+                        type="button"
+                        key={release.id}
+                        onClick={() => openRelease(release)}
+                      >
+                        <span>{release.date}</span>
+                        <strong>{release.name}</strong>
+                        <small>{release.category}</small>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </>
+          )}
+        </section>
       )}
       {selectedCard && (
         <CardDetail
