@@ -304,7 +304,11 @@ export default function InventoryConsole({
           <button type="button" onClick={() => setColumnMenu((value) => !value)}>
             열 설정
           </button>
-          <select value={rowDensity} onChange={(event) => setRowDensity(event.target.value)} aria-label="행 높이"><option value="compact">행 높이: 압축</option><option value="normal">행 높이: 기본</option><option value="comfortable">행 높이: 여유</option></select>
+          <select value={rowDensity} onChange={(event) => setRowDensity(event.target.value)} aria-label="행 높이">
+            <option value="compact">행 높이: 압축</option>
+            <option value="normal">행 높이: 기본</option>
+            <option value="comfortable">행 높이: 여유</option>
+          </select>
           {columnMenu && (
             <div className="column-menu">
               {columns.map((column) => (
@@ -341,8 +345,6 @@ export default function InventoryConsole({
                 {visibleColumns.map((column) => (
                   <th
                     key={column.id}
-                    draggable
-                    onDragStart={(event) => event.dataTransfer.setData("column", column.id)}
                     onDrop={(event) => {
                       event.preventDefault();
                       moveColumn(event.dataTransfer.getData("column"), column.id);
@@ -350,7 +352,7 @@ export default function InventoryConsole({
                     onDragOver={(event) => event.preventDefault()}
                     style={{ width: column.width }}
                   >
-                    <span className="column-label">{column.label}</span>
+                    <span className="column-label" draggable onDragStart={(event) => { event.stopPropagation(); event.dataTransfer.setData("column", column.id); }}> {column.label} </span>
                     <button
                       className={`column-filter-button ${columnFilters[column.id] ? "active" : ""}`}
                       type="button"
