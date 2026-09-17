@@ -396,6 +396,20 @@ export default function App() {
     }
   };
 
+  const deleteInventoryItems = async (ids) => {
+    if (!supabase || !session || !ids.length) return;
+    const { error } = await supabase.from("inventory_items").delete().in("id", ids).eq("user_id", session.user.id);
+    if (error) return setActionError(`재고 삭제 오류: ${error.message}`);
+    setInventoryItems((items) => items.filter((item) => !ids.includes(item.id)));
+  };
+
+  const updateInventoryItems = async (ids, changes) => {
+    if (!supabase || !session || !ids.length) return;
+    const { data, error } = await supabase.from("inventory_items").update({ ...changes, updated_at: new Date().toISOString() }).in("id", ids).eq("user_id", session.user.id).select();
+    if (error) return setActionError(`재고 수정 오류: ${error.message}`);
+    setInventoryItems((items) => items.map((item) => data.find((updated) => updated.id === item.id) || item));
+  };
+
   const addInventoryVariant = async ({ card, set, condition, price, quantity, imageIndex }) => {
     const image = card.card_images?.[imageIndex] || card.card_images?.[0];
     await addInventoryCards(
@@ -521,6 +535,8 @@ export default function App() {
         inventoryBusy={inventoryBusy}
         onBatchIntake={batchIntake}
         onAddInventory={addInventoryVariant}
+        onDeleteInventory={deleteInventoryItems}
+        onUpdateInventory={updateInventoryItems}
       />
       {loading && <p>카드를 검색하고 있습니다...</p>}
       {cardDetailLoading && <p>카드 상세를 불러오는 중입니다...</p>}

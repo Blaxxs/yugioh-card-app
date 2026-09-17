@@ -41,6 +41,8 @@ export default function ManagementTabs({
   inventoryBusy,
   onBatchIntake,
   onAddInventory,
+  onDeleteInventory,
+  onUpdateInventory,
 }) {
   const cards =
     activeTab === "inventory" ? inventoryItems.map((item) => item.card_snapshot).filter(Boolean) : favoriteCards;
@@ -84,6 +86,8 @@ export default function ManagementTabs({
               busy={inventoryBusy}
               onBatchIntake={onBatchIntake}
               onAddInventory={onAddInventory}
+              onDeleteInventory={onDeleteInventory}
+              onUpdateInventory={onUpdateInventory}
             />
           )}
           {activeTab === "favorites" && (
