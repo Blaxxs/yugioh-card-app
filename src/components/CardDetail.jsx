@@ -6,11 +6,9 @@ export default function CardDetail({
   card,
   session,
   inventory,
-  inventoryBusy,
   isFavorite,
   onFavorite,
   onClose,
-  onInventory,
   inventoryTransactions = [],
   onCancelTransaction,
   onUpdateTransaction,
@@ -443,7 +441,6 @@ export default function CardDetail({
             <strong>등록일:</strong>{" "}
             {inventory?.created_at ? new Date(inventory.created_at).toLocaleString("ko-KR") : "미등록"}
           </p>
-          <p className="inventory-help">+1/-1은 수량과 거래 이력을 자동 저장합니다.</p>
           <h4>거래 이력</h4>
           <div className="transaction-list">
             {inventoryTransactions.length ? (
@@ -473,14 +470,6 @@ export default function CardDetail({
             ) : (
               <p>거래 이력이 없습니다.</p>
             )}
-          </div>
-          <div>
-            <button onClick={() => onInventory(-1)} disabled={inventoryBusy || !inventory?.quantity}>
-              -1 재고 차감
-            </button>
-            <button onClick={() => onInventory(1)} disabled={inventoryBusy}>
-              +1 재고 추가
-            </button>
           </div>
         </div>
       )}
