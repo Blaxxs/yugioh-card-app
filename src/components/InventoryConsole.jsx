@@ -20,6 +20,7 @@ export default function InventoryConsole({
 }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("updated");
+  const [rowDensity, setRowDensity] = useState("compact");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [packQuery, setPackQuery] = useState("");
   const [packMatches, setPackMatches] = useState([]);
@@ -255,7 +256,7 @@ export default function InventoryConsole({
   };
 
   return (
-    <section className="inventory-console">
+    <section className={`inventory-console density-${rowDensity}`}>
       <div className="inventory-metrics">
         <div>
           <span>보유 종류</span>
@@ -303,6 +304,7 @@ export default function InventoryConsole({
           <button type="button" onClick={() => setColumnMenu((value) => !value)}>
             열 설정
           </button>
+          <select value={rowDensity} onChange={(event) => setRowDensity(event.target.value)} aria-label="행 높이"><option value="compact">행 높이: 압축</option><option value="normal">행 높이: 기본</option><option value="comfortable">행 높이: 여유</option></select>
           {columnMenu && (
             <div className="column-menu">
               {columns.map((column) => (
@@ -349,8 +351,38 @@ export default function InventoryConsole({
                     style={{ width: column.width }}
                   >
                     <span className="column-label">{column.label}</span>
-                    <button className={`column-filter-button ${columnFilters[column.id] ? "active" : ""}`} type="button" aria-label={`${column.label} 필터`} onClick={(event) => { event.stopPropagation(); setOpenFilter((current) => current === column.id ? null : column.id); }}><Filter size={13} aria-hidden="true" /></button>
-                    {openFilter === column.id && <div className="column-filter-popover" onClick={(event) => event.stopPropagation()}><input autoFocus value={columnFilters[column.id] || ""} onChange={(event) => setColumnFilters((current) => ({ ...current, [column.id]: event.target.value }))} placeholder={`${column.label} 필터`} /><button type="button" onClick={() => { setColumnFilters((current) => ({ ...current, [column.id]: "" })); setOpenFilter(null); }}>초기화</button></div>}
+                    <button
+                      className={`column-filter-button ${columnFilters[column.id] ? "active" : ""}`}
+                      type="button"
+                      aria-label={`${column.label} 필터`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setOpenFilter((current) => (current === column.id ? null : column.id));
+                      }}
+                    >
+                      <Filter size={13} aria-hidden="true" />
+                    </button>
+                    {openFilter === column.id && (
+                      <div className="column-filter-popover" onClick={(event) => event.stopPropagation()}>
+                        <input
+                          autoFocus
+                          value={columnFilters[column.id] || ""}
+                          onChange={(event) =>
+                            setColumnFilters((current) => ({ ...current, [column.id]: event.target.value }))
+                          }
+                          placeholder={`${column.label} 필터`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setColumnFilters((current) => ({ ...current, [column.id]: "" }));
+                            setOpenFilter(null);
+                          }}
+                        >
+                          초기화
+                        </button>
+                      </div>
+                    )}
                     <span
                       className="column-resize"
                       onPointerDown={(event) => {
