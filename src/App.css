@@ -962,10 +962,41 @@ button:disabled {
   border: 0;
   background: transparent;
 }
-.resize-right { top: 20px; right: -5px; bottom: 20px; width: 10px; cursor: ew-resize; }
-.resize-left { top: 20px; bottom: 20px; left: -5px; width: 10px; cursor: ew-resize; }
-.resize-bottom { right: 20px; bottom: -5px; left: 20px; height: 10px; cursor: ns-resize; }
-.resize-bottom-left { bottom: -5px; left: -5px; width: 18px; height: 18px; cursor: nesw-resize; }
+.resize-right {
+  top: 20px;
+  right: -5px;
+  bottom: 20px;
+  width: 10px;
+  cursor: ew-resize;
+}
+.resize-left {
+  top: 20px;
+  bottom: 20px;
+  left: -5px;
+  width: 10px;
+  cursor: ew-resize;
+}
+.resize-bottom {
+  right: 20px;
+  bottom: -5px;
+  left: 20px;
+  height: 10px;
+  cursor: ns-resize;
+}
+.resize-bottom-left {
+  bottom: -5px;
+  left: -5px;
+  width: 18px;
+  height: 18px;
+  cursor: nesw-resize;
+}
+.resize-bottom-right {
+  right: -5px;
+  bottom: -5px;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+}
 .pack-window-resizer::after {
   content: none;
 }

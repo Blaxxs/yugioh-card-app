@@ -1,6 +1,12 @@
 import { Download, Minus, PackagePlus, Plus, Search, X } from "lucide-react";
 import { useRef, useState } from "react";
-import { fetchOfficialCardById, fetchReleaseCards, fetchReleaseList, hydrateCardPreviews, searchOfficialCards } from "../lib/officialCardApi";
+import {
+  fetchOfficialCardById,
+  fetchReleaseCards,
+  fetchReleaseList,
+  hydrateCardPreviews,
+  searchOfficialCards,
+} from "../lib/officialCardApi";
 
 export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, onAddInventory }) {
   const [query, setQuery] = useState("");
@@ -114,11 +120,16 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
   };
   const dragPack = (event) => {
     if (!dragRef.current) return;
-    setPackWindow((current) => ({ ...(current || {}), left: dragRef.current.left + event.clientX - dragRef.current.startX, top: dragRef.current.top + event.clientY - dragRef.current.startY }));
+    setPackWindow((current) => ({
+      ...(current || {}),
+      left: dragRef.current.left + event.clientX - dragRef.current.startX,
+      top: dragRef.current.top + event.clientY - dragRef.current.startY,
+    }));
   };
   const stopPackDrag = (event) => {
     dragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
   };
   const stopPackResize = (event) => {
     resizeRef.current = null;
@@ -254,7 +265,12 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
             onClick={() => setPackModalOpen(false)}
           />
           <section className="pack-intake-dialog" style={packWindow ? { ...packWindow, position: "fixed" } : undefined}>
-            <header onPointerDown={startPackDrag} onPointerMove={dragPack} onPointerUp={stopPackDrag} onPointerCancel={stopPackDrag}>
+            <header
+              onPointerDown={startPackDrag}
+              onPointerMove={dragPack}
+              onPointerUp={stopPackDrag}
+              onPointerCancel={stopPackDrag}
+            >
               <div>
                 <span>PACK INTAKE</span>
                 <h3>팩 개봉 일괄 입고</h3>
@@ -333,9 +349,42 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
               onPointerUp={stopPackResize}
               onPointerCancel={stopPackResize}
             />
-            <button className="pack-window-resizer resize-left" type="button" aria-label="왼쪽 크기 조절" onPointerDown={(event) => startPackResize(event, "left")} onPointerMove={resizePack} onPointerUp={stopPackResize} onPointerCancel={stopPackResize} />
-            <button className="pack-window-resizer resize-bottom" type="button" aria-label="아래쪽 크기 조절" onPointerDown={(event) => startPackResize(event, "bottom")} onPointerMove={resizePack} onPointerUp={stopPackResize} onPointerCancel={stopPackResize} />
-            <button className="pack-window-resizer resize-bottom-left" type="button" aria-label="왼쪽 아래 크기 조절" onPointerDown={(event) => startPackResize(event, "bottom-left")} onPointerMove={resizePack} onPointerUp={stopPackResize} onPointerCancel={stopPackResize} />
+            <button
+              className="pack-window-resizer resize-left"
+              type="button"
+              aria-label="왼쪽 크기 조절"
+              onPointerDown={(event) => startPackResize(event, "left")}
+              onPointerMove={resizePack}
+              onPointerUp={stopPackResize}
+              onPointerCancel={stopPackResize}
+            />
+            <button
+              className="pack-window-resizer resize-bottom"
+              type="button"
+              aria-label="아래쪽 크기 조절"
+              onPointerDown={(event) => startPackResize(event, "bottom")}
+              onPointerMove={resizePack}
+              onPointerUp={stopPackResize}
+              onPointerCancel={stopPackResize}
+            />
+            <button
+              className="pack-window-resizer resize-bottom-left"
+              type="button"
+              aria-label="왼쪽 아래 크기 조절"
+              onPointerDown={(event) => startPackResize(event, "bottom-left")}
+              onPointerMove={resizePack}
+              onPointerUp={stopPackResize}
+              onPointerCancel={stopPackResize}
+            />
+            <button
+              className="pack-window-resizer resize-bottom-right"
+              type="button"
+              aria-label="오른쪽 아래 크기 조절"
+              onPointerDown={(event) => startPackResize(event, "bottom-right")}
+              onPointerMove={resizePack}
+              onPointerUp={stopPackResize}
+              onPointerCancel={stopPackResize}
+            />
           </section>
         </div>
       )}
