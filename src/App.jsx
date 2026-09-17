@@ -391,8 +391,8 @@ export default function App() {
   };
 
   const batchIntake = async (items) => {
-    for (const { card, quantity } of items) {
-      await addInventoryCards([card], quantity);
+    for (const { card, quantity, price } of items) {
+      await addInventoryCards([{ ...card, purchase_price: price }], quantity);
     }
   };
 
