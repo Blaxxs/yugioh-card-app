@@ -679,6 +679,69 @@ button:disabled {
   padding: 0 8px;
   color: var(--app-ink);
 }
+.rarity-value {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+  border: 1px solid #c4cad5;
+  border-radius: 3px;
+  padding: 0 4px 0 8px;
+  color: var(--app-ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+.rarity-value button {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid #c4cad5;
+  border-radius: 3px;
+  background: #fff;
+  color: var(--app-ink);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rarity-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid #c4cad5;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(20, 27, 40, 0.18);
+}
+.rarity-options button {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--app-ink);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.rarity-options button:hover {
+  background: #eef1f6;
+}
+.rarity-options button.selected {
+  border-color: var(--app-primary);
+  background: #eef0ff;
+}
 
 /* Inventory workstation: dense desktop back-office layout */
 .app-shell:has(.inventory-console) .app-tabs {

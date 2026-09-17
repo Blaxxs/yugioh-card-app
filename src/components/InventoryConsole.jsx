@@ -1,5 +1,5 @@
 import { Download, Filter, Minus, PackagePlus, Plus, Search, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   fetchOfficialCardById,
   fetchReleaseCards,
@@ -35,6 +35,8 @@ export default function InventoryConsole({
   const [addCard, setAddCard] = useState(null);
   const [addCode, setAddCode] = useState("");
   const [addRarity, setAddRarity] = useState("");
+  const [addRarityEditing, setAddRarityEditing] = useState(false);
+  const rarityFieldRef = useRef(null);
   const [addImageIndex, setAddImageIndex] = useState(0);
   const [addCondition, setAddCondition] = useState("S급 (신품급)");
   const [addPrice, setAddPrice] = useState("");
@@ -104,6 +106,14 @@ export default function InventoryConsole({
     const releases = await fetchReleaseList();
     setPackMatches(releases.filter((release) => release.name.includes(packQuery)).slice(0, 12));
   };
+  useEffect(() => {
+    if (!addRarityEditing) return undefined;
+    const closeIfOutside = (event) => {
+      if (rarityFieldRef.current && !rarityFieldRef.current.contains(event.target)) setAddRarityEditing(false);
+    };
+    document.addEventListener("mousedown", closeIfOutside);
+    return () => document.removeEventListener("mousedown", closeIfOutside);
+  }, [addRarityEditing]);
   const handlePackSearchKeyDown = (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -275,6 +285,12 @@ export default function InventoryConsole({
     const firstSet = detailed.card_sets?.[0];
     setAddCode(firstSet?.set_code || "");
     setAddRarity(firstSet?.rarity_code || firstSet?.set_rarity || "");
+    setAddRarityEditing(false);
+  };
+  const closeAddModal = () => {
+    setAddModalOpen(false);
+    setAddCard(null);
+    setAddRarityEditing(false);
   };
 
   return (
@@ -766,12 +782,7 @@ export default function InventoryConsole({
       )}
       {addModalOpen && (
         <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="재고 추가">
-          <button
-            className="pack-intake-backdrop"
-            type="button"
-            aria-label="재고 추가 닫기"
-            onClick={() => setAddModalOpen(false)}
-          />
+          <button className="pack-intake-backdrop" type="button" aria-label="재고 추가 닫기" onClick={closeAddModal} />
           <section className="pack-intake-dialog inventory-add-dialog">
             <header>
               <div>
@@ -779,7 +790,7 @@ export default function InventoryConsole({
                 <h3>재고 추가</h3>
                 <p>카드와 판매 정보를 선택해 저장하세요.</p>
               </div>
-              <button type="button" onClick={() => setAddModalOpen(false)}>
+              <button type="button" onClick={closeAddModal}>
                 <X size={19} />
               </button>
             </header>
@@ -820,12 +831,7 @@ export default function InventoryConsole({
                     ) ||
                     addCard.card_sets?.find((item) => item.set_code === addCode) ||
                     {};
-                  const selectedSet = {
-                    ...set,
-                    set_code: addCode,
-                    set_rarity: addRarity,
-                    rarity_code: addRarity,
-                  };
+                  const selectedSet = { ...set, set_code: addCode, set_rarity: addRarity, rarity_code: addRarity };
                   await onAddInventory({
                     card: addCard,
                     set: selectedSet,
@@ -834,8 +840,7 @@ export default function InventoryConsole({
                     price: addPrice,
                     quantity: addQuantity,
                   });
-                  setAddModalOpen(false);
-                  setAddCard(null);
+                  closeAddModal();
                 }}
               >
                 <div className="add-card-preview">
@@ -873,17 +878,34 @@ export default function InventoryConsole({
                 </label>
                 <label>
                   레어도
-                  <input
-                    value={addRarity}
-                    onChange={(event) => setAddRarity(event.target.value)}
-                    list="inventory-rarity-options"
-                    placeholder="예: UR, QCSE, 숨겨진 레어도"
-                  />
-                  <datalist id="inventory-rarity-options">
-                    {[...new Set((addCard.card_sets || []).map((set) => set.rarity_code || set.set_rarity).filter(Boolean))].map(
-                      (rarity) => <option value={rarity} key={rarity} />,
+                  <div className="rarity-value" ref={rarityFieldRef}>
+                    <span>{addRarity || "-"}</span>
+                    <button type="button" onClick={() => setAddRarityEditing((value) => !value)}>
+                      변경
+                    </button>
+                    {addRarityEditing && (
+                      <ul className="rarity-options">
+                        {[
+                          ...new Set(
+                            (addCard.card_sets || []).map((set) => set.rarity_code || set.set_rarity).filter(Boolean),
+                          ),
+                        ].map((rarity) => (
+                          <li key={rarity}>
+                            <button
+                              type="button"
+                              className={rarity === addRarity ? "selected" : ""}
+                              onClick={() => {
+                                setAddRarity(rarity);
+                                setAddRarityEditing(false);
+                              }}
+                            >
+                              {rarity}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     )}
-                  </datalist>
+                  </div>
                 </label>
                 <label>
                   상태
