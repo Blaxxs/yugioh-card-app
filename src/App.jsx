@@ -405,7 +405,12 @@ export default function App() {
 
   const updateInventoryItems = async (ids, changes) => {
     if (!supabase || !session || !ids.length) return;
-    const { data, error } = await supabase.from("inventory_items").update({ ...changes, updated_at: new Date().toISOString() }).in("id", ids).eq("user_id", session.user.id).select();
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .update({ ...changes, updated_at: new Date().toISOString() })
+      .in("id", ids)
+      .eq("user_id", session.user.id)
+      .select();
     if (error) return setActionError(`재고 수정 오류: ${error.message}`);
     setInventoryItems((items) => items.map((item) => data.find((updated) => updated.id === item.id) || item));
   };

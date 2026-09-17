@@ -1,4 +1,4 @@
-import { Download, Minus, PackagePlus, Plus, Search, X } from "lucide-react";
+import { Download, Filter, Minus, PackagePlus, Plus, Search, X } from "lucide-react";
 import { useRef, useState } from "react";
 import {
   fetchOfficialCardById,
@@ -10,7 +10,14 @@ import {
   getRarityLabel,
 } from "../lib/officialCardApi";
 
-export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, onAddInventory, onDeleteInventory, onUpdateInventory }) {
+export default function InventoryConsole({
+  inventoryItems,
+  busy,
+  onBatchIntake,
+  onAddInventory,
+  onDeleteInventory,
+  onUpdateInventory,
+}) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("updated");
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -44,15 +51,23 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
   ]);
   const [columnFilters, setColumnFilters] = useState({});
   const [columnMenu, setColumnMenu] = useState(false);
+  const [openFilter, setOpenFilter] = useState(null);
   const [viewItem, setViewItem] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editQuantity, setEditQuantity] = useState(1);
   const [editCondition, setEditCondition] = useState("S급 (신품급)");
   const [editPrice, setEditPrice] = useState("");
   const visibleItems = inventoryItems
-    .filter((item) =>
-      `${item.card_name} ${item.set_code || ""} ${item.rarity || ""}`.toLowerCase().includes(query.toLowerCase()) &&
-      Object.entries(columnFilters).every(([key, value]) => !value || String(item[key === "name" ? "card_name" : key === "code" ? "set_code" : key] || "").toLowerCase().includes(value.toLowerCase())),
+    .filter(
+      (item) =>
+        `${item.card_name} ${item.set_code || ""} ${item.rarity || ""}`.toLowerCase().includes(query.toLowerCase()) &&
+        Object.entries(columnFilters).every(
+          ([key, value]) =>
+            !value ||
+            String(item[key === "name" ? "card_name" : key === "code" ? "set_code" : key] || "")
+              .toLowerCase()
+              .includes(value.toLowerCase()),
+        ),
     )
     .sort((left, right) =>
       sort === "name"
@@ -186,12 +201,48 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
 
   const languageOf = (item) => (/JP/i.test(item.set_code || "") ? "일본판" : "한글판");
   const groupOf = () => "유희왕";
-  const cellValue = (item, id) => ({ language: languageOf(item), group: groupOf(item), name: item.card_name, rarity: item.rarity || "-", code: item.set_code || "-", condition: item.condition || "-", quantity: item.quantity, price: item.purchase_price || item.sale_price || "-", memo: item.memo || "-" })[id];
+  const cellValue = (item, id) =>
+    ({
+      language: languageOf(item),
+      group: groupOf(item),
+      name: item.card_name,
+      rarity: item.rarity || "-",
+      code: item.set_code || "-",
+      condition: item.condition || "-",
+      quantity: item.quantity,
+      price: item.purchase_price || item.sale_price || "-",
+      memo: item.memo || "-",
+    })[id];
   const visibleColumns = columns.filter((column) => column.visible);
-  const moveColumn = (fromId, toId) => setColumns((current) => { const next = [...current]; const from = next.findIndex((item) => item.id === fromId); const to = next.findIndex((item) => item.id === toId); const [item] = next.splice(from, 1); next.splice(to, 0, item); return next; });
-  const resizeColumn = (id, width) => setColumns((current) => current.map((column) => column.id === id ? { ...column, width: Math.max(60, width) } : column));
-  const deleteSelected = async () => { if (!selectedIds.size) return; if (!window.confirm("선택한 재고를 삭제할까요?")) return; if (!window.confirm("삭제하면 되돌릴 수 없습니다. 정말 삭제할까요?")) return; await onDeleteInventory([...selectedIds]); setSelectedIds(new Set()); };
-  const editSelected = async (event) => { event.preventDefault(); await onUpdateInventory([...selectedIds], { quantity: Number(editQuantity), condition: editCondition, purchase_price: editPrice === "" ? null : Number(editPrice) }); setEditOpen(false); };
+  const moveColumn = (fromId, toId) =>
+    setColumns((current) => {
+      const next = [...current];
+      const from = next.findIndex((item) => item.id === fromId);
+      const to = next.findIndex((item) => item.id === toId);
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  const resizeColumn = (id, width) =>
+    setColumns((current) =>
+      current.map((column) => (column.id === id ? { ...column, width: Math.max(60, width) } : column)),
+    );
+  const deleteSelected = async () => {
+    if (!selectedIds.size) return;
+    if (!window.confirm("선택한 재고를 삭제할까요?")) return;
+    if (!window.confirm("삭제하면 되돌릴 수 없습니다. 정말 삭제할까요?")) return;
+    await onDeleteInventory([...selectedIds]);
+    setSelectedIds(new Set());
+  };
+  const editSelected = async (event) => {
+    event.preventDefault();
+    await onUpdateInventory([...selectedIds], {
+      quantity: Number(editQuantity),
+      condition: editCondition,
+      purchase_price: editPrice === "" ? null : Number(editPrice),
+    });
+    setEditOpen(false);
+  };
   const searchAddCards = async () => setAddResults(await searchOfficialCards(addQuery));
   const chooseAddCard = async (card) => {
     const detailed = card.isDetailLoaded
@@ -243,10 +294,33 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
           <button type="button" disabled={!selectedIds.size} onClick={() => exportCsv(true)}>
             <Download size={16} aria-hidden="true" /> 선택 CSV
           </button>
-          <button type="button" disabled={!selectedIds.size} onClick={() => setEditOpen(true)}>선택 수정</button>
-          <button type="button" disabled={!selectedIds.size} onClick={deleteSelected}>선택 삭제</button>
-          <button type="button" onClick={() => setColumnMenu((value) => !value)}>열 설정</button>
-          {columnMenu && <div className="column-menu">{columns.map((column) => <label key={column.id}><input type="checkbox" checked={column.visible} onChange={() => setColumns((current) => current.map((item) => item.id === column.id ? { ...item, visible: !item.visible } : item))} /> {column.label}</label>)}</div>}
+          <button type="button" disabled={!selectedIds.size} onClick={() => setEditOpen(true)}>
+            선택 수정
+          </button>
+          <button type="button" disabled={!selectedIds.size} onClick={deleteSelected}>
+            선택 삭제
+          </button>
+          <button type="button" onClick={() => setColumnMenu((value) => !value)}>
+            열 설정
+          </button>
+          {columnMenu && (
+            <div className="column-menu">
+              {columns.map((column) => (
+                <label key={column.id}>
+                  <input
+                    type="checkbox"
+                    checked={column.visible}
+                    onChange={() =>
+                      setColumns((current) =>
+                        current.map((item) => (item.id === column.id ? { ...item, visible: !item.visible } : item)),
+                      )
+                    }
+                  />{" "}
+                  {column.label}
+                </label>
+              ))}
+            </div>
+          )}
         </div>
         <div className="inventory-table-wrap">
           <table className="inventory-table">
@@ -262,7 +336,37 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
                     }
                   />
                 </th>
-                {visibleColumns.map((column) => <th key={column.id} draggable onDragStart={(event) => event.dataTransfer.setData("column", column.id)} onDrop={(event) => { event.preventDefault(); moveColumn(event.dataTransfer.getData("column"), column.id); }} onDragOver={(event) => event.preventDefault()} style={{ width: column.width }}>{column.label}<input className="column-filter" value={columnFilters[column.id] || ""} onChange={(event) => setColumnFilters((current) => ({ ...current, [column.id]: event.target.value }))} placeholder="필터" /><span className="column-resize" onPointerDown={(event) => { const start = event.clientX; const initial = column.width; const move = (moveEvent) => resizeColumn(column.id, initial + moveEvent.clientX - start); const stop = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", stop); }} /></th>)}
+                {visibleColumns.map((column) => (
+                  <th
+                    key={column.id}
+                    draggable
+                    onDragStart={(event) => event.dataTransfer.setData("column", column.id)}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      moveColumn(event.dataTransfer.getData("column"), column.id);
+                    }}
+                    onDragOver={(event) => event.preventDefault()}
+                    style={{ width: column.width }}
+                  >
+                    <span className="column-label">{column.label}</span>
+                    <button className={`column-filter-button ${columnFilters[column.id] ? "active" : ""}`} type="button" aria-label={`${column.label} 필터`} onClick={(event) => { event.stopPropagation(); setOpenFilter((current) => current === column.id ? null : column.id); }}><Filter size={13} aria-hidden="true" /></button>
+                    {openFilter === column.id && <div className="column-filter-popover" onClick={(event) => event.stopPropagation()}><input autoFocus value={columnFilters[column.id] || ""} onChange={(event) => setColumnFilters((current) => ({ ...current, [column.id]: event.target.value }))} placeholder={`${column.label} 필터`} /><button type="button" onClick={() => { setColumnFilters((current) => ({ ...current, [column.id]: "" })); setOpenFilter(null); }}>초기화</button></div>}
+                    <span
+                      className="column-resize"
+                      onPointerDown={(event) => {
+                        const start = event.clientX;
+                        const initial = column.width;
+                        const move = (moveEvent) => resizeColumn(column.id, initial + moveEvent.clientX - start);
+                        const stop = () => {
+                          window.removeEventListener("pointermove", move);
+                          window.removeEventListener("pointerup", stop);
+                        };
+                        window.addEventListener("pointermove", move);
+                        window.addEventListener("pointerup", stop);
+                      }}
+                    />
+                  </th>
+                ))}
                 <th>보기</th>
               </tr>
             </thead>
@@ -283,16 +387,79 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
                       }
                     />
                   </td>
-                  {visibleColumns.map((column) => <td key={column.id}>{column.id === "quantity" ? <b>{cellValue(item, column.id)}</b> : cellValue(item, column.id)}</td>)}
-                  <td><button type="button" className="inventory-view-button" onClick={() => setViewItem(item)}>보기</button></td>
+                  {visibleColumns.map((column) => (
+                    <td key={column.id}>
+                      {column.id === "quantity" ? <b>{cellValue(item, column.id)}</b> : cellValue(item, column.id)}
+                    </td>
+                  ))}
+                  <td>
+                    <button type="button" className="inventory-view-button" onClick={() => setViewItem(item)}>
+                      보기
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
-      {viewItem && <div className="inventory-view-modal" role="dialog" aria-modal="true"><button className="pack-intake-backdrop" onClick={() => setViewItem(null)} /><section><button onClick={() => setViewItem(null)}><X size={18} /></button><img src={viewItem.card_snapshot?.card_images?.[0]?.image_url_small} alt={viewItem.card_name} /><h3>{viewItem.card_name}</h3><p>{viewItem.set_code || "-"} · {viewItem.rarity || "-"} · 수량 {viewItem.quantity}</p></section></div>}
-      {editOpen && <div className="inventory-edit-modal" role="dialog" aria-modal="true"><button className="pack-intake-backdrop" onClick={() => setEditOpen(false)} /><form onSubmit={editSelected}><header><h3>선택 재고 수정</h3><button type="button" onClick={() => setEditOpen(false)}><X size={18} /></button></header>{visibleItems.filter((item) => selectedIds.has(item.id)).map((item) => <div className="inventory-edit-row" key={item.id}><img src={item.card_snapshot?.card_images?.[0]?.image_url_small} alt="" /><strong>{item.card_name}</strong><input type="number" min="0" defaultValue={item.quantity} onChange={(event) => setEditQuantity(event.target.value)} /><select value={editCondition} onChange={(event) => setEditCondition(event.target.value)}><option>S급 (신품급)</option><option>S-급 (미품급)</option><option>A급</option><option>B급</option><option>C급</option></select><input type="number" min="0" placeholder="가격" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} /></div>)}<button type="submit">선택 항목 저장</button></form></div>}
+      {viewItem && (
+        <div className="inventory-view-modal" role="dialog" aria-modal="true">
+          <button className="pack-intake-backdrop" onClick={() => setViewItem(null)} />
+          <section>
+            <button onClick={() => setViewItem(null)}>
+              <X size={18} />
+            </button>
+            <img src={viewItem.card_snapshot?.card_images?.[0]?.image_url_small} alt={viewItem.card_name} />
+            <h3>{viewItem.card_name}</h3>
+            <p>
+              {viewItem.set_code || "-"} · {viewItem.rarity || "-"} · 수량 {viewItem.quantity}
+            </p>
+          </section>
+        </div>
+      )}
+      {editOpen && (
+        <div className="inventory-edit-modal" role="dialog" aria-modal="true">
+          <button className="pack-intake-backdrop" onClick={() => setEditOpen(false)} />
+          <form onSubmit={editSelected}>
+            <header>
+              <h3>선택 재고 수정</h3>
+              <button type="button" onClick={() => setEditOpen(false)}>
+                <X size={18} />
+              </button>
+            </header>
+            {visibleItems
+              .filter((item) => selectedIds.has(item.id))
+              .map((item) => (
+                <div className="inventory-edit-row" key={item.id}>
+                  <img src={item.card_snapshot?.card_images?.[0]?.image_url_small} alt="" />
+                  <strong>{item.card_name}</strong>
+                  <input
+                    type="number"
+                    min="0"
+                    defaultValue={item.quantity}
+                    onChange={(event) => setEditQuantity(event.target.value)}
+                  />
+                  <select value={editCondition} onChange={(event) => setEditCondition(event.target.value)}>
+                    <option>S급 (신품급)</option>
+                    <option>S-급 (미품급)</option>
+                    <option>A급</option>
+                    <option>B급</option>
+                    <option>C급</option>
+                  </select>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="가격"
+                    value={editPrice}
+                    onChange={(event) => setEditPrice(event.target.value)}
+                  />
+                </div>
+              ))}
+            <button type="submit">선택 항목 저장</button>
+          </form>
+        </div>
+      )}
       {packModalOpen && (
         <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="팩 개봉 입고">
           <button
