@@ -1643,6 +1643,10 @@ button:disabled {
   .inventory-table-toolbar button {
     padding: 0 5px;
   }
+  .inventory-table-toolbar select {
+    flex: 1 1 100%;
+    width: 100%;
+  }
   .inventory-table {
     min-width: 0;
   }
