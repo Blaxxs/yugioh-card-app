@@ -956,8 +956,19 @@ button:disabled {
   background: #f5f6f8;
   box-shadow: 0 18px 55px rgba(20, 27, 40, 0.24);
 }
-.pack-window-resizer { position: absolute; right: 0; bottom: 0; z-index: 5; width: 22px; height: 22px; border: 0; background: transparent; cursor: nwse-resize; }
-.pack-window-resizer::after { content: ""; position: absolute; right: 4px; bottom: 4px; width: 10px; height: 10px; border-right: 2px solid #7d8795; border-bottom: 2px solid #7d8795; }
+.pack-window-resizer {
+  position: absolute;
+  z-index: 5;
+  border: 0;
+  background: transparent;
+}
+.resize-right { top: 20px; right: -5px; bottom: 20px; width: 10px; cursor: ew-resize; }
+.resize-left { top: 20px; bottom: 20px; left: -5px; width: 10px; cursor: ew-resize; }
+.resize-bottom { right: 20px; bottom: -5px; left: 20px; height: 10px; cursor: ns-resize; }
+.resize-bottom-left { bottom: -5px; left: -5px; width: 18px; height: 18px; cursor: nesw-resize; }
+.pack-window-resizer::after {
+  content: none;
+}
 .pack-intake-dialog > header {
   display: flex;
   align-items: flex-start;
@@ -1134,7 +1145,9 @@ button:disabled {
     max-height: calc(100dvh - 64px);
     border-radius: 14px 14px 0 0;
   }
-  .pack-window-resizer { display: none; }
+  .pack-window-resizer {
+    display: none;
+  }
   .pack-card-album {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     max-height: 62dvh;

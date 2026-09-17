@@ -1,12 +1,6 @@
 import { Download, Minus, PackagePlus, Plus, Search, X } from "lucide-react";
 import { useRef, useState } from "react";
-import {
-  fetchOfficialCardById,
-  fetchReleaseCards,
-  fetchReleaseList,
-  hydrateCardPreviews,
-  searchOfficialCards,
-} from "../lib/officialCardApi";
+import { fetchOfficialCardById, fetchReleaseCards, fetchReleaseList, hydrateCardPreviews, searchOfficialCards } from "../lib/officialCardApi";
 
 export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, onAddInventory }) {
   const [query, setQuery] = useState("");
@@ -18,6 +12,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
   const [packModalOpen, setPackModalOpen] = useState(false);
   const [packWindow, setPackWindow] = useState(null);
   const resizeRef = useRef(null);
+  const dragRef = useRef(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState([]);
@@ -94,19 +89,41 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
     );
   const changePackPrice = (key, price) =>
     setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, price } : item)));
-  const startPackResize = (event) => {
+  const startPackResize = (event, direction) => {
     const rect = event.currentTarget.parentElement.getBoundingClientRect();
-    resizeRef.current = { startX: event.clientX, startY: event.clientY, rect };
+    resizeRef.current = { startX: event.clientX, startY: event.clientY, rect, direction };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const resizePack = (event) => {
     if (!resizeRef.current) return;
-    const { rect, startX, startY } = resizeRef.current;
-    setPackWindow({ left: rect.left, top: rect.top, width: Math.max(420, rect.width + event.clientX - startX), height: Math.max(420, rect.height + event.clientY - startY) });
+    const { rect, startX, startY, direction } = resizeRef.current;
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    setPackWindow({
+      left: direction.includes("left") ? rect.left + deltaX : rect.left,
+      top: rect.top,
+      width: Math.max(420, direction.includes("left") ? rect.width - deltaX : rect.width + deltaX),
+      height: Math.max(420, direction.includes("bottom") ? rect.height + deltaY : rect.height),
+    });
+  };
+  const startPackDrag = (event) => {
+    if (event.target.closest("button")) return;
+    const rect = event.currentTarget.parentElement.getBoundingClientRect();
+    dragRef.current = { startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const dragPack = (event) => {
+    if (!dragRef.current) return;
+    setPackWindow((current) => ({ ...(current || {}), left: dragRef.current.left + event.clientX - dragRef.current.startX, top: dragRef.current.top + event.clientY - dragRef.current.startY }));
+  };
+  const stopPackDrag = (event) => {
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
   const stopPackResize = (event) => {
     resizeRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
   };
   const savePack = async () => {
     const selected = packCards.filter((item) => item.quantity > 0);
@@ -237,7 +254,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
             onClick={() => setPackModalOpen(false)}
           />
           <section className="pack-intake-dialog" style={packWindow ? { ...packWindow, position: "fixed" } : undefined}>
-            <header>
+            <header onPointerDown={startPackDrag} onPointerMove={dragPack} onPointerUp={stopPackDrag} onPointerCancel={stopPackDrag}>
               <div>
                 <span>PACK INTAKE</span>
                 <h3>팩 개봉 일괄 입고</h3>
@@ -307,7 +324,18 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
             >
               <PackagePlus size={17} /> 선택 수량 저장
             </button>
-            <button className="pack-window-resizer" type="button" aria-label="창 크기 조절" onPointerDown={startPackResize} onPointerMove={resizePack} onPointerUp={stopPackResize} onPointerCancel={stopPackResize} />
+            <button
+              className="pack-window-resizer resize-right"
+              type="button"
+              aria-label="오른쪽 크기 조절"
+              onPointerDown={(event) => startPackResize(event, "right")}
+              onPointerMove={resizePack}
+              onPointerUp={stopPackResize}
+              onPointerCancel={stopPackResize}
+            />
+            <button className="pack-window-resizer resize-left" type="button" aria-label="왼쪽 크기 조절" onPointerDown={(event) => startPackResize(event, "left")} onPointerMove={resizePack} onPointerUp={stopPackResize} onPointerCancel={stopPackResize} />
+            <button className="pack-window-resizer resize-bottom" type="button" aria-label="아래쪽 크기 조절" onPointerDown={(event) => startPackResize(event, "bottom")} onPointerMove={resizePack} onPointerUp={stopPackResize} onPointerCancel={stopPackResize} />
+            <button className="pack-window-resizer resize-bottom-left" type="button" aria-label="왼쪽 아래 크기 조절" onPointerDown={(event) => startPackResize(event, "bottom-left")} onPointerMove={resizePack} onPointerUp={stopPackResize} onPointerCancel={stopPackResize} />
           </section>
         </div>
       )}
