@@ -356,6 +356,8 @@ export default function App() {
               rarity: set?.set_rarity || null,
               set_code: setCode,
               rarity_code: rarityCode,
+              condition: card.condition || null,
+              purchase_price: card.purchase_price ? Number(card.purchase_price) : null,
               quantity: (current?.quantity || 0) + quantity,
             },
             { onConflict: "user_id,card_id,set_code,rarity_code" },
@@ -392,6 +394,11 @@ export default function App() {
     for (const { card, quantity } of items) {
       await addInventoryCards([card], quantity);
     }
+  };
+
+  const addInventoryVariant = async ({ card, set, condition, price, quantity, imageIndex }) => {
+    const image = card.card_images?.[imageIndex] || card.card_images?.[0];
+    await addInventoryCards([{ ...card, card_images: image ? [image] : [], card_sets: [set], condition, purchase_price: price }], Number(quantity));
   };
 
   const cancelTransaction = async (transaction) => {
@@ -510,6 +517,7 @@ export default function App() {
         showContent={!selectedCard}
         inventoryBusy={inventoryBusy}
         onBatchIntake={batchIntake}
+        onAddInventory={addInventoryVariant}
       />
       {loading && <p>카드를 검색하고 있습니다...</p>}
       {cardDetailLoading && <p>카드 상세를 불러오는 중입니다...</p>}

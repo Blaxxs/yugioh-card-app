@@ -1,8 +1,8 @@
 import { Download, Minus, PackagePlus, Plus, Search, X } from "lucide-react";
 import { useState } from "react";
-import { fetchReleaseCards, fetchReleaseList, hydrateCardPreviews } from "../lib/officialCardApi";
+import { fetchOfficialCardById, fetchReleaseCards, fetchReleaseList, hydrateCardPreviews, searchOfficialCards } from "../lib/officialCardApi";
 
-export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }) {
+export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, onAddInventory }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("updated");
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -10,6 +10,15 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
   const [packMatches, setPackMatches] = useState([]);
   const [packCards, setPackCards] = useState([]);
   const [packModalOpen, setPackModalOpen] = useState(false);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addQuery, setAddQuery] = useState("");
+  const [addResults, setAddResults] = useState([]);
+  const [addCard, setAddCard] = useState(null);
+  const [addSetIndex, setAddSetIndex] = useState(0);
+  const [addImageIndex, setAddImageIndex] = useState(0);
+  const [addCondition, setAddCondition] = useState("NM");
+  const [addPrice, setAddPrice] = useState("");
+  const [addQuantity, setAddQuantity] = useState(1);
   const visibleItems = inventoryItems
     .filter((item) =>
       `${item.card_name} ${item.set_code || ""} ${item.rarity || ""}`.toLowerCase().includes(query.toLowerCase()),
@@ -63,10 +72,11 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
     setPackMatches([]);
     setPackQuery(release.name);
   };
-  const changePackQuantity = (cardId, nextQuantity) =>
+  const packKey = (card) => card.id || card.cardId;
+  const changePackQuantity = (key, nextQuantity) =>
     setPackCards((items) =>
       items.map((item) =>
-        item.card.cardId === cardId ? { ...item, quantity: Math.max(0, Number(nextQuantity) || 0) } : item,
+        packKey(item.card) === key ? { ...item, quantity: Math.max(0, Number(nextQuantity) || 0) } : item,
       ),
     );
   const savePack = async () => {
@@ -78,6 +88,12 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
 
   const languageOf = (item) => (/JP/i.test(item.set_code || "") ? "일본판" : "한글판");
   const groupOf = () => "유희왕";
+  const searchAddCards = async () => setAddResults(await searchOfficialCards(addQuery));
+  const chooseAddCard = async (card) => {
+    const detailed = card.isDetailLoaded ? card : await fetchOfficialCardById(card.cardId, card.name, card.card_images?.[0]?.image_url_small);
+    setAddCard(detailed);
+    setAddSetIndex(0);
+  };
 
   return (
     <section className="inventory-console">
@@ -91,7 +107,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
           <strong>{inventoryItems.reduce((total, item) => total + item.quantity, 0)}</strong>
         </div>
       </div>
-      <button className="pack-intake-open" type="button" onClick={() => setPackModalOpen(true)}><PackagePlus size={18} aria-hidden="true" /> 팩 개봉 일괄 입고</button>
+      <div className="inventory-action-buttons"><button className="pack-intake-open" type="button" onClick={() => setPackModalOpen(true)}><PackagePlus size={18} aria-hidden="true" /> 팩 개봉 일괄 입고</button><button className="inventory-add-open" type="button" onClick={() => setAddModalOpen(true)}><Plus size={18} aria-hidden="true" /> 재고 추가</button></div>
       <section className="inventory-table-section">
         <div className="inventory-table-toolbar">
           <strong>보유 재고</strong>
@@ -199,16 +215,16 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
                   <div className="pack-card-image">
                     <img src={card.card_images[0]?.image_url_small} alt={card.name} />
                     <div>
-                      <button type="button" onClick={() => changePackQuantity(card.cardId, quantity - 1)}>
+                        <button type="button" onClick={() => changePackQuantity(packKey(card), quantity - 1)}>
                         <Minus size={14} />
                       </button>
                       <input
                         type="number"
                         min="0"
                         value={quantity}
-                        onChange={(event) => changePackQuantity(card.cardId, event.target.value)}
+                        onChange={(event) => changePackQuantity(packKey(card), event.target.value)}
                       />
-                      <button type="button" onClick={() => changePackQuantity(card.cardId, quantity + 1)}>
+                        <button type="button" onClick={() => changePackQuantity(packKey(card), quantity + 1)}>
                         <Plus size={14} />
                       </button>
                     </div>
@@ -231,6 +247,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
           </section>
         </div>
       )}
+      {addModalOpen && <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="재고 추가"><button className="pack-intake-backdrop" type="button" aria-label="재고 추가 닫기" onClick={() => setAddModalOpen(false)} /><section className="pack-intake-dialog inventory-add-dialog"><header><div><span>INVENTORY ADD</span><h3>재고 추가</h3><p>카드와 판매 정보를 선택해 저장하세요.</p></div><button type="button" onClick={() => setAddModalOpen(false)}><X size={19} /></button></header>{!addCard ? <><div className="pack-search pack-modal-search"><input value={addQuery} onChange={(event) => setAddQuery(event.target.value)} placeholder="카드명 검색" /><button type="button" onClick={searchAddCards}><Search size={16} /> 검색</button></div><div className="add-search-results">{addResults.map((card) => <button type="button" key={card.cardId} onClick={() => chooseAddCard(card)}>{card.name}</button>)}</div></> : <form className="inventory-add-form" onSubmit={async (event) => { event.preventDefault(); const set = addCard.card_sets?.[addSetIndex] || {}; await onAddInventory({ card: addCard, set, imageIndex: addImageIndex, condition: addCondition, price: addPrice, quantity: addQuantity }); setAddModalOpen(false); setAddCard(null); }}><div className="add-card-preview"><img src={addCard.card_images?.[addImageIndex]?.image_url_small} alt={addCard.name} /><div>{addCard.card_images?.map((image, index) => <button type="button" key={image.id} className={index === addImageIndex ? "selected" : ""} onClick={() => setAddImageIndex(index)}><img src={image.image_url_small} alt="" /></button>)}</div></div><strong>{addCard.name}</strong><label>코드<select value={addSetIndex} onChange={(event) => setAddSetIndex(Number(event.target.value))}>{(addCard.card_sets || []).map((set, index) => <option value={index} key={`${set.set_code}-${index}`}>{set.set_code}</option>)}</select></label><label>레어도<select value={addSetIndex} onChange={(event) => setAddSetIndex(Number(event.target.value))}>{(addCard.card_sets || []).map((set, index) => <option value={index} key={`rarity-${set.set_code}-${index}`}>{set.rarity_code || set.set_rarity || "미상"}</option>)}</select></label><label>상태<select value={addCondition} onChange={(event) => setAddCondition(event.target.value)}><option>NM</option><option>LP</option><option>MP</option><option>HP</option></select></label><label>가격<input type="number" min="0" value={addPrice} onChange={(event) => setAddPrice(event.target.value)} /></label><label>수량<input type="number" min="1" value={addQuantity} onChange={(event) => setAddQuantity(event.target.value)} /></label><button className="pack-save" type="submit">재고 저장</button></form>}</section></div>}
     </section>
   );
 }
