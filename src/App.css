@@ -1690,6 +1690,10 @@ button:disabled {
   .inventory-table {
     min-width: 0;
   }
+  .inventory-table th:first-child,
+  .inventory-table td:first-child {
+    width: auto;
+  }
   .inventory-table th,
   .inventory-table td {
     padding-left: 4px;
