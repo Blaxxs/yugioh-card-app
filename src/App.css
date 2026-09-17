@@ -956,8 +956,6 @@ button:disabled {
   background: #f5f6f8;
   box-shadow: 0 18px 55px rgba(20, 27, 40, 0.24);
 }
-.pack-intake-dialog .pack-window-resizer { position: absolute; right: 0; bottom: 0; z-index: 4; width: 20px; height: 20px; border: 0; background: transparent; cursor: nwse-resize; }
-.pack-intake-dialog .pack-window-resizer::after { content: ""; position: absolute; right: 3px; bottom: 3px; width: 9px; height: 9px; border-right: 2px solid #7e8795; border-bottom: 2px solid #7e8795; }
 .pack-intake-dialog > header {
   display: flex;
   align-items: flex-start;

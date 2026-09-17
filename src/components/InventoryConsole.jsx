@@ -1,5 +1,5 @@
 import { Download, Minus, PackagePlus, Plus, Search, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   fetchOfficialCardById,
   fetchReleaseCards,
@@ -16,11 +16,6 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
   const [packMatches, setPackMatches] = useState([]);
   const [packCards, setPackCards] = useState([]);
   const [packModalOpen, setPackModalOpen] = useState(false);
-  const [packWindow, setPackWindow] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("ygo-pack-window")) || { width: 520, height: 620, x: null, y: null }; } catch { return { width: 520, height: 620, x: null, y: null }; }
-  });
-  const dragRef = useRef(null);
-  const resizeRef = useRef(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState([]);
@@ -102,25 +97,6 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
     setPackCards([]);
     setPackModalOpen(false);
   };
-  const movePackWindow = (event) => {
-    if (!dragRef.current) return;
-    const next = { ...packWindow, x: dragRef.current.x + event.clientX - dragRef.current.startX, y: dragRef.current.y + event.clientY - dragRef.current.startY };
-    setPackWindow(next);
-    localStorage.setItem("ygo-pack-window", JSON.stringify(next));
-  };
-  const resizePackWindow = (event) => {
-    if (!resizeRef.current) return;
-    const next = { ...packWindow, width: Math.max(420, resizeRef.current.width + event.clientX - resizeRef.current.startX), height: Math.max(420, resizeRef.current.height + event.clientY - resizeRef.current.startY) };
-    setPackWindow(next);
-    localStorage.setItem("ygo-pack-window", JSON.stringify(next));
-  };
-  useEffect(() => {
-    const stop = () => { dragRef.current = null; resizeRef.current = null; document.body.style.userSelect = ""; };
-    window.addEventListener("pointermove", movePackWindow);
-    window.addEventListener("pointermove", resizePackWindow);
-    window.addEventListener("pointerup", stop);
-    return () => { window.removeEventListener("pointermove", movePackWindow); window.removeEventListener("pointermove", resizePackWindow); window.removeEventListener("pointerup", stop); };
-  });
 
   const languageOf = (item) => (/JP/i.test(item.set_code || "") ? "일본판" : "한글판");
   const groupOf = () => "유희왕";
@@ -243,8 +219,8 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
             aria-label="팩 입고 닫기"
             onClick={() => setPackModalOpen(false)}
           />
-          <section className="pack-intake-dialog" style={{ width: packWindow.width, height: packWindow.height, left: packWindow.x ?? undefined, top: packWindow.y ?? undefined, transform: packWindow.x === null ? "translate(-50%, -50%)" : "none" }}>
-            <header onPointerDown={(event) => { if (event.target.closest("button")) return; const rect = event.currentTarget.parentElement.getBoundingClientRect(); dragRef.current = { startX: event.clientX, startY: event.clientY, x: rect.left, y: rect.top }; document.body.style.userSelect = "none"; }}>
+          <section className="pack-intake-dialog">
+            <header>
               <div>
                 <span>PACK INTAKE</span>
                 <h3>팩 개봉 일괄 입고</h3>
@@ -289,8 +265,8 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
                         <Plus size={14} />
                       </button>
                     </div>
-                    <input className="pack-card-price" type="number" min="0" placeholder="가격" value={price} onChange={(event) => changePackPrice(packKey(card), event.target.value)} />
                   </div>
+                  <input className="pack-card-price" type="number" min="0" placeholder="가격" value={price} onChange={(event) => changePackPrice(packKey(card), event.target.value)} />
                   <strong>{card.name}</strong>
                   <small>
                     {card.card_sets?.[0]?.set_code || "코드 확인 중"} ·{" "}
@@ -307,7 +283,6 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
             >
               <PackagePlus size={17} /> 선택 수량 저장
             </button>
-            <button className="pack-window-resizer" type="button" aria-label="창 크기 조절" onPointerDown={(event) => { const rect = event.currentTarget.parentElement.getBoundingClientRect(); resizeRef.current = { startX: event.clientX, startY: event.clientY, width: rect.width, height: rect.height }; document.body.style.userSelect = "none"; }} />
           </section>
         </div>
       )}
