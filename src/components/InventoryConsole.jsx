@@ -270,6 +270,12 @@ export default function InventoryConsole({
     setColumns((current) =>
       current.map((column) => (column.id === id ? { ...column, width: Math.max(60, width) } : column)),
     );
+  const toggleItemSelected = (id) =>
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   const deleteSelected = async () => {
     if (!selectedIds.size) return;
     if (!window.confirm("선택한 재고를 삭제할까요?")) return;
@@ -419,7 +425,7 @@ export default function InventoryConsole({
           <table className="inventory-table">
             <thead>
               <tr>
-                <th>
+                <th className="inventory-select-cell">
                   <input
                     type="checkbox"
                     aria-label="전체 선택"
@@ -558,24 +564,25 @@ export default function InventoryConsole({
                     />
                   </th>
                 ))}
-                <th>보기</th>
+                <th className="inventory-view-cell">보기</th>
               </tr>
             </thead>
             <tbody>
               {visibleItems.map((item) => (
-                <tr key={item.id}>
-                  <td>
+                <tr
+                  key={item.id}
+                  className={selectedIds.has(item.id) ? "selected" : ""}
+                  onClick={(event) => {
+                    if (event.target.closest("button, input, a")) return;
+                    toggleItemSelected(item.id);
+                  }}
+                >
+                  <td className="inventory-select-cell">
                     <input
                       type="checkbox"
                       aria-label={`${item.card_name} 선택`}
                       checked={selectedIds.has(item.id)}
-                      onChange={() =>
-                        setSelectedIds((current) => {
-                          const next = new Set(current);
-                          next.has(item.id) ? next.delete(item.id) : next.add(item.id);
-                          return next;
-                        })
-                      }
+                      onChange={() => toggleItemSelected(item.id)}
                     />
                   </td>
                   {visibleColumns.map((column) => (
@@ -583,7 +590,7 @@ export default function InventoryConsole({
                       {column.id === "quantity" ? <b>{cellValue(item, column.id)}</b> : cellValue(item, column.id)}
                     </td>
                   ))}
-                  <td>
+                  <td className="inventory-view-cell">
                     <button type="button" className="inventory-view-button" onClick={() => setViewItem(item)}>
                       보기
                     </button>
