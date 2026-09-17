@@ -1,6 +1,6 @@
 import { Download, Minus, PackagePlus, Plus, Search, X } from "lucide-react";
 import { useState } from "react";
-import { fetchReleaseCards, fetchReleaseList } from "../lib/officialCardApi";
+import { fetchReleaseCards, fetchReleaseList, hydrateCardPreviews } from "../lib/officialCardApi";
 
 export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }) {
   const [message, setMessage] = useState("");
@@ -50,6 +50,11 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
   const choosePack = async (release) => {
     const cards = await fetchReleaseCards(release.path);
     setPackCards(cards.map((card) => ({ card, quantity: 0 })));
+    hydrateCardPreviews(cards, (detailedCard) => {
+      setPackCards((items) =>
+        items.map((item) => (item.card.cardId === detailedCard.cardId ? { ...item, card: detailedCard } : item)),
+      );
+    });
     setPackMatches([]);
     setPackQuery(release.name);
   };
