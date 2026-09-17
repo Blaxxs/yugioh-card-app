@@ -53,6 +53,8 @@ export default function InventoryConsole({
   const [columnFilters, setColumnFilters] = useState({});
   const [columnMenu, setColumnMenu] = useState(false);
   const [openFilter, setOpenFilter] = useState(null);
+  const [filterSelections, setFilterSelections] = useState({});
+  const [filterSearch, setFilterSearch] = useState("");
   const [viewItem, setViewItem] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editQuantity, setEditQuantity] = useState(1);
@@ -62,13 +64,7 @@ export default function InventoryConsole({
     .filter(
       (item) =>
         `${item.card_name} ${item.set_code || ""} ${item.rarity || ""}`.toLowerCase().includes(query.toLowerCase()) &&
-        Object.entries(columnFilters).every(
-          ([key, value]) =>
-            !value ||
-            String(item[key === "name" ? "card_name" : key === "code" ? "set_code" : key] || "")
-              .toLowerCase()
-              .includes(value.toLowerCase()),
-        ),
+        Object.entries(columnFilters).every(([key, value]) => { const raw = String(item[key === "name" ? "card_name" : key === "code" ? "set_code" : key] || ""); return Array.isArray(value) ? !value.length || value.includes(raw) : !value || raw.toLowerCase().includes(value.toLowerCase()); }),
     )
     .sort((left, right) =>
       sort === "name"
@@ -352,39 +348,31 @@ export default function InventoryConsole({
                     onDragOver={(event) => event.preventDefault()}
                     style={{ width: column.width }}
                   >
-                    <span className="column-label" draggable onDragStart={(event) => { event.stopPropagation(); event.dataTransfer.setData("column", column.id); }}> {column.label} </span>
+                    <span
+                      className="column-label"
+                      draggable
+                      onDragStart={(event) => {
+                        event.stopPropagation();
+                        event.dataTransfer.setData("column", column.id);
+                      }}
+                    >
+                      {" "}
+                      {column.label}{" "}
+                    </span>
                     <button
-                      className={`column-filter-button ${columnFilters[column.id] ? "active" : ""}`}
+                      className={`column-filter-button ${columnFilters[column.id]?.length ? "active" : ""}`}
                       type="button"
                       aria-label={`${column.label} 필터`}
                       onClick={(event) => {
                         event.stopPropagation();
+                        setFilterSearch("");
+                        setFilterSelections((current) => ({ ...current, [column.id]: columnFilters[column.id] || [] }));
                         setOpenFilter((current) => (current === column.id ? null : column.id));
                       }}
                     >
                       <Filter size={13} aria-hidden="true" />
                     </button>
-                    {openFilter === column.id && (
-                      <div className="column-filter-popover" onClick={(event) => event.stopPropagation()}>
-                        <input
-                          autoFocus
-                          value={columnFilters[column.id] || ""}
-                          onChange={(event) =>
-                            setColumnFilters((current) => ({ ...current, [column.id]: event.target.value }))
-                          }
-                          placeholder={`${column.label} 필터`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setColumnFilters((current) => ({ ...current, [column.id]: "" }));
-                            setOpenFilter(null);
-                          }}
-                        >
-                          초기화
-                        </button>
-                      </div>
-                    )}
+                    {openFilter === column.id && (() => { const field = column.id === "name" ? "card_name" : column.id === "code" ? "set_code" : column.id; const values = [...new Set(inventoryItems.map((item) => String(item[field] || "")))].filter((value) => value.toLowerCase().includes(filterSearch.toLowerCase())); const selected = filterSelections[column.id] || []; return <div className="column-filter-popover spreadsheet-filter-menu" onClick={(event) => event.stopPropagation()}><div className="filter-sort-actions"><button type="button" onClick={() => setSort(column.id === "quantity" ? "quantity" : "name")}>정렬, 오름차순</button><button type="button" onClick={() => setSort(column.id === "quantity" ? "quantity" : "updated")}>정렬, 내림차순</button></div><hr /><input autoFocus value={filterSearch} onChange={(event) => setFilterSearch(event.target.value)} placeholder="값 검색" /><div className="filter-values">{values.map((value) => <label key={value}><input type="checkbox" checked={!selected.length || selected.includes(value)} onChange={() => setFilterSelections((current) => { const all = [...new Set(inventoryItems.map((item) => String(item[field] || "")))]; const currentValues = current[column.id] || []; const next = currentValues.length ? (currentValues.includes(value) ? currentValues.filter((item) => item !== value) : [...currentValues, value]) : all.filter((item) => item !== value); return { ...current, [column.id]: next }; })} /> {value || "(공백)"}</label>)}</div><div className="filter-menu-footer"><button type="button" onClick={() => { setColumnFilters((current) => ({ ...current, [column.id]: filterSelections[column.id] || [] })); setOpenFilter(null); }}>확인</button><button type="button" onClick={() => setOpenFilter(null)}>취소</button></div></div>; })()}
                     <span
                       className="column-resize"
                       onPointerDown={(event) => {
