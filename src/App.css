@@ -997,6 +997,9 @@ button:disabled {
   height: 18px;
   cursor: nwse-resize;
 }
+.resize-top { top: -5px; right: 20px; left: 20px; height: 10px; cursor: ns-resize; }
+.resize-top-left { top: -5px; left: -5px; width: 18px; height: 18px; cursor: nwse-resize; }
+.resize-top-right { top: -5px; right: -5px; width: 18px; height: 18px; cursor: nesw-resize; }
 .pack-window-resizer::after {
   content: none;
 }
