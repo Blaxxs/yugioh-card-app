@@ -1,4 +1,4 @@
-import { Download, Filter, Minus, PackagePlus, Plus, Search, X } from "lucide-react";
+import { Download, Filter, Minus, PackagePlus, Plus, Search, ShoppingCart, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   fetchOfficialCardById,
@@ -18,6 +18,7 @@ export default function InventoryConsole({
   onAddInventory,
   onDeleteInventory,
   onUpdateInventory,
+  onSellInventory,
 }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("updated");
@@ -43,6 +44,8 @@ export default function InventoryConsole({
   const [addCondition, setAddCondition] = useState("S급 (신품급)");
   const [addPrice, setAddPrice] = useState("");
   const [addQuantity, setAddQuantity] = useState(1);
+  const [sellModalOpen, setSellModalOpen] = useState(false);
+  const [sellItems, setSellItems] = useState([]);
   const [columns, setColumns] = useState(() => {
     const isMobile = typeof window !== "undefined" && window.innerWidth <= 700;
     return [
@@ -296,6 +299,41 @@ export default function InventoryConsole({
     setAddRarityEditing(false);
   };
 
+  const openSellModal = () => {
+    const selected = inventoryItems.filter((item) => selectedIds.has(item.id) && item.quantity > 0);
+    setSellItems(
+      selected.map((item) => ({
+        id: item.id,
+        cardName: item.card_name,
+        setCode: item.set_code,
+        image: item.card_snapshot?.card_images?.[0]?.image_url_small,
+        price: item.sale_price ?? item.purchase_price ?? "",
+        quantity: 1,
+        maxQuantity: item.quantity,
+      })),
+    );
+    setSellModalOpen(true);
+  };
+  const closeSellModal = () => {
+    setSellModalOpen(false);
+    setSellItems([]);
+  };
+  const changeSellPrice = (id, price) =>
+    setSellItems((items) => items.map((item) => (item.id === id ? { ...item, price } : item)));
+  const changeSellQuantity = (id, quantity) =>
+    setSellItems((items) =>
+      items.map((item) =>
+        item.id === id
+          ? { ...item, quantity: Math.min(Math.max(1, Number(quantity) || 1), item.maxQuantity) }
+          : item,
+      ),
+    );
+  const confirmSell = async () => {
+    await onSellInventory(sellItems.map(({ id, price, quantity }) => ({ id, price, quantity })));
+    setSelectedIds(new Set());
+    closeSellModal();
+  };
+
   return (
     <section className={`inventory-console density-${rowDensity}`}>
       <div className="inventory-metrics">
@@ -314,6 +352,14 @@ export default function InventoryConsole({
         </button>
         <button className="inventory-add-open" type="button" onClick={() => setAddModalOpen(true)}>
           <Plus size={18} aria-hidden="true" /> 재고 추가
+        </button>
+        <button
+          className="inventory-sell-open"
+          type="button"
+          disabled={!selectedIds.size}
+          onClick={openSellModal}
+        >
+          <ShoppingCart size={18} aria-hidden="true" /> 선택 재고 판매
         </button>
       </div>
       <section className="inventory-table-section">
@@ -949,6 +995,59 @@ export default function InventoryConsole({
                 </button>
               </form>
             )}
+          </section>
+        </div>
+      )}
+      {sellModalOpen && (
+        <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="선택 재고 판매">
+          <button className="pack-intake-backdrop" type="button" aria-label="판매 닫기" onClick={closeSellModal} />
+          <section className="pack-intake-dialog pack-cards-dialog sell-intake-dialog">
+            <header>
+              <div>
+                <span>INVENTORY SELL</span>
+                <h3>선택 재고 판매</h3>
+                <p>판매 가격과 수량을 입력한 뒤 판매하세요.</p>
+              </div>
+              <button type="button" aria-label="판매 닫기" onClick={closeSellModal}>
+                <X size={19} />
+              </button>
+            </header>
+            <div className="pack-card-list pack-card-album">
+              {sellItems.map((sale) => (
+                <article className="pack-card" key={sale.id}>
+                  <div className="pack-card-image">
+                    <img src={sale.image} alt={sale.cardName} />
+                  </div>
+                  <div className="pack-card-row">
+                    <input
+                      className="pack-card-price"
+                      type="number"
+                      min="0"
+                      placeholder="가격"
+                      value={sale.price}
+                      onChange={(event) => changeSellPrice(sale.id, event.target.value)}
+                      aria-label={`${sale.cardName} 판매 가격`}
+                    />
+                    <input
+                      className="pack-card-rarity"
+                      type="number"
+                      min="1"
+                      max={sale.maxQuantity}
+                      value={sale.quantity}
+                      onChange={(event) => changeSellQuantity(sale.id, event.target.value)}
+                      aria-label={`${sale.cardName} 판매 수량`}
+                    />
+                  </div>
+                  <strong>{sale.cardName}</strong>
+                  <small>
+                    {sale.setCode || "코드 미상"} · 재고 {sale.maxQuantity}개
+                  </small>
+                </article>
+              ))}
+            </div>
+            <button className="pack-save" type="button" disabled={busy || !sellItems.length} onClick={confirmSell}>
+              <ShoppingCart size={17} /> 판매하기
+            </button>
           </section>
         </div>
       )}

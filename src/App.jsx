@@ -415,6 +415,51 @@ export default function App() {
     setInventoryItems((items) => items.map((item) => data.find((updated) => updated.id === item.id) || item));
   };
 
+  const sellInventoryItems = async (sales) => {
+    if (!supabase || !session || !sales.length) return;
+    setInventoryBusy(true);
+    try {
+      const updatedItems = [];
+      for (const sale of sales) {
+        const item = inventoryItems.find((current) => current.id === sale.id);
+        if (!item) continue;
+        const soldQuantity = Math.min(Math.max(1, Number(sale.quantity) || 0), item.quantity);
+        if (!soldQuantity) continue;
+        const unitPrice = sale.price === "" || sale.price == null ? null : Number(sale.price);
+        const { data, error } = await supabase
+          .from("inventory_items")
+          .update({
+            quantity: item.quantity - soldQuantity,
+            sale_price: unitPrice ?? item.sale_price,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", item.id)
+          .eq("user_id", session.user.id)
+          .select()
+          .single();
+        if (error) throw error;
+        const { error: transactionError } = await supabase.from("inventory_transactions").insert({
+          user_id: session.user.id,
+          inventory_item_id: item.id,
+          type: "sale",
+          quantity: soldQuantity,
+          unit_price: unitPrice,
+        });
+        if (transactionError) throw transactionError;
+        updatedItems.push(data);
+      }
+      setInventoryItems((items) =>
+        items
+          .map((item) => updatedItems.find((updated) => updated.id === item.id) || item)
+          .filter((item) => item.quantity > 0),
+      );
+    } catch (error) {
+      setActionError(`판매 처리 오류: ${error.message}`);
+    } finally {
+      setInventoryBusy(false);
+    }
+  };
+
   const addInventoryVariant = async ({ card, set, condition, price, quantity, imageIndex }) => {
     const image = card.card_images?.[imageIndex] || card.card_images?.[0];
     await addInventoryCards(
@@ -544,6 +589,7 @@ export default function App() {
         onAddInventory={addInventoryVariant}
         onDeleteInventory={deleteInventoryItems}
         onUpdateInventory={updateInventoryItems}
+        onSellInventory={sellInventoryItems}
       />
       {loading && <p>카드를 검색하고 있습니다...</p>}
       {cardDetailLoading && <p>카드 상세를 불러오는 중입니다...</p>}

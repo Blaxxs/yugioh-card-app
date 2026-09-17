@@ -560,7 +560,8 @@ button:disabled {
   margin: 8px;
 }
 .pack-intake-open,
-.inventory-add-open {
+.inventory-add-open,
+.inventory-sell-open {
   display: inline-flex;
   min-height: 32px;
   align-items: center;
@@ -579,6 +580,20 @@ button:disabled {
   border-color: var(--app-primary);
   background: var(--app-primary);
   color: #fff;
+}
+.inventory-sell-open {
+  border-color: #1f9d6b;
+  background: #e4f7ee;
+  color: #16794f;
+}
+.inventory-sell-open:disabled {
+  border-color: #c8bfff;
+  background: #f1f0fa;
+  color: #9c98b8;
+  cursor: not-allowed;
+}
+.sell-intake-dialog {
+  width: min(760px, calc(100vw - 48px));
 }
 .inventory-add-dialog {
   width: min(420px, calc(100vw - 48px));
@@ -1477,6 +1492,10 @@ button:disabled {
   }
   .pack-intake-dialog.inventory-add-dialog {
     width: 420px;
+    min-width: 0;
+  }
+  .pack-intake-dialog.sell-intake-dialog {
+    width: min(760px, calc(100vw - 48px));
     min-width: 0;
   }
 }
