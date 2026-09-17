@@ -122,7 +122,13 @@ export default function InventoryConsole({
       const variants = detailedCards.flatMap((detailedCard) => {
         const sets = detailedCard.card_sets.filter((set) => set.set_name === release.name);
         return (sets.length ? sets : [null]).map((set) => ({
-          card: set ? { ...detailedCard, id: `${detailedCard.cardId}-${set.set_code}-${set.rarity_code || set.set_rarity}`, card_sets: [set] } : detailedCard,
+          card: set
+            ? {
+                ...detailedCard,
+                id: `${detailedCard.cardId}-${set.set_code}-${set.rarity_code || set.set_rarity}`,
+                card_sets: [set],
+              }
+            : detailedCard,
           quantity: 0,
           price: "",
         }));
@@ -596,7 +602,7 @@ export default function InventoryConsole({
                 <X size={19} />
               </button>
             </header>
-            <div className="pack-search pack-modal-search">
+            {!packLoading && <div className="pack-search pack-modal-search">
               <input
                 value={packQuery}
                 onChange={(event) => setPackQuery(event.target.value)}
@@ -606,54 +612,62 @@ export default function InventoryConsole({
               <button type="button" onClick={findPacks}>
                 <Search size={16} aria-hidden="true" /> 찾기
               </button>
-            </div>
-            {packMatches.map((release) => (
+            </div>}
+            {!packLoading && packMatches.map((release) => (
               <button className="pack-match" type="button" key={release.id} onClick={() => choosePack(release)}>
                 {release.name}
                 <small>{release.date}</small>
               </button>
             ))}
-            {packLoading ? <div className="pack-loading-state"><span className="pack-loading-spinner" /><strong>카드 이미지를 준비하는 중입니다</strong><small>잠시만 기다려 주세요.</small></div> : <div className="pack-card-list pack-card-album">
-              {packCards.map(({ card, quantity, price }) => (
-                <article className="pack-card" key={card.id || card.cardId}>
-                  <div className="pack-card-image">
-                    <img src={card.card_images[0]?.image_url_small} alt={card.name} />
-                    <div>
-                      <button type="button" onClick={() => changePackQuantity(packKey(card), quantity - 1)}>
-                        <Minus size={14} />
-                      </button>
-                      <input
-                        type="number"
-                        min="0"
-                        value={quantity}
-                        onChange={(event) => changePackQuantity(packKey(card), event.target.value)}
-                      />
-                      <button type="button" onClick={() => changePackQuantity(packKey(card), quantity + 1)}>
-                        <Plus size={14} />
-                      </button>
+            {packLoading ? (
+              <div className="pack-loading-state">
+                <span className="pack-loading-spinner" />
+                <strong>카드 이미지를 준비하는 중입니다</strong>
+                <small>잠시만 기다려 주세요.</small>
+              </div>
+            ) : (
+              <div className="pack-card-list pack-card-album">
+                {packCards.map(({ card, quantity, price }) => (
+                  <article className="pack-card" key={card.id || card.cardId}>
+                    <div className="pack-card-image">
+                      <img src={card.card_images[0]?.image_url_small} alt={card.name} />
+                      <div>
+                        <button type="button" onClick={() => changePackQuantity(packKey(card), quantity - 1)}>
+                          <Minus size={14} />
+                        </button>
+                        <input
+                          type="number"
+                          min="0"
+                          value={quantity}
+                          onChange={(event) => changePackQuantity(packKey(card), event.target.value)}
+                        />
+                        <button type="button" onClick={() => changePackQuantity(packKey(card), quantity + 1)}>
+                          <Plus size={14} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <input
-                    className="pack-card-price"
-                    type="number"
-                    min="0"
-                    placeholder="가격"
-                    value={price}
-                    onChange={(event) => changePackPrice(packKey(card), event.target.value)}
-                  />
-                  <strong>{card.name}</strong>
-                  <small>
-                    {card.card_sets?.[0]?.set_code || "코드 확인 중"} ·{" "}
-                    <b
-                      className="rarity-chip"
-                      title={getRarityLabel(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity)}
-                    >
-                      {getRarityCode(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity) || "?"}
-                    </b>
-                  </small>
-                </article>
-              ))}
-            </div>}
+                    <input
+                      className="pack-card-price"
+                      type="number"
+                      min="0"
+                      placeholder="가격"
+                      value={price}
+                      onChange={(event) => changePackPrice(packKey(card), event.target.value)}
+                    />
+                    <strong>{card.name}</strong>
+                    <small>
+                      {card.card_sets?.[0]?.set_code || "코드 확인 중"} ·{" "}
+                      <b
+                        className="rarity-chip"
+                        title={getRarityLabel(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity)}
+                      >
+                        {getRarityCode(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity) || "?"}
+                      </b>
+                    </small>
+                  </article>
+                ))}
+              </div>
+            )}
             <button
               className="pack-save"
               type="button"
