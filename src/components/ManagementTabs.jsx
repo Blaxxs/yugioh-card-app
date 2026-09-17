@@ -86,26 +86,30 @@ export default function ManagementTabs({
               onBatchIntake={onBatchIntake}
             />
           )}
-          <div className="management-heading">
-            <ViewFilters value={viewMode} onChange={onViewModeChange} />
-          </div>
-          <div className={`card-grid management-results view-${viewMode}`}>
-            {cards.length ? (
-              cards.map((card) => (
-                <CardResult
-                  key={card.cardId}
-                  card={card}
-                  isFavorite={favoriteIds?.has(card.cardId) || activeTab === "favorites"}
-                  onFavorite={onFavorite}
-                  onOpen={onOpenCard}
-                  viewMode={viewMode}
-                  showCardName={viewMode !== "album"}
-                />
-              ))
-            ) : (
-              <p>{emptyMessage}</p>
-            )}
-          </div>
+          {activeTab === "favorites" && (
+            <>
+              <div className="management-heading">
+                <ViewFilters value={viewMode} onChange={onViewModeChange} />
+              </div>
+              <div className={`card-grid management-results view-${viewMode}`}>
+                {cards.length ? (
+                  cards.map((card) => (
+                    <CardResult
+                      key={card.cardId}
+                      card={card}
+                      isFavorite={favoriteIds?.has(card.cardId) || activeTab === "favorites"}
+                      onFavorite={onFavorite}
+                      onOpen={onOpenCard}
+                      viewMode={viewMode}
+                      showCardName={viewMode !== "album"}
+                    />
+                  ))
+                ) : (
+                  <p>{emptyMessage}</p>
+                )}
+              </div>
+            </>
+          )}
         </section>
       )}
     </>
