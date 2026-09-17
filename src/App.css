@@ -548,6 +548,8 @@ button:disabled {
 .release-stock-button {
   margin: -4px 0 14px;
 }
+.pack-intake-open { display: inline-flex; min-height: 38px; align-items: center; gap: 6px; margin: 8px; border: 1px solid #c8bfff; border-radius: 3px; padding: 0 12px; background: var(--app-soft); color: var(--app-primary-strong); font-size: 13px; font-weight: 750; cursor: pointer; }
+.pack-modal-search { margin: 10px 12px 6px; }
 
 /* Inventory workstation: dense desktop back-office layout */
 .app-shell:has(.inventory-console) .app-tabs {

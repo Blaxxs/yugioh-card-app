@@ -3,13 +3,13 @@ import { useState } from "react";
 import { fetchReleaseCards, fetchReleaseList, hydrateCardPreviews } from "../lib/officialCardApi";
 
 export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }) {
-  const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("updated");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [packQuery, setPackQuery] = useState("");
   const [packMatches, setPackMatches] = useState([]);
   const [packCards, setPackCards] = useState([]);
+  const [packModalOpen, setPackModalOpen] = useState(false);
   const visibleItems = inventoryItems
     .filter((item) =>
       `${item.card_name} ${item.set_code || ""} ${item.rarity || ""}`.toLowerCase().includes(query.toLowerCase()),
@@ -50,10 +50,15 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
   const choosePack = async (release) => {
     const cards = await fetchReleaseCards(release.path);
     setPackCards(cards.map((card) => ({ card, quantity: 0 })));
+    setPackModalOpen(true);
     hydrateCardPreviews(cards, (detailedCard) => {
-      setPackCards((items) =>
-        items.map((item) => (item.card.cardId === detailedCard.cardId ? { ...item, card: detailedCard } : item)),
-      );
+      const variants = detailedCard.card_sets
+        .filter((set) => set.set_name === release.name)
+        .map((set) => ({ ...detailedCard, id: `${detailedCard.cardId}-${set.set_code}-${set.rarity_code || set.set_rarity}`, card_sets: [set] }));
+      setPackCards((items) => [
+        ...items.filter((item) => item.card.cardId !== detailedCard.cardId),
+        ...(variants.length ? variants : [detailedCard]).map((card) => ({ card, quantity: 0 })),
+      ]);
     });
     setPackMatches([]);
     setPackQuery(release.name);
@@ -68,7 +73,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
     const selected = packCards.filter((item) => item.quantity > 0);
     await onBatchIntake(selected);
     setPackCards([]);
-    setMessage(`팩 입고 완료: ${selected.length}종`);
+    setPackModalOpen(false);
   };
 
   const languageOf = (item) => (/JP/i.test(item.set_code || "") ? "일본판" : "한글판");
@@ -86,28 +91,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
           <strong>{inventoryItems.reduce((total, item) => total + item.quantity, 0)}</strong>
         </div>
       </div>
-      <section className="pack-intake">
-        <div className="bulk-intake-heading">
-          <PackagePlus size={19} aria-hidden="true" />
-          <div>
-            <strong>팩 개봉 일괄 입고</strong>
-            <span>수록 팩을 찾아 카드별 수량을 조정하세요.</span>
-          </div>
-        </div>
-        <div className="pack-search">
-          <input value={packQuery} onChange={(event) => setPackQuery(event.target.value)} placeholder="수록 팩 이름" />
-          <button type="button" onClick={findPacks}>
-            <Search size={16} aria-hidden="true" /> 찾기
-          </button>
-        </div>
-        {packMatches.map((release) => (
-          <button className="pack-match" type="button" key={release.id} onClick={() => choosePack(release)}>
-            {release.name}
-            <small>{release.date}</small>
-          </button>
-        ))}
-        {message && <p className="bulk-intake-message">{message}</p>}
-      </section>
+      <button className="pack-intake-open" type="button" onClick={() => setPackModalOpen(true)}><PackagePlus size={18} aria-hidden="true" /> 팩 개봉 일괄 입고</button>
       <section className="inventory-table-section">
         <div className="inventory-table-toolbar">
           <strong>보유 재고</strong>
@@ -188,28 +172,30 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
           </table>
         </div>
       </section>
-      {packCards.length > 0 && (
+      {packModalOpen && (
         <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="팩 개봉 입고">
           <button
             className="pack-intake-backdrop"
             type="button"
             aria-label="팩 입고 닫기"
-            onClick={() => setPackCards([])}
+            onClick={() => setPackModalOpen(false)}
           />
           <section className="pack-intake-dialog">
             <header>
               <div>
                 <span>PACK INTAKE</span>
-                <h3>{packQuery}</h3>
+                <h3>팩 개봉 일괄 입고</h3>
                 <p>카드 이미지 위 수량을 조정한 뒤 저장하세요.</p>
               </div>
-              <button type="button" aria-label="팩 입고 닫기" onClick={() => setPackCards([])}>
+              <button type="button" aria-label="팩 입고 닫기" onClick={() => setPackModalOpen(false)}>
                 <X size={19} />
               </button>
             </header>
+            <div className="pack-search pack-modal-search"><input value={packQuery} onChange={(event) => setPackQuery(event.target.value)} placeholder="수록 팩 이름" /><button type="button" onClick={findPacks}><Search size={16} aria-hidden="true" /> 찾기</button></div>
+            {packMatches.map((release) => <button className="pack-match" type="button" key={release.id} onClick={() => choosePack(release)}>{release.name}<small>{release.date}</small></button>)}
             <div className="pack-card-list pack-card-album">
               {packCards.map(({ card, quantity }) => (
-                <article className="pack-card" key={card.cardId}>
+                <article className="pack-card" key={card.id || card.cardId}>
                   <div className="pack-card-image">
                     <img src={card.card_images[0]?.image_url_small} alt={card.name} />
                     <div>
@@ -229,7 +215,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }
                   </div>
                   <strong>{card.name}</strong>
                   <small>
-                    {card.card_sets?.[0]?.set_code || "코드 확인 중"} · {card.card_sets?.[0]?.rarity_code || "레어도"}
+                    {card.card_sets?.[0]?.set_code || "코드 확인 중"} · {card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity || "레어도"}
                   </small>
                 </article>
               ))}
