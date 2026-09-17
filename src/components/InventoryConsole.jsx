@@ -1,4 +1,4 @@
-import { Download, Filter, Minus, PackagePlus, Plus, Search, ShoppingCart, X } from "lucide-react";
+import { Download, Filter, Minus, PackagePlus, Plus, Receipt, Search, ShoppingCart, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   fetchOfficialCardById,
@@ -10,6 +10,7 @@ import {
   getRarityLabel,
   ALL_RARITY_CODES,
 } from "../lib/officialCardApi";
+import SalesHistory from "./SalesHistory";
 
 export default function InventoryConsole({
   inventoryItems,
@@ -19,6 +20,8 @@ export default function InventoryConsole({
   onDeleteInventory,
   onUpdateInventory,
   onSellInventory,
+  salesHistory,
+  onCancelSales,
 }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("updated");
@@ -46,6 +49,7 @@ export default function InventoryConsole({
   const [addQuantity, setAddQuantity] = useState(1);
   const [sellModalOpen, setSellModalOpen] = useState(false);
   const [sellItems, setSellItems] = useState([]);
+  const [salesHistoryOpen, setSalesHistoryOpen] = useState(false);
   const [columns, setColumns] = useState(() => {
     const isMobile = typeof window !== "undefined" && window.innerWidth <= 700;
     return [
@@ -323,9 +327,7 @@ export default function InventoryConsole({
   const changeSellQuantity = (id, quantity) =>
     setSellItems((items) =>
       items.map((item) =>
-        item.id === id
-          ? { ...item, quantity: Math.min(Math.max(1, Number(quantity) || 1), item.maxQuantity) }
-          : item,
+        item.id === id ? { ...item, quantity: Math.min(Math.max(1, Number(quantity) || 1), item.maxQuantity) } : item,
       ),
     );
   const confirmSell = async () => {
@@ -353,13 +355,11 @@ export default function InventoryConsole({
         <button className="inventory-add-open" type="button" onClick={() => setAddModalOpen(true)}>
           <Plus size={18} aria-hidden="true" /> 재고 추가
         </button>
-        <button
-          className="inventory-sell-open"
-          type="button"
-          disabled={!selectedIds.size}
-          onClick={openSellModal}
-        >
+        <button className="inventory-sell-open" type="button" disabled={!selectedIds.size} onClick={openSellModal}>
           <ShoppingCart size={18} aria-hidden="true" /> 선택 재고 판매
+        </button>
+        <button className="inventory-sales-history-open" type="button" onClick={() => setSalesHistoryOpen(true)}>
+          <Receipt size={18} aria-hidden="true" /> 판매 내역
         </button>
       </div>
       <section className="inventory-table-section">
@@ -1051,6 +1051,13 @@ export default function InventoryConsole({
           </section>
         </div>
       )}
+      <SalesHistory
+        open={salesHistoryOpen}
+        onClose={() => setSalesHistoryOpen(false)}
+        salesHistory={salesHistory}
+        busy={busy}
+        onCancelSales={onCancelSales}
+      />
     </section>
   );
 }

@@ -32,6 +32,7 @@ export default function App() {
   const [inventoryItems, setInventoryItems] = useState([]);
   const [inventory, setInventory] = useState(null);
   const [inventoryTransactions, setInventoryTransactions] = useState([]);
+  const [salesHistory, setSalesHistory] = useState([]);
   const [inventoryBusy, setInventoryBusy] = useState(false);
   const [activeTab, setActiveTab] = useState(savedHistory?.activeTab || savedView.activeTab || "search");
   const [viewModes, setViewModes] = useState(
@@ -98,9 +99,16 @@ export default function App() {
     Promise.all([
       supabase.from("favorites").select("card_id, card_snapshot"),
       supabase.from("inventory_items").select("*").gt("quantity", 0).order("updated_at", { ascending: false }),
-    ]).then(async ([favoritesResult, inventoryResult]) => {
-      if (favoritesResult.error) setActionError(`찜 목록 오류: ${favoritesResult.error.message}`);
+      supabase
+        .from("inventory_transactions")
+        .select("*, inventory_items(card_name, set_code, rarity_code, rarity, condition, card_snapshot)")
+        .eq("user_id", session.user.id)
+        .eq("type", "sale")
+        .order("occurred_at", { ascending: false }),
+    ]).then(async ([favoritesResult, inventoryResult, salesResult]) => {
+      if (favoritesResult.error) setActionError(`찌 목록 오류: ${favoritesResult.error.message}`);
       if (inventoryResult.error) setActionError(`재고 목록 오류: ${inventoryResult.error.message}`);
+      if (salesResult.error) setActionError(`판매 내역 오류: ${salesResult.error.message}`);
       setFavoriteIds(new Set((favoritesResult.data || []).map((item) => item.card_id)));
       const savedCards = (favoritesResult.data || [])
         .map((item) => ({ snapshot: item.card_snapshot, cardId: item.card_id }))
@@ -122,6 +130,7 @@ export default function App() {
       );
       setFavoriteCards(refreshedCards);
       setInventoryItems(inventoryResult.data || []);
+      setSalesHistory(salesResult.data || []);
     });
     return undefined;
   }, [session]);
@@ -420,6 +429,7 @@ export default function App() {
     setInventoryBusy(true);
     try {
       const updatedItems = [];
+      const newSaleEntries = [];
       for (const sale of sales) {
         const item = inventoryItems.find((current) => current.id === sale.id);
         if (!item) continue;
@@ -438,23 +448,86 @@ export default function App() {
           .select()
           .single();
         if (error) throw error;
-        const { error: transactionError } = await supabase.from("inventory_transactions").insert({
-          user_id: session.user.id,
-          inventory_item_id: item.id,
-          type: "sale",
-          quantity: soldQuantity,
-          unit_price: unitPrice,
-        });
+        const { data: transaction, error: transactionError } = await supabase
+          .from("inventory_transactions")
+          .insert({
+            user_id: session.user.id,
+            inventory_item_id: item.id,
+            type: "sale",
+            quantity: soldQuantity,
+            unit_price: unitPrice,
+          })
+          .select()
+          .single();
         if (transactionError) throw transactionError;
         updatedItems.push(data);
+        newSaleEntries.push({
+          ...transaction,
+          inventory_items: {
+            card_name: item.card_name,
+            set_code: item.set_code,
+            rarity_code: item.rarity_code,
+            rarity: item.rarity,
+            condition: item.condition,
+            card_snapshot: item.card_snapshot,
+          },
+        });
       }
       setInventoryItems((items) =>
         items
           .map((item) => updatedItems.find((updated) => updated.id === item.id) || item)
           .filter((item) => item.quantity > 0),
       );
+      setSalesHistory((history) => [...newSaleEntries, ...history]);
     } catch (error) {
       setActionError(`판매 처리 오류: ${error.message}`);
+    } finally {
+      setInventoryBusy(false);
+    }
+  };
+
+  const cancelSalesTransactions = async (transactions) => {
+    if (!supabase || !session || !transactions.length) return;
+    setInventoryBusy(true);
+    try {
+      for (const transaction of transactions) {
+        if (transaction.canceled_at) continue;
+        const { data: currentItem, error: fetchError } = await supabase
+          .from("inventory_items")
+          .select("*")
+          .eq("id", transaction.inventory_item_id)
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+        if (fetchError) throw fetchError;
+        const nextQuantity = (currentItem?.quantity || 0) + transaction.quantity;
+        const { data: updatedItem, error: updateError } = await supabase
+          .from("inventory_items")
+          .update({ quantity: nextQuantity, updated_at: new Date().toISOString() })
+          .eq("id", transaction.inventory_item_id)
+          .eq("user_id", session.user.id)
+          .select()
+          .single();
+        if (updateError) throw updateError;
+        const { error: cancelError } = await supabase
+          .from("inventory_transactions")
+          .update({ canceled_at: new Date().toISOString() })
+          .eq("id", transaction.id)
+          .eq("user_id", session.user.id);
+        if (cancelError) throw cancelError;
+        setInventoryItems((items) => {
+          const exists = items.some((item) => item.id === updatedItem.id);
+          return exists
+            ? items.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+            : [updatedItem, ...items];
+        });
+        setSalesHistory((history) =>
+          history.map((entry) =>
+            entry.id === transaction.id ? { ...entry, canceled_at: new Date().toISOString() } : entry,
+          ),
+        );
+      }
+    } catch (error) {
+      setActionError(`판매 취소 오류: ${error.message}`);
     } finally {
       setInventoryBusy(false);
     }
@@ -590,6 +663,8 @@ export default function App() {
         onDeleteInventory={deleteInventoryItems}
         onUpdateInventory={updateInventoryItems}
         onSellInventory={sellInventoryItems}
+        salesHistory={salesHistory}
+        onCancelSales={cancelSalesTransactions}
       />
       {loading && <p>카드를 검색하고 있습니다...</p>}
       {cardDetailLoading && <p>카드 상세를 불러오는 중입니다...</p>}

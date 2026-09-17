@@ -561,7 +561,8 @@ button:disabled {
 }
 .pack-intake-open,
 .inventory-add-open,
-.inventory-sell-open {
+.inventory-sell-open,
+.inventory-sales-history-open {
   display: inline-flex;
   min-height: 32px;
   align-items: center;
@@ -594,6 +595,18 @@ button:disabled {
 }
 .sell-intake-dialog {
   width: min(760px, calc(100vw - 48px));
+}
+.sales-history-dialog {
+  width: min(920px, calc(100vw - 48px));
+}
+.sales-history-wrap {
+  height: min(50dvh, 420px);
+  min-height: 200px;
+  max-height: none;
+}
+.sale-canceled-row td {
+  color: #9aa2b1;
+  text-decoration: line-through;
 }
 .inventory-add-dialog {
   width: min(420px, calc(100vw - 48px));
@@ -1496,6 +1509,10 @@ button:disabled {
   }
   .pack-intake-dialog.sell-intake-dialog {
     width: min(760px, calc(100vw - 48px));
+    min-width: 0;
+  }
+  .pack-intake-dialog.sales-history-dialog {
+    width: min(920px, calc(100vw - 48px));
     min-width: 0;
   }
 }
