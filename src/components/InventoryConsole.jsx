@@ -7,7 +7,6 @@ import {
   hydrateCardPreviews,
   searchOfficialCards,
   getRarityCode,
-  getRarityLabel,
 } from "../lib/officialCardApi";
 
 export default function InventoryConsole({
@@ -131,6 +130,7 @@ export default function InventoryConsole({
             : detailedCard,
           quantity: 0,
           price: "",
+          rarity: getRarityCode(set?.rarity_code || set?.set_rarity) || "",
         }));
       });
       setPackCards(variants);
@@ -149,6 +149,8 @@ export default function InventoryConsole({
     );
   const changePackPrice = (key, price) =>
     setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, price } : item)));
+  const changePackRarity = (key, rarity) =>
+    setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, rarity } : item)));
   const startPackResize = (event, direction) => {
     const rect = event.currentTarget.parentElement.getBoundingClientRect();
     resizeRef.current = { startX: event.clientX, startY: event.clientY, rect, direction };
@@ -205,7 +207,15 @@ export default function InventoryConsole({
       event.currentTarget.releasePointerCapture(event.pointerId);
   };
   const savePack = async () => {
-    const selected = packCards.filter((item) => item.quantity > 0);
+    const selected = packCards
+      .filter((item) => item.quantity > 0)
+      .map((item) => ({
+        ...item,
+        card: {
+          ...item.card,
+          card_sets: [{ ...(item.card.card_sets?.[0] || {}), rarity_code: item.rarity, set_rarity: item.rarity }],
+        },
+      }));
     await onBatchIntake(selected);
     setPackCards([]);
     setPackModalOpen(false);
@@ -226,6 +236,7 @@ export default function InventoryConsole({
       memo: item.memo || "-",
     })[id];
   const visibleColumns = columns.filter((column) => column.visible);
+  const tableWidthTotal = visibleColumns.reduce((total, column) => total + column.width, 0) + 84;
   const moveColumn = (fromId, toId) =>
     setColumns((current) => {
       const next = [...current];
@@ -361,7 +372,7 @@ export default function InventoryConsole({
                       moveColumn(event.dataTransfer.getData("column"), column.id);
                     }}
                     onDragOver={(event) => event.preventDefault()}
-                    style={{ width: column.width }}
+                    style={{ width: `${(column.width / tableWidthTotal) * 100}%` }}
                   >
                     <span
                       className="column-label"
@@ -602,23 +613,26 @@ export default function InventoryConsole({
                 <X size={19} />
               </button>
             </header>
-            {!packLoading && <div className="pack-search pack-modal-search">
-              <input
-                value={packQuery}
-                onChange={(event) => setPackQuery(event.target.value)}
-                onKeyDown={handlePackSearchKeyDown}
-                placeholder="수록 팩 이름"
-              />
-              <button type="button" onClick={findPacks}>
-                <Search size={16} aria-hidden="true" /> 찾기
-              </button>
-            </div>}
-            {!packLoading && packMatches.map((release) => (
-              <button className="pack-match" type="button" key={release.id} onClick={() => choosePack(release)}>
-                {release.name}
-                <small>{release.date}</small>
-              </button>
-            ))}
+            {!packLoading && (
+              <div className="pack-search pack-modal-search">
+                <input
+                  value={packQuery}
+                  onChange={(event) => setPackQuery(event.target.value)}
+                  onKeyDown={handlePackSearchKeyDown}
+                  placeholder="수록 팩 이름"
+                />
+                <button type="button" onClick={findPacks}>
+                  <Search size={16} aria-hidden="true" /> 찾기
+                </button>
+              </div>
+            )}
+            {!packLoading &&
+              packMatches.map((release) => (
+                <button className="pack-match" type="button" key={release.id} onClick={() => choosePack(release)}>
+                  {release.name}
+                  <small>{release.date}</small>
+                </button>
+              ))}
             {packLoading ? (
               <div className="pack-loading-state">
                 <span className="pack-loading-spinner" />
@@ -627,7 +641,7 @@ export default function InventoryConsole({
               </div>
             ) : (
               <div className="pack-card-list pack-card-album">
-                {packCards.map(({ card, quantity, price }) => (
+                {packCards.map(({ card, quantity, price, rarity }) => (
                   <article className="pack-card" key={card.id || card.cardId}>
                     <div className="pack-card-image">
                       <img src={card.card_images[0]?.image_url_small} alt={card.name} />
@@ -654,16 +668,15 @@ export default function InventoryConsole({
                       value={price}
                       onChange={(event) => changePackPrice(packKey(card), event.target.value)}
                     />
+                    <input
+                      className="pack-card-rarity"
+                      value={rarity}
+                      onChange={(event) => changePackRarity(packKey(card), event.target.value)}
+                      placeholder="레어도"
+                      aria-label={`${card.name} 레어도`}
+                    />
                     <strong>{card.name}</strong>
-                    <small>
-                      {card.card_sets?.[0]?.set_code || "코드 확인 중"} ·{" "}
-                      <b
-                        className="rarity-chip"
-                        title={getRarityLabel(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity)}
-                      >
-                        {getRarityCode(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity) || "?"}
-                      </b>
-                    </small>
+                    <small>{card.card_sets?.[0]?.set_code || "코드 확인 중"}</small>
                   </article>
                 ))}
               </div>
@@ -807,9 +820,15 @@ export default function InventoryConsole({
                     ) ||
                     addCard.card_sets?.find((item) => item.set_code === addCode) ||
                     {};
+                  const selectedSet = {
+                    ...set,
+                    set_code: addCode,
+                    set_rarity: addRarity,
+                    rarity_code: addRarity,
+                  };
                   await onAddInventory({
                     card: addCard,
-                    set,
+                    set: selectedSet,
                     imageIndex: addImageIndex,
                     condition: addCondition,
                     price: addPrice,
@@ -854,20 +873,17 @@ export default function InventoryConsole({
                 </label>
                 <label>
                   레어도
-                  <select value={addRarity} onChange={(event) => setAddRarity(event.target.value)}>
-                    {[
-                      ...new Set(
-                        (addCard.card_sets || [])
-                          .filter((set) => set.set_code === addCode)
-                          .map((set) => set.rarity_code || set.set_rarity)
-                          .filter(Boolean),
-                      ),
-                    ].map((rarity) => (
-                      <option value={rarity} key={rarity}>
-                        {rarity}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    value={addRarity}
+                    onChange={(event) => setAddRarity(event.target.value)}
+                    list="inventory-rarity-options"
+                    placeholder="예: UR, QCSE, 숨겨진 레어도"
+                  />
+                  <datalist id="inventory-rarity-options">
+                    {[...new Set((addCard.card_sets || []).map((set) => set.rarity_code || set.set_rarity).filter(Boolean))].map(
+                      (rarity) => <option value={rarity} key={rarity} />,
+                    )}
+                  </datalist>
                 </label>
                 <label>
                   상태
