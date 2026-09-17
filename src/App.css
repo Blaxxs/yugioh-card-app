@@ -902,6 +902,9 @@ button:disabled {
 }
 .pack-card-album .pack-card-image {
   position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
 }
 .pack-card-album .pack-card-image img {
   display: block;
