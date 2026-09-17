@@ -1049,8 +1049,8 @@ button:disabled {
   padding: 12px;
   border: 0;
 }
-@media (min-width: 701px) {
-  .pack-card-album { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (min-width: 1000px) {
+  .pack-intake-dialog { width: min(1000px, calc(100vw - 48px)); min-width: 900px; }
 }
 .pack-card-album .pack-card {
   display: flex;
