@@ -574,13 +574,21 @@ button:disabled {
   background: var(--app-primary);
   color: #fff;
 }
-.inventory-add-dialog { width: min(720px, calc(100vw - 48px)); }
+.inventory-add-dialog {
+  width: min(420px, calc(100vw - 48px));
+}
 .inventory-add-form input[type="number"],
-.pack-card-album input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+.pack-card-album input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
 .inventory-add-form input[type="number"]::-webkit-inner-spin-button,
 .inventory-add-form input[type="number"]::-webkit-outer-spin-button,
 .pack-card-album input[type="number"]::-webkit-inner-spin-button,
-.pack-card-album input[type="number"]::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
+.pack-card-album input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
 .pack-modal-search {
   margin: 10px 12px 6px;
 }
@@ -940,7 +948,7 @@ button:disabled {
   position: relative;
   z-index: 1;
   display: grid;
-  width: min(900px, calc(100vw - 48px));
+  width: min(520px, calc(100vw - 48px));
   max-height: calc(100dvh - 48px);
   overflow: hidden;
   border: 1px solid #c2c8d2;

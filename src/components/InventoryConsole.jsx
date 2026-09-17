@@ -328,7 +328,12 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
                 className="inventory-add-form"
                 onSubmit={async (event) => {
                   event.preventDefault();
-                  const set = addCard.card_sets?.find((item) => item.set_code === addCode && (item.rarity_code || item.set_rarity) === addRarity) || addCard.card_sets?.find((item) => item.set_code === addCode) || {};
+                  const set =
+                    addCard.card_sets?.find(
+                      (item) => item.set_code === addCode && (item.rarity_code || item.set_rarity) === addRarity,
+                    ) ||
+                    addCard.card_sets?.find((item) => item.set_code === addCode) ||
+                    {};
                   await onAddInventory({
                     card: addCard,
                     set,
@@ -359,17 +364,35 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
                 <strong>{addCard.name}</strong>
                 <label>
                   코드
-                  <select value={addCode} onChange={(event) => { setAddCode(event.target.value); const next = addCard.card_sets?.find((item) => item.set_code === event.target.value); setAddRarity(next?.rarity_code || next?.set_rarity || ""); }}>
+                  <select
+                    value={addCode}
+                    onChange={(event) => {
+                      setAddCode(event.target.value);
+                      const next = addCard.card_sets?.find((item) => item.set_code === event.target.value);
+                      setAddRarity(next?.rarity_code || next?.set_rarity || "");
+                    }}
+                  >
                     {[...new Set((addCard.card_sets || []).map((set) => set.set_code).filter(Boolean))].map((code) => (
-                      <option value={code} key={code}>{code}</option>
+                      <option value={code} key={code}>
+                        {code}
+                      </option>
                     ))}
                   </select>
                 </label>
                 <label>
                   레어도
                   <select value={addRarity} onChange={(event) => setAddRarity(event.target.value)}>
-                    {[...new Set((addCard.card_sets || []).filter((set) => set.set_code === addCode).map((set) => set.rarity_code || set.set_rarity).filter(Boolean))].map((rarity) => (
-                      <option value={rarity} key={rarity}>{rarity}</option>
+                    {[
+                      ...new Set(
+                        (addCard.card_sets || [])
+                          .filter((set) => set.set_code === addCode)
+                          .map((set) => set.rarity_code || set.set_rarity)
+                          .filter(Boolean),
+                      ),
+                    ].map((rarity) => (
+                      <option value={rarity} key={rarity}>
+                        {rarity}
+                      </option>
                     ))}
                   </select>
                 </label>
