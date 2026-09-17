@@ -882,6 +882,8 @@ button:disabled {
 .pack-card-album {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  grid-auto-rows: max-content;
+  align-items: start;
   gap: 8px;
   max-height: 510px;
   overflow: auto;
@@ -890,7 +892,10 @@ button:disabled {
 }
 .pack-card-album .pack-card {
   display: flex;
+  height: auto !important;
   min-height: 0;
+  align-self: start;
+  overflow: visible;
   flex-direction: column;
   align-items: stretch;
   gap: 5px;
@@ -905,6 +910,8 @@ button:disabled {
   display: block;
   flex: 0 0 auto;
   width: 100%;
+  height: auto !important;
+  min-height: 0;
 }
 .pack-card-album .pack-card-image img {
   display: block;
