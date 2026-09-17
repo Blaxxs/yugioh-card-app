@@ -1537,6 +1537,16 @@ button:disabled {
   border: 1px solid #c4cad5;
   text-align: center;
 }
+.pack-card-row {
+  display: flex;
+  gap: 5px;
+}
+.pack-card-row .pack-card-price,
+.pack-card-row .pack-card-rarity {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
 .pack-card-price,
 .pack-card-rarity {
   display: block;
@@ -1560,6 +1570,11 @@ button:disabled {
 .pack-card-rarity {
   border: 1px solid #c4cad5;
   padding: 0 8px;
+}
+.pack-card-rarity:disabled {
+  background: #eef0f3;
+  color: #6b7484;
+  cursor: not-allowed;
 }
 .pack-card small .rarity-chip {
   display: inline-flex;
@@ -1629,7 +1644,7 @@ button:disabled {
     padding: 0 5px;
   }
   .inventory-table {
-    min-width: 0;
+    min-width: 760px;
   }
   .inventory-table th,
   .inventory-table td {
@@ -1637,17 +1652,17 @@ button:disabled {
     padding-right: 4px;
   }
   .pack-intake-modal {
-    align-items: end;
-    padding: 0;
+    align-items: center;
+    padding: 16px;
   }
   .pack-intake-dialog {
-    width: 100%;
+    width: min(100%, 480px);
     height: auto !important;
     left: auto !important;
     top: auto !important;
     transform: none !important;
-    max-height: calc(100dvh - 64px);
-    border-radius: 14px 14px 0 0;
+    max-height: calc(100dvh - 32px);
+    border-radius: 12px;
   }
   .pack-window-resizer {
     display: none;

@@ -159,8 +159,6 @@ export default function InventoryConsole({
     );
   const changePackPrice = (key, price) =>
     setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, price } : item)));
-  const changePackRarity = (key, rarity) =>
-    setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, rarity } : item)));
   const startPackResize = (event, direction) => {
     const rect = event.currentTarget.parentElement.getBoundingClientRect();
     resizeRef.current = { startX: event.clientX, startY: event.clientY, rect, direction };
@@ -676,21 +674,24 @@ export default function InventoryConsole({
                         </button>
                       </div>
                     </div>
-                    <input
-                      className="pack-card-price"
-                      type="number"
-                      min="0"
-                      placeholder="가격"
-                      value={price}
-                      onChange={(event) => changePackPrice(packKey(card), event.target.value)}
-                    />
-                    <input
-                      className="pack-card-rarity"
-                      value={rarity}
-                      onChange={(event) => changePackRarity(packKey(card), event.target.value)}
-                      placeholder="레어도"
-                      aria-label={`${card.name} 레어도`}
-                    />
+                    <div className="pack-card-row">
+                      <input
+                        className="pack-card-price"
+                        type="number"
+                        min="0"
+                        placeholder="가격"
+                        value={price}
+                        onChange={(event) => changePackPrice(packKey(card), event.target.value)}
+                      />
+                      <input
+                        className="pack-card-rarity"
+                        value={rarity}
+                        readOnly
+                        disabled
+                        placeholder="레어도"
+                        aria-label={`${card.name} 레어도 (수정 불가)`}
+                      />
+                    </div>
                     <strong>{card.name}</strong>
                     <small>{card.card_sets?.[0]?.set_code || "코드 확인 중"}</small>
                   </article>

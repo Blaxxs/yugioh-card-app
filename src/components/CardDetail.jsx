@@ -105,6 +105,10 @@ export default function CardDetail({
     [],
   );
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const copyCode = async (code, rowKey) => {
     try {
       await navigator.clipboard.writeText(code);
