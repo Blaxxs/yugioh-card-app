@@ -7,6 +7,8 @@ import {
   hydrateCardPreviews,
   searchOfficialCards,
   getRarityCode,
+  getRarityLabel,
+  ALL_RARITY_CODES,
 } from "../lib/officialCardApi";
 
 export default function InventoryConsole({
@@ -41,17 +43,20 @@ export default function InventoryConsole({
   const [addCondition, setAddCondition] = useState("S급 (신품급)");
   const [addPrice, setAddPrice] = useState("");
   const [addQuantity, setAddQuantity] = useState(1);
-  const [columns, setColumns] = useState([
-    { id: "language", label: "언어", visible: true, width: 90 },
-    { id: "group", label: "카드군", visible: true, width: 90 },
-    { id: "name", label: "이름", visible: true, width: 220 },
-    { id: "rarity", label: "레어도", visible: true, width: 90 },
-    { id: "code", label: "코드", visible: true, width: 120 },
-    { id: "condition", label: "상태", visible: true, width: 110 },
-    { id: "quantity", label: "수량", visible: true, width: 70 },
-    { id: "price", label: "가격", visible: true, width: 100 },
-    { id: "memo", label: "비고", visible: true, width: 140 },
-  ]);
+  const [columns, setColumns] = useState(() => {
+    const isMobile = typeof window !== "undefined" && window.innerWidth <= 700;
+    return [
+      { id: "language", label: "언어", visible: !isMobile, width: 90 },
+      { id: "group", label: "카드군", visible: !isMobile, width: 90 },
+      { id: "name", label: "이름", visible: true, width: 220 },
+      { id: "rarity", label: "레어도", visible: true, width: 90 },
+      { id: "code", label: "코드", visible: true, width: 120 },
+      { id: "condition", label: "상태", visible: !isMobile, width: 110 },
+      { id: "quantity", label: "수량", visible: true, width: 70 },
+      { id: "price", label: "가격", visible: true, width: 100 },
+      { id: "memo", label: "비고", visible: !isMobile, width: 140 },
+    ];
+  });
   const [columnFilters, setColumnFilters] = useState({});
   const [columnMenu, setColumnMenu] = useState(false);
   const [openFilter, setOpenFilter] = useState(null);
@@ -693,7 +698,19 @@ export default function InventoryConsole({
                       />
                     </div>
                     <strong>{card.name}</strong>
-                    <small>{card.card_sets?.[0]?.set_code || "코드 확인 중"}</small>
+                    <small>
+                      {card.card_sets?.[0]?.set_code || "코드 확인 중"}
+                      {rarity && (
+                        <span
+                          className={`rarity-chip rarity-${getRarityCode(rarity)
+                            .replace(/[^a-z0-9+]/gi, "")
+                            .toLowerCase()}`}
+                          title={getRarityLabel(rarity)}
+                        >
+                          {rarity}
+                        </span>
+                      )}
+                    </small>
                   </article>
                 ))}
               </div>
@@ -886,11 +903,7 @@ export default function InventoryConsole({
                     </button>
                     {addRarityEditing && (
                       <ul className="rarity-options">
-                        {[
-                          ...new Set(
-                            (addCard.card_sets || []).map((set) => set.rarity_code || set.set_rarity).filter(Boolean),
-                          ),
-                        ].map((rarity) => (
+                        {ALL_RARITY_CODES.map((rarity) => (
                           <li key={rarity}>
                             <button
                               type="button"

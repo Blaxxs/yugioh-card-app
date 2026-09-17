@@ -1644,12 +1644,23 @@ button:disabled {
     padding: 0 5px;
   }
   .inventory-table {
-    min-width: 760px;
+    min-width: 0;
   }
   .inventory-table th,
   .inventory-table td {
     padding-left: 4px;
     padding-right: 4px;
+  }
+  .inventory-table th {
+    padding-right: 4px;
+  }
+  .column-label {
+    width: 100%;
+    padding: 0 2px;
+  }
+  .column-filter-button,
+  .column-filter-popover {
+    display: none;
   }
   .pack-intake-modal {
     align-items: center;

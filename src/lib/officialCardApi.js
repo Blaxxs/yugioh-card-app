@@ -46,6 +46,8 @@ const RARITY_KOREAN_BY_ENGLISH = new Map(
   [...RARITY_ENGLISH.entries()].map(([name, english]) => [english.toLowerCase(), name]),
 );
 
+export const ALL_RARITY_CODES = [...RARITY_CODES.values()];
+
 export const getRarityLabel = (rarity) => {
   if (!rarity) return "레어도 미상";
   const normalized = String(rarity).replace(/\s+/g, " ").trim();
