@@ -1000,17 +1000,78 @@ button:disabled {
   font-size: 11px;
   font-weight: 600;
 }
-.spreadsheet-filter-menu { display: grid; gap: 7px; width: 230px; padding: 10px; color: #334155; font-weight: 500; }
-.filter-sort-actions { display: grid; gap: 2px; }
-.filter-sort-actions button { border: 0; padding: 6px 5px; background: #fff; color: #334155; text-align: left; font-size: 12px; cursor: pointer; }
-.filter-sort-actions button:hover { background: #f1f5f9; }
-.spreadsheet-filter-menu hr { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid #d7dce4; }
-.spreadsheet-filter-menu > input { width: 100%; height: 28px; border: 1px solid #c2c8d2; padding: 0 7px; }
-.filter-values { display: grid; max-height: 150px; overflow: auto; gap: 6px; padding: 2px; font-size: 12px; }
-.filter-values label { display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.filter-menu-footer { display: flex; justify-content: flex-end; gap: 6px; border-top: 1px solid #d7dce4; padding-top: 9px; }
-.filter-menu-footer button { min-width: 58px; min-height: 28px; border: 1px solid #c2c8d2; border-radius: 3px; background: #fff; cursor: pointer; }
-.filter-menu-footer button:first-child { border-color: #16803c; background: #16803c; color: #fff; }
+.spreadsheet-filter-menu {
+  display: grid;
+  gap: 7px;
+  width: 230px;
+  padding: 10px;
+  color: #334155;
+  font-weight: 500;
+}
+.filter-sort-actions {
+  display: grid;
+  gap: 2px;
+}
+.filter-sort-actions button {
+  border: 0;
+  padding: 6px 5px;
+  background: #fff;
+  color: #334155;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+}
+.filter-sort-actions button:hover {
+  background: #f1f5f9;
+}
+.spreadsheet-filter-menu hr {
+  width: 100%;
+  margin: 2px 0;
+  border: 0;
+  border-top: 1px solid #d7dce4;
+}
+.spreadsheet-filter-menu > input {
+  width: 100%;
+  height: 28px;
+  border: 1px solid #c2c8d2;
+  padding: 0 7px;
+}
+.filter-values {
+  display: grid;
+  max-height: 150px;
+  overflow: auto;
+  gap: 6px;
+  padding: 2px;
+  font-size: 12px;
+}
+.filter-values label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.filter-menu-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  border-top: 1px solid #d7dce4;
+  padding-top: 9px;
+}
+.filter-menu-footer button {
+  min-width: 58px;
+  min-height: 28px;
+  border: 1px solid #c2c8d2;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+}
+.filter-menu-footer button:first-child {
+  border-color: #16803c;
+  background: #16803c;
+  color: #fff;
+}
 .inventory-view-button {
   border: 1px solid #c2c8d2;
   border-radius: 2px;
@@ -1284,6 +1345,10 @@ button:disabled {
   }
   .pack-intake-dialog.pack-search-dialog {
     width: 520px;
+    min-width: 0;
+  }
+  .pack-intake-dialog.inventory-add-dialog {
+    width: 420px;
     min-width: 0;
   }
 }
