@@ -6,6 +6,8 @@ import {
   fetchReleaseList,
   hydrateCardPreviews,
   searchOfficialCards,
+  getRarityCode,
+  getRarityLabel,
 } from "../lib/officialCardApi";
 
 export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, onAddInventory }) {
@@ -65,6 +67,12 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
   const findPacks = async () => {
     const releases = await fetchReleaseList();
     setPackMatches(releases.filter((release) => release.name.includes(packQuery)).slice(0, 12));
+  };
+  const handlePackSearchKeyDown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      findPacks();
+    }
   };
   const choosePack = async (release) => {
     const cards = await fetchReleaseCards(release.path);
@@ -151,7 +159,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
       ? card
       : await fetchOfficialCardById(card.cardId, card.name, card.card_images?.[0]?.image_url_small);
     setAddCard(detailed);
-    const firstSet = card.card_sets?.[0];
+    const firstSet = detailed.card_sets?.[0];
     setAddCode(firstSet?.set_code || "");
     setAddRarity(firstSet?.rarity_code || firstSet?.set_rarity || "");
   };
@@ -284,6 +292,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
               <input
                 value={packQuery}
                 onChange={(event) => setPackQuery(event.target.value)}
+                onKeyDown={handlePackSearchKeyDown}
                 placeholder="수록 팩 이름"
               />
               <button type="button" onClick={findPacks}>
@@ -325,10 +334,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
                     onChange={(event) => changePackPrice(packKey(card), event.target.value)}
                   />
                   <strong>{card.name}</strong>
-                  <small>
-                    {card.card_sets?.[0]?.set_code || "코드 확인 중"} ·{" "}
-                    {card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity || "레어도"}
-                  </small>
+                  <small>{card.card_sets?.[0]?.set_code || "코드 확인 중"} · <b className="rarity-chip" title={getRarityLabel(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity)}>{getRarityCode(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity) || "?"}</b></small>
                 </article>
               ))}
             </div>
@@ -416,6 +422,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
                   <input
                     value={addQuery}
                     onChange={(event) => setAddQuery(event.target.value)}
+                    onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); searchAddCards(); } }}
                     placeholder="카드명 검색"
                   />
                   <button type="button" onClick={searchAddCards}>

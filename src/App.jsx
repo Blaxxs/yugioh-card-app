@@ -633,6 +633,7 @@ export default function App() {
                 <input
                   value={releaseQuery}
                   onChange={(event) => setReleaseQuery(event.target.value)}
+                  onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }}
                   placeholder="상품명 검색"
                 />
               </label>
