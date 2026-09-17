@@ -1,5 +1,5 @@
 import { Download, Minus, PackagePlus, Plus, Search, X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   fetchOfficialCardById,
   fetchReleaseCards,
@@ -16,6 +16,8 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
   const [packMatches, setPackMatches] = useState([]);
   const [packCards, setPackCards] = useState([]);
   const [packModalOpen, setPackModalOpen] = useState(false);
+  const [packWindow, setPackWindow] = useState(null);
+  const resizeRef = useRef(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState([]);
@@ -90,7 +92,22 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
         packKey(item.card) === key ? { ...item, quantity: Math.max(0, Number(nextQuantity) || 0) } : item,
       ),
     );
-  const changePackPrice = (key, price) => setPackCards((items) => items.map((item) => packKey(item.card) === key ? { ...item, price } : item));
+  const changePackPrice = (key, price) =>
+    setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, price } : item)));
+  const startPackResize = (event) => {
+    const rect = event.currentTarget.parentElement.getBoundingClientRect();
+    resizeRef.current = { startX: event.clientX, startY: event.clientY, rect };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const resizePack = (event) => {
+    if (!resizeRef.current) return;
+    const { rect, startX, startY } = resizeRef.current;
+    setPackWindow({ left: rect.left, top: rect.top, width: Math.max(420, rect.width + event.clientX - startX), height: Math.max(420, rect.height + event.clientY - startY) });
+  };
+  const stopPackResize = (event) => {
+    resizeRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
   const savePack = async () => {
     const selected = packCards.filter((item) => item.quantity > 0);
     await onBatchIntake(selected);
@@ -219,7 +236,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
             aria-label="팩 입고 닫기"
             onClick={() => setPackModalOpen(false)}
           />
-          <section className="pack-intake-dialog">
+          <section className="pack-intake-dialog" style={packWindow ? { ...packWindow, position: "fixed" } : undefined}>
             <header>
               <div>
                 <span>PACK INTAKE</span>
@@ -266,7 +283,14 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
                       </button>
                     </div>
                   </div>
-                  <input className="pack-card-price" type="number" min="0" placeholder="가격" value={price} onChange={(event) => changePackPrice(packKey(card), event.target.value)} />
+                  <input
+                    className="pack-card-price"
+                    type="number"
+                    min="0"
+                    placeholder="가격"
+                    value={price}
+                    onChange={(event) => changePackPrice(packKey(card), event.target.value)}
+                  />
                   <strong>{card.name}</strong>
                   <small>
                     {card.card_sets?.[0]?.set_code || "코드 확인 중"} ·{" "}
@@ -283,6 +307,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
             >
               <PackagePlus size={17} /> 선택 수량 저장
             </button>
+            <button className="pack-window-resizer" type="button" aria-label="창 크기 조절" onPointerDown={startPackResize} onPointerMove={resizePack} onPointerUp={stopPackResize} onPointerCancel={stopPackResize} />
           </section>
         </div>
       )}
