@@ -333,6 +333,8 @@ button:disabled {
   gap: 8px;
   margin-bottom: 20px;
 }
+.search-slot { min-height: 68px; }
+.search-slot .search-bar { margin-bottom: 0; }
 
 .search-input-wrap {
   display: flex;
@@ -676,9 +678,9 @@ button:disabled {
 }
 @media (min-width: 701px) {
   .app-shell:has(.inventory-console) {
-    width: calc(100% - 32px);
-    max-width: none;
-    padding: 18px 16px 32px;
+    width: min(100%, 1120px);
+    max-width: 1120px;
+    padding: 28px 24px 48px;
   }
 }
 .app-shell:has(.inventory-console) .inventory-console {

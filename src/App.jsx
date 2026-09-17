@@ -503,28 +503,30 @@ export default function App() {
       {!isSupabaseConfigured && (
         <p className="setup-message">Supabase 환경변수를 설정하면 로그인을 사용할 수 있습니다.</p>
       )}
-      {activeTab === "search" && (
-        <form
-          className="search-bar"
-          onSubmit={(event) => {
-            event.preventDefault();
-            searchCard();
-          }}
-        >
-          <label className="search-input-wrap">
-            <Search size={20} aria-hidden="true" />
-            <input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="카드 이름을 검색하세요"
-              aria-label="카드 이름 검색"
-            />
-          </label>
-          <button className="search-submit" type="submit">
-            검색
-          </button>
-        </form>
-      )}
+      <div className="search-slot">
+        {activeTab === "search" && (
+          <form
+            className="search-bar"
+            onSubmit={(event) => {
+              event.preventDefault();
+              searchCard();
+            }}
+          >
+            <label className="search-input-wrap">
+              <Search size={20} aria-hidden="true" />
+              <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="카드 이름을 검색하세요"
+                aria-label="카드 이름 검색"
+              />
+            </label>
+            <button className="search-submit" type="submit">
+              검색
+            </button>
+          </form>
+        )}
+      </div>
       <ManagementTabs
         activeTab={activeTab}
         onTabChange={changeTab}
