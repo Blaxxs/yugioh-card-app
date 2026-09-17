@@ -592,6 +592,12 @@ button:disabled {
 .pack-modal-search {
   margin: 10px 12px 6px;
 }
+@media (min-width: 701px) {
+  .pack-intake-dialog:not(.inventory-add-dialog) .pack-modal-search {
+    width: min(600px, calc(100% - 24px));
+    margin: 10px auto 6px;
+  }
+}
 .add-search-results {
   display: grid;
   gap: 5px;
