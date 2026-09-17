@@ -398,7 +398,10 @@ export default function App() {
 
   const addInventoryVariant = async ({ card, set, condition, price, quantity, imageIndex }) => {
     const image = card.card_images?.[imageIndex] || card.card_images?.[0];
-    await addInventoryCards([{ ...card, card_images: image ? [image] : [], card_sets: [set], condition, purchase_price: price }], Number(quantity));
+    await addInventoryCards(
+      [{ ...card, card_images: image ? [image] : [], card_sets: [set], condition, purchase_price: price }],
+      Number(quantity),
+    );
   };
 
   const cancelTransaction = async (transaction) => {

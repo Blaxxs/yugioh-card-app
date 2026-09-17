@@ -79,7 +79,12 @@ export default function ManagementTabs({
       {showContent && ["inventory", "favorites"].includes(activeTab) && session && (
         <section className="management-panel">
           {activeTab === "inventory" && (
-            <InventoryConsole inventoryItems={inventoryItems} busy={inventoryBusy} onBatchIntake={onBatchIntake} onAddInventory={onAddInventory} />
+            <InventoryConsole
+              inventoryItems={inventoryItems}
+              busy={inventoryBusy}
+              onBatchIntake={onBatchIntake}
+              onAddInventory={onAddInventory}
+            />
           )}
           {activeTab === "favorites" && (
             <>
