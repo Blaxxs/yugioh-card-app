@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { LoaderCircle, LogIn, LogOut, PackagePlus, Search, X } from "lucide-react";
+import { LoaderCircle, LogIn, LogOut, Search, X } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import {
   fetchOfficialCardById,
-  fetchOfficialCardBySetCode,
   fetchReleaseCards,
   fetchReleaseList,
   hydrateCardPreviews,
@@ -389,36 +388,9 @@ export default function App() {
     }
   };
 
-  const bulkIntakeByCode = async (rawCodes, quantity) => {
-    const codes = [
-      ...new Set(
-        rawCodes
-          .split(/\r?\n|,/)
-          .map((code) => code.trim())
-          .filter(Boolean),
-      ),
-    ];
-    const cardsToAdd = [];
-    for (const code of codes) {
-      const card = await fetchOfficialCardBySetCode(code);
-      if (card) cardsToAdd.push(card);
-    }
-    const added = await addInventoryCards(cardsToAdd, quantity);
-    return { added, missing: codes.length - cardsToAdd.length };
-  };
-
   const batchIntake = async (items) => {
     for (const { card, quantity } of items) {
       await addInventoryCards([card], quantity);
-    }
-  };
-
-  const stockSelectedRelease = async () => {
-    try {
-      await addInventoryCards(releaseCards, 1);
-      setActionError("");
-    } catch (error) {
-      setActionError(`팩 입고 오류: ${error.message}`);
     }
   };
 
@@ -537,7 +509,6 @@ export default function App() {
         onFavorite={toggleFavorite}
         showContent={!selectedCard}
         inventoryBusy={inventoryBusy}
-        onBulkIntake={bulkIntakeByCode}
         onBatchIntake={batchIntake}
       />
       {loading && <p>카드를 검색하고 있습니다...</p>}
@@ -612,16 +583,6 @@ export default function App() {
                   <X size={18} aria-hidden="true" />
                 </button>
               </div>
-              {session && (
-                <button
-                  className="release-stock-button"
-                  type="button"
-                  disabled={releaseLoading || inventoryBusy || !releaseCards.length}
-                  onClick={stockSelectedRelease}
-                >
-                  <PackagePlus size={17} aria-hidden="true" /> 이 팩 전체 +1 입고
-                </button>
-              )}
               {releaseLoading ? (
                 <p className="release-loading">
                   <LoaderCircle size={18} aria-hidden="true" /> 수록 카드를 불러오는 중입니다.

@@ -818,6 +818,142 @@ button:disabled {
 .inventory-table td:last-child {
   text-align: right;
 }
+.pack-intake-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.pack-intake-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(20, 27, 40, 0.42);
+}
+.pack-intake-dialog {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(900px, calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+  border: 1px solid #c2c8d2;
+  border-radius: 4px;
+  background: #f5f6f8;
+  box-shadow: 0 18px 55px rgba(20, 27, 40, 0.24);
+}
+.pack-intake-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #c9ced8;
+  background: #fff;
+}
+.pack-intake-dialog header span {
+  color: var(--app-primary);
+  font-size: 10px;
+  font-weight: 800;
+}
+.pack-intake-dialog header h3 {
+  margin: 2px 0;
+  color: var(--app-ink);
+  font-size: 18px;
+}
+.pack-intake-dialog header p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 11px;
+}
+.pack-intake-dialog header button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #c9ced8;
+  border-radius: 3px;
+  background: #fff;
+  color: #3d4858;
+  cursor: pointer;
+}
+.pack-card-album {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  gap: 8px;
+  max-height: 510px;
+  overflow: auto;
+  padding: 12px;
+  border: 0;
+}
+.pack-card-album .pack-card {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  border: 1px solid #cdd2dc;
+  border-radius: 3px;
+  padding: 7px;
+  background: #fff;
+  font-size: 11px;
+}
+.pack-card-album .pack-card-image {
+  position: relative;
+}
+.pack-card-album .pack-card-image img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 0.72;
+  object-fit: contain;
+  background: #eef1f3;
+}
+.pack-card-album .pack-card-image > div {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  left: 4px;
+  display: grid;
+  grid-template-columns: 28px 1fr 28px;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.94);
+}
+.pack-card-album .pack-card-image button {
+  display: grid;
+  height: 28px;
+  place-items: center;
+  border: 1px solid #c4cad5;
+  background: #f8f9fb;
+  cursor: pointer;
+}
+.pack-card-album .pack-card-image input {
+  width: 100%;
+  border: 1px solid #c4cad5;
+  text-align: center;
+}
+.pack-card-album .pack-card strong {
+  overflow: hidden;
+  color: #283447;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pack-card-album .pack-card small {
+  color: #768194;
+}
+.pack-intake-dialog .pack-save {
+  margin: 0 12px 12px;
+  min-height: 38px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--app-primary);
+  color: #fff;
+  font-weight: 750;
+  cursor: pointer;
+}
 
 @media (max-width: 700px) {
   .app-shell:has(.inventory-console) .inventory-console {
@@ -842,6 +978,20 @@ button:disabled {
   }
   .inventory-table {
     min-width: 620px;
+  }
+  .pack-intake-modal {
+    align-items: end;
+    padding: 0;
+  }
+  .pack-intake-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 64px);
+    border-radius: 14px 14px 0 0;
+  }
+  .pack-card-album {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-height: 62dvh;
+    padding: 8px;
   }
 }
 .release-panel {

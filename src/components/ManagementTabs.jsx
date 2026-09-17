@@ -39,7 +39,6 @@ export default function ManagementTabs({
   onFavorite,
   showContent = true,
   inventoryBusy,
-  onBulkIntake,
   onBatchIntake,
 }) {
   const cards =
@@ -79,12 +78,7 @@ export default function ManagementTabs({
       {showContent && ["inventory", "favorites"].includes(activeTab) && session && (
         <section className="management-panel">
           {activeTab === "inventory" && (
-            <InventoryConsole
-              inventoryItems={inventoryItems}
-              busy={inventoryBusy}
-              onBulkIntake={onBulkIntake}
-              onBatchIntake={onBatchIntake}
-            />
+            <InventoryConsole inventoryItems={inventoryItems} busy={inventoryBusy} onBatchIntake={onBatchIntake} />
           )}
           {activeTab === "favorites" && (
             <>

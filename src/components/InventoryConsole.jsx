@@ -1,10 +1,8 @@
-import { ClipboardPlus, Download, Minus, PackagePlus, Plus, Search } from "lucide-react";
+import { Download, Minus, PackagePlus, Plus, Search, X } from "lucide-react";
 import { useState } from "react";
 import { fetchReleaseCards, fetchReleaseList } from "../lib/officialCardApi";
 
-export default function InventoryConsole({ inventoryItems, busy, onBulkIntake, onBatchIntake }) {
-  const [codes, setCodes] = useState("");
-  const [quantity, setQuantity] = useState(1);
+export default function InventoryConsole({ inventoryItems, busy, onBatchIntake }) {
   const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("updated");
@@ -12,21 +10,6 @@ export default function InventoryConsole({ inventoryItems, busy, onBulkIntake, o
   const [packQuery, setPackQuery] = useState("");
   const [packMatches, setPackMatches] = useState([]);
   const [packCards, setPackCards] = useState([]);
-  const codeCount = new Set(
-    codes
-      .split(/\r?\n|,/)
-      .map((code) => code.trim())
-      .filter(Boolean),
-  ).size;
-
-  const submit = async (event) => {
-    event.preventDefault();
-    if (!codeCount || busy) return;
-    const result = await onBulkIntake(codes, Number(quantity));
-    setMessage(`입고 완료: ${result.added}종${result.missing ? ` · 찾지 못함 ${result.missing}종` : ""}`);
-    if (result.added) setCodes("");
-  };
-
   const visibleItems = inventoryItems
     .filter((item) =>
       `${item.card_name} ${item.set_code || ""} ${item.rarity || ""}`.toLowerCase().includes(query.toLowerCase()),
@@ -83,6 +66,9 @@ export default function InventoryConsole({ inventoryItems, busy, onBulkIntake, o
     setMessage(`팩 입고 완료: ${selected.length}종`);
   };
 
+  const languageOf = (item) => (/JP/i.test(item.set_code || "") ? "일본판" : "한글판");
+  const groupOf = () => "유희왕";
+
   return (
     <section className="inventory-console">
       <div className="inventory-metrics">
@@ -95,37 +81,6 @@ export default function InventoryConsole({ inventoryItems, busy, onBulkIntake, o
           <strong>{inventoryItems.reduce((total, item) => total + item.quantity, 0)}</strong>
         </div>
       </div>
-      <form className="bulk-intake-form" onSubmit={submit}>
-        <div className="bulk-intake-heading">
-          <ClipboardPlus size={19} aria-hidden="true" />
-          <div>
-            <strong>빠른 일괄 입고</strong>
-            <span>카드 코드를 줄마다 붙여 넣으세요.</span>
-          </div>
-        </div>
-        <textarea
-          value={codes}
-          onChange={(event) => setCodes(event.target.value)}
-          placeholder={"예: LOCR-KR001\nLOCR-KR002"}
-          aria-label="일괄 입고할 카드 코드"
-        />
-        <div className="bulk-intake-actions">
-          <label>
-            카드당 수량
-            <input
-              type="number"
-              min="1"
-              max="999"
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-            />
-          </label>
-          <button type="submit" disabled={!codeCount || busy}>
-            <PackagePlus size={17} aria-hidden="true" /> {busy ? "처리 중" : `${codeCount}종 입고`}
-          </button>
-        </div>
-        {message && <p className="bulk-intake-message">{message}</p>}
-      </form>
       <section className="pack-intake">
         <div className="bulk-intake-heading">
           <PackagePlus size={19} aria-hidden="true" />
@@ -146,40 +101,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBulkIntake, o
             <small>{release.date}</small>
           </button>
         ))}
-        {!!packCards.length && (
-          <>
-            <div className="pack-card-list">
-              {packCards.map(({ card, quantity }) => (
-                <div className="pack-card" key={card.cardId}>
-                  <img src={card.card_images[0]?.image_url_small} alt="" />
-                  <span>{card.name}</span>
-                  <div>
-                    <button type="button" onClick={() => changePackQuantity(card.cardId, quantity - 1)}>
-                      <Minus size={14} />
-                    </button>
-                    <input
-                      type="number"
-                      min="0"
-                      value={quantity}
-                      onChange={(event) => changePackQuantity(card.cardId, event.target.value)}
-                    />
-                    <button type="button" onClick={() => changePackQuantity(card.cardId, quantity + 1)}>
-                      <Plus size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button
-              className="pack-save"
-              type="button"
-              disabled={busy || !packCards.some((item) => item.quantity)}
-              onClick={savePack}
-            >
-              선택 수량 일괄 저장
-            </button>
-          </>
-        )}
+        {message && <p className="bulk-intake-message">{message}</p>}
       </section>
       <section className="inventory-table-section">
         <div className="inventory-table-toolbar">
@@ -216,10 +138,15 @@ export default function InventoryConsole({ inventoryItems, busy, onBulkIntake, o
                     }
                   />
                 </th>
-                <th>카드</th>
-                <th>코드</th>
+                <th>언어</th>
+                <th>카드군</th>
+                <th>이름</th>
                 <th>레어도</th>
+                <th>코드</th>
+                <th>상태</th>
                 <th>수량</th>
+                <th>가격</th>
+                <th>비고</th>
               </tr>
             </thead>
             <tbody>
@@ -239,18 +166,80 @@ export default function InventoryConsole({ inventoryItems, busy, onBulkIntake, o
                       }
                     />
                   </td>
+                  <td>{languageOf(item)}</td>
+                  <td>{groupOf(item)}</td>
                   <td>{item.card_name}</td>
-                  <td>{item.set_code || "-"}</td>
                   <td>{item.rarity || "-"}</td>
+                  <td>{item.set_code || "-"}</td>
+                  <td>{item.condition || "-"}</td>
                   <td>
                     <b>{item.quantity}</b>
                   </td>
+                  <td>{item.sale_price ? `${Number(item.sale_price).toLocaleString()}원` : "-"}</td>
+                  <td>{item.memo || "-"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
+      {packCards.length > 0 && (
+        <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="팩 개봉 입고">
+          <button
+            className="pack-intake-backdrop"
+            type="button"
+            aria-label="팩 입고 닫기"
+            onClick={() => setPackCards([])}
+          />
+          <section className="pack-intake-dialog">
+            <header>
+              <div>
+                <span>PACK INTAKE</span>
+                <h3>{packQuery}</h3>
+                <p>카드 이미지 위 수량을 조정한 뒤 저장하세요.</p>
+              </div>
+              <button type="button" aria-label="팩 입고 닫기" onClick={() => setPackCards([])}>
+                <X size={19} />
+              </button>
+            </header>
+            <div className="pack-card-list pack-card-album">
+              {packCards.map(({ card, quantity }) => (
+                <article className="pack-card" key={card.cardId}>
+                  <div className="pack-card-image">
+                    <img src={card.card_images[0]?.image_url_small} alt={card.name} />
+                    <div>
+                      <button type="button" onClick={() => changePackQuantity(card.cardId, quantity - 1)}>
+                        <Minus size={14} />
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        value={quantity}
+                        onChange={(event) => changePackQuantity(card.cardId, event.target.value)}
+                      />
+                      <button type="button" onClick={() => changePackQuantity(card.cardId, quantity + 1)}>
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <strong>{card.name}</strong>
+                  <small>
+                    {card.card_sets?.[0]?.set_code || "코드 확인 중"} · {card.card_sets?.[0]?.rarity_code || "레어도"}
+                  </small>
+                </article>
+              ))}
+            </div>
+            <button
+              className="pack-save"
+              type="button"
+              disabled={busy || !packCards.some((item) => item.quantity)}
+              onClick={savePack}
+            >
+              <PackagePlus size={17} /> 선택 수량 저장
+            </button>
+          </section>
+        </div>
+      )}
     </section>
   );
 }
