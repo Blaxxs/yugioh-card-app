@@ -116,8 +116,22 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
     setPackWindow({
       left: direction.includes("left") ? rect.left + deltaX : rect.left,
       top: direction.includes("top") ? rect.top + deltaY : rect.top,
-      width: Math.max(420, direction.includes("left") ? rect.width - deltaX : direction.includes("right") ? rect.width + deltaX : rect.width),
-      height: Math.max(420, direction.includes("top") ? rect.height - deltaY : direction.includes("bottom") ? rect.height + deltaY : rect.height),
+      width: Math.max(
+        420,
+        direction.includes("left")
+          ? rect.width - deltaX
+          : direction.includes("right")
+            ? rect.width + deltaX
+            : rect.width,
+      ),
+      height: Math.max(
+        420,
+        direction.includes("top")
+          ? rect.height - deltaY
+          : direction.includes("bottom")
+            ? rect.height + deltaY
+            : rect.height,
+      ),
     });
   };
   const startPackDrag = (event) => {
@@ -272,7 +286,7 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
             aria-label="팩 입고 닫기"
             onClick={() => setPackModalOpen(false)}
           />
-          <section className="pack-intake-dialog" style={packWindow ? { ...packWindow, position: "fixed" } : undefined}>
+          <section className={`pack-intake-dialog ${packCards.length ? "pack-cards-dialog" : "pack-search-dialog"}`} style={packWindow ? { ...packWindow, position: "fixed" } : undefined}>
             <header
               onPointerDown={startPackDrag}
               onPointerMove={dragPack}
@@ -334,7 +348,15 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
                     onChange={(event) => changePackPrice(packKey(card), event.target.value)}
                   />
                   <strong>{card.name}</strong>
-                  <small>{card.card_sets?.[0]?.set_code || "코드 확인 중"} · <b className="rarity-chip" title={getRarityLabel(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity)}>{getRarityCode(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity) || "?"}</b></small>
+                  <small>
+                    {card.card_sets?.[0]?.set_code || "코드 확인 중"} ·{" "}
+                    <b
+                      className="rarity-chip"
+                      title={getRarityLabel(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity)}
+                    >
+                      {getRarityCode(card.card_sets?.[0]?.rarity_code || card.card_sets?.[0]?.set_rarity) || "?"}
+                    </b>
+                  </small>
                 </article>
               ))}
             </div>
@@ -391,9 +413,33 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
               onPointerUp={stopPackResize}
               onPointerCancel={stopPackResize}
             />
-            <button className="pack-window-resizer resize-top" type="button" aria-label="위쪽 크기 조절" onPointerDown={(event) => startPackResize(event, "top")} onPointerMove={resizePack} onPointerUp={stopPackResize} onPointerCancel={stopPackResize} />
-            <button className="pack-window-resizer resize-top-left" type="button" aria-label="왼쪽 위 크기 조절" onPointerDown={(event) => startPackResize(event, "top-left")} onPointerMove={resizePack} onPointerUp={stopPackResize} onPointerCancel={stopPackResize} />
-            <button className="pack-window-resizer resize-top-right" type="button" aria-label="오른쪽 위 크기 조절" onPointerDown={(event) => startPackResize(event, "top-right")} onPointerMove={resizePack} onPointerUp={stopPackResize} onPointerCancel={stopPackResize} />
+            <button
+              className="pack-window-resizer resize-top"
+              type="button"
+              aria-label="위쪽 크기 조절"
+              onPointerDown={(event) => startPackResize(event, "top")}
+              onPointerMove={resizePack}
+              onPointerUp={stopPackResize}
+              onPointerCancel={stopPackResize}
+            />
+            <button
+              className="pack-window-resizer resize-top-left"
+              type="button"
+              aria-label="왼쪽 위 크기 조절"
+              onPointerDown={(event) => startPackResize(event, "top-left")}
+              onPointerMove={resizePack}
+              onPointerUp={stopPackResize}
+              onPointerCancel={stopPackResize}
+            />
+            <button
+              className="pack-window-resizer resize-top-right"
+              type="button"
+              aria-label="오른쪽 위 크기 조절"
+              onPointerDown={(event) => startPackResize(event, "top-right")}
+              onPointerMove={resizePack}
+              onPointerUp={stopPackResize}
+              onPointerCancel={stopPackResize}
+            />
           </section>
         </div>
       )}
@@ -422,7 +468,12 @@ export default function InventoryConsole({ inventoryItems, busy, onBatchIntake, 
                   <input
                     value={addQuery}
                     onChange={(event) => setAddQuery(event.target.value)}
-                    onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); searchAddCards(); } }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        searchAddCards();
+                      }
+                    }}
                     placeholder="카드명 검색"
                   />
                   <button type="button" onClick={searchAddCards}>

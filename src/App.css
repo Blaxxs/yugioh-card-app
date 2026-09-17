@@ -1003,9 +1003,27 @@ button:disabled {
   height: 18px;
   cursor: nwse-resize;
 }
-.resize-top { top: -5px; right: 20px; left: 20px; height: 10px; cursor: ns-resize; }
-.resize-top-left { top: -5px; left: -5px; width: 18px; height: 18px; cursor: nwse-resize; }
-.resize-top-right { top: -5px; right: -5px; width: 18px; height: 18px; cursor: nesw-resize; }
+.resize-top {
+  top: -5px;
+  right: 20px;
+  left: 20px;
+  height: 10px;
+  cursor: ns-resize;
+}
+.resize-top-left {
+  top: -5px;
+  left: -5px;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+}
+.resize-top-right {
+  top: -5px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
+  cursor: nesw-resize;
+}
 .pack-window-resizer::after {
   content: none;
 }
@@ -1056,7 +1074,14 @@ button:disabled {
   border: 0;
 }
 @media (min-width: 1000px) {
-  .pack-intake-dialog { width: min(1000px, calc(100vw - 48px)); min-width: 900px; }
+  .pack-intake-dialog {
+    width: min(1000px, calc(100vw - 48px));
+    min-width: 900px;
+  }
+  .pack-intake-dialog.pack-search-dialog {
+    width: 520px;
+    min-width: 0;
+  }
 }
 .pack-card-album .pack-card {
   display: flex;
@@ -1131,9 +1156,32 @@ button:disabled {
   appearance: textfield;
   -moz-appearance: textfield;
 }
-.pack-card small .rarity-chip { display: inline-flex; min-width: 24px; height: 18px; align-items: center; justify-content: center; border-radius: 3px; padding: 0 4px; background: #e9e5ff; color: #4e47dc; font-size: 10px; font-weight: 800; cursor: help; }
-.inventory-add-form input[type="number"], .pack-card-album input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
-.inventory-add-form input[type="number"]::-webkit-inner-spin-button, .inventory-add-form input[type="number"]::-webkit-outer-spin-button, .pack-card-album input[type="number"]::-webkit-inner-spin-button, .pack-card-album input[type="number"]::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
+.pack-card small .rarity-chip {
+  display: inline-flex;
+  min-width: 24px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  padding: 0 4px;
+  background: #e9e5ff;
+  color: #4e47dc;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: help;
+}
+.inventory-add-form input[type="number"],
+.pack-card-album input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.inventory-add-form input[type="number"]::-webkit-inner-spin-button,
+.inventory-add-form input[type="number"]::-webkit-outer-spin-button,
+.pack-card-album input[type="number"]::-webkit-inner-spin-button,
+.pack-card-album input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
 .pack-card-album .pack-card strong {
   overflow: hidden;
   color: #283447;
