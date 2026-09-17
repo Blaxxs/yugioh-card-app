@@ -26,6 +26,7 @@ export default function InventoryConsole({
   const [packMatches, setPackMatches] = useState([]);
   const [packCards, setPackCards] = useState([]);
   const [packModalOpen, setPackModalOpen] = useState(false);
+  const [packLoading, setPackLoading] = useState(false);
   const [packWindow, setPackWindow] = useState(null);
   const resizeRef = useRef(null);
   const dragRef = useRef(null);
@@ -111,24 +112,27 @@ export default function InventoryConsole({
     }
   };
   const choosePack = async (release) => {
-    const cards = await fetchReleaseCards(release.path);
-    setPackCards(cards.map((card) => ({ card, quantity: 0, price: "" })));
+    setPackLoading(true);
+    setPackCards([]);
     setPackModalOpen(true);
-    hydrateCardPreviews(cards, (detailedCard) => {
-      const variants = detailedCard.card_sets
-        .filter((set) => set.set_name === release.name)
-        .map((set) => ({
-          ...detailedCard,
-          id: `${detailedCard.cardId}-${set.set_code}-${set.rarity_code || set.set_rarity}`,
-          card_sets: [set],
+    try {
+      const cards = await fetchReleaseCards(release.path);
+      const detailedCards = [];
+      await hydrateCardPreviews(cards, (detailedCard) => detailedCards.push(detailedCard));
+      const variants = detailedCards.flatMap((detailedCard) => {
+        const sets = detailedCard.card_sets.filter((set) => set.set_name === release.name);
+        return (sets.length ? sets : [null]).map((set) => ({
+          card: set ? { ...detailedCard, id: `${detailedCard.cardId}-${set.set_code}-${set.rarity_code || set.set_rarity}`, card_sets: [set] } : detailedCard,
+          quantity: 0,
+          price: "",
         }));
-      setPackCards((items) => [
-        ...items.filter((item) => item.card.cardId !== detailedCard.cardId),
-        ...(variants.length ? variants : [detailedCard]).map((card) => ({ card, quantity: 0, price: "" })),
-      ]);
-    });
-    setPackMatches([]);
-    setPackQuery(release.name);
+      });
+      setPackCards(variants);
+      setPackMatches([]);
+      setPackQuery(release.name);
+    } finally {
+      setPackLoading(false);
+    }
   };
   const packKey = (card) => card.id || card.cardId;
   const changePackQuantity = (key, nextQuantity) =>
@@ -609,7 +613,7 @@ export default function InventoryConsole({
                 <small>{release.date}</small>
               </button>
             ))}
-            <div className="pack-card-list pack-card-album">
+            {packLoading ? <div className="pack-loading-state"><span className="pack-loading-spinner" /><strong>카드 이미지를 준비하는 중입니다</strong><small>잠시만 기다려 주세요.</small></div> : <div className="pack-card-list pack-card-album">
               {packCards.map(({ card, quantity, price }) => (
                 <article className="pack-card" key={card.id || card.cardId}>
                   <div className="pack-card-image">
@@ -649,7 +653,7 @@ export default function InventoryConsole({
                   </small>
                 </article>
               ))}
-            </div>
+            </div>}
             <button
               className="pack-save"
               type="button"
