@@ -1,4 +1,4 @@
-import { Download, Filter, Minus, PackagePlus, Plus, Receipt, Search, ShoppingCart, X } from "lucide-react";
+import { Download, Filter, Minus, PackagePlus, Plus, Search, ShoppingCart, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   fetchOfficialCardById,
@@ -350,16 +350,16 @@ export default function InventoryConsole({
       </div>
       <div className="inventory-action-buttons">
         <button className="pack-intake-open" type="button" onClick={() => setPackModalOpen(true)}>
-          <PackagePlus size={18} aria-hidden="true" /> 팩 개봉 일괄 입고
+          일괄 재고 추가
         </button>
         <button className="inventory-add-open" type="button" onClick={() => setAddModalOpen(true)}>
-          <Plus size={18} aria-hidden="true" /> 재고 추가
+          재고 추가
         </button>
         <button className="inventory-sell-open" type="button" disabled={!selectedIds.size} onClick={openSellModal}>
-          <ShoppingCart size={18} aria-hidden="true" /> 선택 재고 판매
+          판매
         </button>
         <button className="inventory-sales-history-open" type="button" onClick={() => setSalesHistoryOpen(true)}>
-          <Receipt size={18} aria-hidden="true" /> 판매 내역
+          판매 내역
         </button>
       </div>
       <section className="inventory-table-section">

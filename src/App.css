@@ -556,6 +556,7 @@ button:disabled {
 }
 .inventory-action-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin: 8px;
 }
@@ -564,8 +565,10 @@ button:disabled {
 .inventory-sell-open,
 .inventory-sales-history-open {
   display: inline-flex;
+  flex: 1 1 auto;
   min-height: 32px;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   margin: 0;
   border: 1px solid #c8bfff;
@@ -575,6 +578,7 @@ button:disabled {
   color: var(--app-primary-strong);
   font-size: 12px;
   font-weight: 750;
+  white-space: nowrap;
   cursor: pointer;
 }
 .inventory-add-open {
