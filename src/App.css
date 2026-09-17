@@ -906,6 +906,8 @@ button:disabled {
 .pack-card-album .pack-card-image img {
   display: block;
   width: 100%;
+  height: auto;
+  min-height: 0;
   aspect-ratio: 0.72;
   object-fit: contain;
   background: #eef1f3;
