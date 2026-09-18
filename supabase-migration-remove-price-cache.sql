@@ -1,0 +1,1 @@
+drop table if exists public.card_price_cache;

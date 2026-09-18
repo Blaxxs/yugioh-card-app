@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, LogIn, LogOut, Search, X } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
-import {
-  fetchOfficialCardById,
-  fetchReleaseCards,
-  fetchReleaseList,
-  hydrateCardPreviews,
-  searchOfficialCards,
-} from "./lib/officialCardApi";
+import { fetchOfficialCardById, fetchReleaseCards, fetchReleaseList, searchOfficialCards } from "./lib/officialCardApi";
 import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
@@ -47,14 +41,6 @@ export default function App() {
   const historyIndex = useRef(savedHistory?.index || 0);
   const viewRef = useRef({ activeTab, selectedCard, selectedRelease });
   const loadedReleasePath = useRef(null);
-
-  const hydratePreviews = (previews, setPreviewCards) => {
-    hydrateCardPreviews(previews, (detailedCard) => {
-      setPreviewCards((currentCards) =>
-        currentCards.map((card) => (card.cardId === detailedCard.cardId ? detailedCard : card)),
-      );
-    });
-  };
 
   useEffect(() => {
     sessionStorage.setItem("ygo-view-state", JSON.stringify({ searchTerm, cards, selectedCard, activeTab, viewModes }));
@@ -105,30 +91,16 @@ export default function App() {
         .eq("user_id", session.user.id)
         .eq("type", "sale")
         .order("occurred_at", { ascending: false }),
-    ]).then(async ([favoritesResult, inventoryResult, salesResult]) => {
+    ]).then(([favoritesResult, inventoryResult, salesResult]) => {
       if (favoritesResult.error) setActionError(`찌 목록 오류: ${favoritesResult.error.message}`);
       if (inventoryResult.error) setActionError(`재고 목록 오류: ${inventoryResult.error.message}`);
       if (salesResult.error) setActionError(`판매 내역 오류: ${salesResult.error.message}`);
       setFavoriteIds(new Set((favoritesResult.data || []).map((item) => item.card_id)));
-      const savedCards = (favoritesResult.data || [])
-        .map((item) => ({ snapshot: item.card_snapshot, cardId: item.card_id }))
-        .filter(({ snapshot }) => snapshot);
-      const refreshedCards = await Promise.all(
-        savedCards.map(async ({ snapshot, cardId }) => {
-          const savedName = snapshot.name || snapshot.koreanData?.cardName;
-          try {
-            const freshCard = await fetchOfficialCardById(
-              cardId,
-              savedName,
-              snapshot.card_images?.[0]?.image_url_small,
-            );
-            return freshCard || snapshot;
-          } catch {
-            return snapshot;
-          }
-        }),
+      setFavoriteCards(
+        (favoritesResult.data || [])
+          .filter((item) => item.card_snapshot)
+          .map((item) => ({ ...item.card_snapshot, cardId: item.card_snapshot.cardId || item.card_id })),
       );
-      setFavoriteCards(refreshedCards);
       setInventoryItems(inventoryResult.data || []);
       setSalesHistory(salesResult.data || []);
     });
@@ -184,7 +156,6 @@ export default function App() {
       try {
         const previews = await fetchReleaseCards(selectedRelease.path);
         setReleaseCards(previews);
-        hydratePreviews(previews, setReleaseCards);
       } catch (error) {
         loadedReleasePath.current = null;
         setActionError(error.message);
@@ -367,6 +338,7 @@ export default function App() {
               rarity_code: rarityCode,
               condition: card.condition || null,
               purchase_price: card.purchase_price ? Number(card.purchase_price) : null,
+              memo: card.memo || null,
               quantity: (current?.quantity || 0) + quantity,
             },
             { onConflict: "user_id,card_id,set_code,rarity_code" },
@@ -412,16 +384,35 @@ export default function App() {
     setInventoryItems((items) => items.filter((item) => !ids.includes(item.id)));
   };
 
-  const updateInventoryItems = async (ids, changes) => {
-    if (!supabase || !session || !ids.length) return;
-    const { data, error } = await supabase
-      .from("inventory_items")
-      .update({ ...changes, updated_at: new Date().toISOString() })
-      .in("id", ids)
-      .eq("user_id", session.user.id)
-      .select();
-    if (error) return setActionError(`재고 수정 오류: ${error.message}`);
-    setInventoryItems((items) => items.map((item) => data.find((updated) => updated.id === item.id) || item));
+  const updateInventoryItems = async (updates) => {
+    if (!supabase || !session || !updates.length || inventoryBusy) return false;
+    setInventoryBusy(true);
+    setActionError("");
+    const updatedItems = [];
+    try {
+      for (const update of updates) {
+        const { data, error } = await supabase
+          .from("inventory_items")
+          .update({ ...update.changes, updated_at: new Date().toISOString() })
+          .eq("id", update.id)
+          .eq("user_id", session.user.id)
+          .select()
+          .single();
+        if (error) throw error;
+        updatedItems.push(data);
+      }
+      setInventoryItems((items) => items.map((item) => updatedItems.find((updated) => updated.id === item.id) || item));
+      return true;
+    } catch (error) {
+      setActionError(
+        error.code === "23505"
+          ? "같은 카드·코드·레어도 재고가 이미 존재합니다. 기존 항목과 합친 뒤 다시 시도해 주세요."
+          : `재고 수정 오류: ${error.message}`,
+      );
+      return false;
+    } finally {
+      setInventoryBusy(false);
+    }
   };
 
   const sellInventoryItems = async (sales) => {
@@ -533,10 +524,10 @@ export default function App() {
     }
   };
 
-  const addInventoryVariant = async ({ card, set, condition, price, quantity, imageIndex }) => {
+  const addInventoryVariant = async ({ card, set, condition, price, quantity, imageIndex, memo }) => {
     const image = card.card_images?.[imageIndex] || card.card_images?.[0];
     await addInventoryCards(
-      [{ ...card, card_images: image ? [image] : [], card_sets: [set], condition, purchase_price: price }],
+      [{ ...card, card_images: image ? [image] : [], card_sets: [set], condition, purchase_price: price, memo }],
       Number(quantity),
     );
   };
@@ -588,7 +579,6 @@ export default function App() {
     try {
       const results = await searchOfficialCards(searchTerm);
       setCards(results);
-      hydratePreviews(results, setCards);
     } catch (error) {
       setActionError(error.message);
       setCards([]);

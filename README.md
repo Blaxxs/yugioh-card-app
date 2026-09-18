@@ -23,16 +23,32 @@
 ```text
 VITE_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY
-NAVER_CLIENT_ID
-NAVER_CLIENT_SECRET
 ```
-
-네이버 쇼핑 API 키는 Vercel 환경변수에만 등록합니다. `NAVER_CLIENT_SECRET`은 절대 `VITE_` 접두사를 붙이지 않으며 브라우저에 노출하지 않습니다. 카드 상세의 각 세트 코드·레어도 옆 `네이버 가격 조회` 버튼이 서버 프록시를 통해 검색합니다.
 
 5. Deploy 후 발급된 `https://프로젝트명.vercel.app` 주소를 Supabase Authentication → URL Configuration의 Site URL과 Redirect URLs에 추가합니다.
 6. Google Cloud OAuth 클라이언트의 승인된 JavaScript 원본과 Supabase Google Provider 설정도 같은 공개 주소 기준으로 확인합니다.
 
 공식 한국 카드 DB 요청은 `api/official-ygo/[...path].js` 서버리스 프록시를 통해 처리하므로 공개 배포에서도 브라우저 CORS에 막히지 않습니다.
+
+## 공용 카드 캐시 설정
+
+운영 환경의 일반 카드명 검색과 상세 조회는 `/api/cards`를 사용합니다. 처음 조회한 데이터는 Supabase에 JSON으로 저장되고, 이후 사용자는 공식 DB 대신 공용 캐시를 사용합니다. 로컬 Vite 개발 서버는 기본적으로 기존 프록시를 사용합니다.
+
+1. Supabase Dashboard의 SQL Editor에서 `supabase-migration-card-catalog.sql`을 실행합니다.
+2. Supabase Dashboard의 Project Settings → API에서 Project URL과 `service_role` 키를 확인합니다.
+3. Vercel Project Settings → Environment Variables에 다음 값을 추가합니다.
+
+```text
+SUPABASE_URL=https://<project-id>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+```
+
+`SUPABASE_SERVICE_ROLE_KEY`은 모든 RLS를 우회하므로 `VITE_` 접두사를 붙이거나 브라우저 코드에 넣으면 안 됩니다.
+
+4. Vercel에서 다시 배포합니다.
+5. 배포 주소에서 같은 카드명을 두 번 검색하고 `/api/cards` 응답의 `X-Card-Cache` 헤더를 확인합니다. 첫 요청은 `MISS`, 이후 요청은 `HIT`이어야 합니다.
+
+캐시 없이 API 동작만 로컬에서 확인하려면 `.env`에 `VITE_USE_CARD_API=true`를 추가하고 `vercel dev`로 실행합니다. 일반 `npm run dev`에서는 Vercel 서버리스 함수가 실행되지 않습니다.
 
 Supabase와 Google은 무료 사용량 구간에서 시작할 수 있지만, 저장공간·요청량·인증 사용량이 무료 한도를 넘으면 과금될 수 있습니다. 실제 운영 전에는 각 서비스의 현재 요금과 한도를 확인해야 합니다.
 

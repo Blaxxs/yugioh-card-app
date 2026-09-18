@@ -139,6 +139,8 @@ export default function CardResult({
             className={`carousel-image slide-${slideDirection}`}
             src={images[imageIndex].image_url_small}
             alt={`${card.name} 일러스트 ${imageIndex + 1}`}
+            loading="lazy"
+            decoding="async"
             draggable="false"
           />
         )}

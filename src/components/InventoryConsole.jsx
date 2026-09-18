@@ -1,5 +1,5 @@
-import { Download, Filter, Minus, PackagePlus, Plus, Search, ShoppingCart, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Download, Minus, PackagePlus, Plus, Search, ShoppingCart, X } from "lucide-react";
+import { useRef, useState } from "react";
 import {
   fetchOfficialCardById,
   fetchReleaseCards,
@@ -11,6 +11,9 @@ import {
   ALL_RARITY_CODES,
 } from "../lib/officialCardApi";
 import SalesHistory from "./SalesHistory";
+
+const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_IMPORT_ROWS = 500;
 
 export default function InventoryConsole({
   inventoryItems,
@@ -33,6 +36,10 @@ export default function InventoryConsole({
   const [packModalOpen, setPackModalOpen] = useState(false);
   const [packLoading, setPackLoading] = useState(false);
   const [packWindow, setPackWindow] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const importFileRef = useRef(null);
   const resizeRef = useRef(null);
   const dragRef = useRef(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -41,12 +48,11 @@ export default function InventoryConsole({
   const [addCard, setAddCard] = useState(null);
   const [addCode, setAddCode] = useState("");
   const [addRarity, setAddRarity] = useState("");
-  const [addRarityEditing, setAddRarityEditing] = useState(false);
-  const rarityFieldRef = useRef(null);
   const [addImageIndex, setAddImageIndex] = useState(0);
   const [addCondition, setAddCondition] = useState("S급 (신품급)");
   const [addPrice, setAddPrice] = useState("");
   const [addQuantity, setAddQuantity] = useState(1);
+  const [addMemo, setAddMemo] = useState("");
   const [sellModalOpen, setSellModalOpen] = useState(false);
   const [sellItems, setSellItems] = useState([]);
   const [salesHistoryOpen, setSalesHistoryOpen] = useState(false);
@@ -71,9 +77,8 @@ export default function InventoryConsole({
   const [filterSearch, setFilterSearch] = useState("");
   const [viewItem, setViewItem] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [editQuantity, setEditQuantity] = useState(1);
-  const [editCondition, setEditCondition] = useState("S급 (신품급)");
-  const [editPrice, setEditPrice] = useState("");
+  const [editRows, setEditRows] = useState([]);
+  const [editLoading, setEditLoading] = useState(false);
   const visibleItems = inventoryItems
     .filter(
       (item) =>
@@ -114,18 +119,16 @@ export default function InventoryConsole({
     link.click();
     URL.revokeObjectURL(link.href);
   };
+  const downloadImportTemplate = () => {
+    const link = document.createElement("a");
+    link.href = "/templates/inventory-import-template.xlsx";
+    link.download = "inventory-import-template.xlsx";
+    link.click();
+  };
   const findPacks = async () => {
     const releases = await fetchReleaseList();
     setPackMatches(releases.filter((release) => release.name.includes(packQuery)).slice(0, 12));
   };
-  useEffect(() => {
-    if (!addRarityEditing) return undefined;
-    const closeIfOutside = (event) => {
-      if (rarityFieldRef.current && !rarityFieldRef.current.contains(event.target)) setAddRarityEditing(false);
-    };
-    document.addEventListener("mousedown", closeIfOutside);
-    return () => document.removeEventListener("mousedown", closeIfOutside);
-  }, [addRarityEditing]);
   const handlePackSearchKeyDown = (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -181,10 +184,11 @@ export default function InventoryConsole({
     const { rect, startX, startY, direction } = resizeRef.current;
     const deltaX = event.clientX - startX;
     const deltaY = event.clientY - startY;
-    setPackWindow({
-      left: direction.includes("left") ? rect.left + deltaX : rect.left,
-      top: direction.includes("top") ? rect.top + deltaY : rect.top,
-      width: Math.max(
+    const maxWidth = Math.max(420, window.innerWidth - 48);
+    const maxHeight = Math.max(420, window.innerHeight - 48);
+    const width = Math.min(
+      maxWidth,
+      Math.max(
         420,
         direction.includes("left")
           ? rect.width - deltaX
@@ -192,7 +196,10 @@ export default function InventoryConsole({
             ? rect.width + deltaX
             : rect.width,
       ),
-      height: Math.max(
+    );
+    const height = Math.min(
+      maxHeight,
+      Math.max(
         420,
         direction.includes("top")
           ? rect.height - deltaY
@@ -200,6 +207,18 @@ export default function InventoryConsole({
             ? rect.height + deltaY
             : rect.height,
       ),
+    );
+    setPackWindow({
+      left: Math.max(
+        24,
+        Math.min(window.innerWidth - width - 24, direction.includes("left") ? rect.left + deltaX : rect.left),
+      ),
+      top: Math.max(
+        24,
+        Math.min(window.innerHeight - height - 24, direction.includes("top") ? rect.top + deltaY : rect.top),
+      ),
+      width,
+      height,
     });
   };
   const startPackDrag = (event) => {
@@ -209,11 +228,12 @@ export default function InventoryConsole({
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const dragPack = (event) => {
-    if (!dragRef.current) return;
+    const drag = dragRef.current;
+    if (!drag) return;
     setPackWindow((current) => ({
       ...(current || {}),
-      left: dragRef.current.left + event.clientX - dragRef.current.startX,
-      top: dragRef.current.top + event.clientY - dragRef.current.startY,
+      left: drag.left + event.clientX - drag.startX,
+      top: drag.top + event.clientY - drag.startY,
     }));
   };
   const stopPackDrag = (event) => {
@@ -239,6 +259,86 @@ export default function InventoryConsole({
     await onBatchIntake(selected);
     setPackCards([]);
     setPackModalOpen(false);
+  };
+  const normalizeImportRow = (row) => {
+    const values = Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [String(key).trim().toLowerCase(), value]),
+    );
+    const pick = (...keys) => keys.map((key) => values[key]).find((value) => value !== undefined && value !== "");
+    return {
+      name: String(pick("카드명", "카드 이름", "이름", "card_name", "name") || "").trim(),
+      setCode: String(pick("수록 코드", "세트 코드", "코드", "set_code") || "").trim(),
+      rarity: String(pick("레어도", "rarity") || "").trim(),
+      quantity: Math.max(0, Number(pick("수량", "quantity")) || 0),
+      price: pick("가격", "매입가", "purchase_price", "price") ?? "",
+    };
+  };
+  const importSpreadsheet = async (event) => {
+    const [file] = event.target.files || [];
+    if (!file) return;
+    setImportLoading(true);
+    setImportOpen(true);
+    try {
+      if (!file.name.toLowerCase().endsWith(".xlsx")) throw new Error(".xlsx 파일만 업로드할 수 있습니다.");
+      if (file.size > MAX_IMPORT_FILE_SIZE) throw new Error("파일 크기는 5MB 이하여야 합니다.");
+      const { readSheet } = await import("read-excel-file/browser");
+      const [headerRow = [], ...dataRows] = await readSheet(file);
+      const rows = dataRows
+        .filter((row) => row.some((value) => value !== null && value !== ""))
+        .map((row) =>
+          Object.fromEntries(headerRow.map((header, index) => [String(header || "").trim(), row[index] ?? ""])),
+        );
+      if (rows.length > MAX_IMPORT_ROWS) throw new Error(`한 번에 최대 ${MAX_IMPORT_ROWS}행까지 업로드할 수 있습니다.`);
+      const resolved = [];
+      for (const sourceRow of rows) {
+        const row = normalizeImportRow(sourceRow);
+        if (!row.name || !row.quantity) {
+          resolved.push({ ...row, error: "카드명 또는 수량이 없습니다." });
+          continue;
+        }
+        try {
+          const [match] = await searchOfficialCards(row.setCode || row.name);
+          const candidates = match ? [match] : await searchOfficialCards(row.name);
+          const preview = candidates[0];
+          if (!preview) {
+            resolved.push({ ...row, error: "공식 카드 검색 결과가 없습니다." });
+            continue;
+          }
+          const detail = await fetchOfficialCardById(
+            preview.cardId,
+            preview.name,
+            preview.card_images?.[0]?.image_url_small,
+          );
+          const set =
+            detail.card_sets?.find((item) => row.setCode && item.set_code === row.setCode) || detail.card_sets?.[0];
+          resolved.push({
+            ...row,
+            card: { ...detail, card_sets: set ? [set] : detail.card_sets },
+            error: row.setCode && !set ? "수록 코드가 일치하지 않습니다." : "",
+          });
+        } catch {
+          resolved.push({ ...row, error: "카드 검색 중 오류가 발생했습니다." });
+        }
+      }
+      setImportRows(resolved);
+    } catch (error) {
+      setImportRows([{ name: file.name, setCode: "", quantity: 0, error: error.message || "파일을 읽지 못했습니다." }]);
+    } finally {
+      setImportLoading(false);
+      event.target.value = "";
+    }
+  };
+  const saveImportedRows = async () => {
+    const items = importRows
+      .filter((row) => row.card && !row.error)
+      .map((row) => ({ card: row.card, quantity: row.quantity, price: row.price }));
+    await onBatchIntake(items);
+    setImportRows([]);
+    setImportOpen(false);
+  };
+  const openPackModal = () => {
+    setPackWindow(null);
+    setPackModalOpen(true);
   };
 
   const languageOf = (item) => (/JP/i.test(item.set_code || "") ? "일본판" : "한글판");
@@ -283,14 +383,99 @@ export default function InventoryConsole({
     await onDeleteInventory([...selectedIds]);
     setSelectedIds(new Set());
   };
+  const openEditModal = async () => {
+    const selected = inventoryItems.filter((item) => selectedIds.has(item.id));
+    setEditRows(
+      selected.map((item) => ({
+        id: item.id,
+        cardName: item.card_name,
+        setCode: item.set_code || "",
+        rarity: item.rarity_code || item.rarity || "",
+        quantity: item.quantity,
+        condition: item.condition || "S급 (신품급)",
+        price: item.purchase_price ?? "",
+        memo: item.memo || "",
+        images: item.card_snapshot?.card_images || [],
+        imageIndex: 0,
+        cardSnapshot: item.card_snapshot || {},
+      })),
+    );
+    setEditOpen(true);
+    setEditLoading(true);
+    const detailedCards = await Promise.all(
+      selected.map(async (item) => {
+        try {
+          return await fetchOfficialCardById(
+            item.card_id,
+            item.card_name,
+            item.card_snapshot?.card_images?.[0]?.image_url_small,
+          );
+        } catch {
+          return null;
+        }
+      }),
+    );
+    setEditRows((rows) =>
+      rows.map((row, index) => {
+        const detail = detailedCards[index];
+        if (!detail?.card_images?.length) return row;
+        const currentUrl = row.images[0]?.image_url_small;
+        const imageIndex = Math.max(
+          0,
+          detail.card_images.findIndex((image) => image.image_url_small === currentUrl),
+        );
+        return {
+          ...row,
+          images: detail.card_images,
+          imageIndex,
+          cardSnapshot: {
+            ...detail,
+            card_sets: row.cardSnapshot.card_sets?.length ? row.cardSnapshot.card_sets : detail.card_sets,
+          },
+        };
+      }),
+    );
+    setEditLoading(false);
+  };
+  const changeEditRow = (id, changes) =>
+    setEditRows((rows) => rows.map((row) => (row.id === id ? { ...row, ...changes } : row)));
   const editSelected = async (event) => {
     event.preventDefault();
-    await onUpdateInventory([...selectedIds], {
-      quantity: Number(editQuantity),
-      condition: editCondition,
-      purchase_price: editPrice === "" ? null : Number(editPrice),
+    const updates = editRows.map((row) => {
+      const selectedImage = row.images[row.imageIndex];
+      const images = selectedImage
+        ? [selectedImage, ...row.images.filter((_image, index) => index !== row.imageIndex)]
+        : row.images;
+      const currentSet = row.cardSnapshot.card_sets?.[0] || {};
+      return {
+        id: row.id,
+        changes: {
+          set_code: row.setCode.trim().toUpperCase(),
+          rarity: row.rarity.trim() || null,
+          rarity_code: row.rarity.trim().toUpperCase(),
+          quantity: Math.max(0, Number(row.quantity) || 0),
+          condition: row.condition,
+          purchase_price: row.price === "" ? null : Math.max(0, Number(row.price) || 0),
+          memo: row.memo.trim() || null,
+          card_snapshot: {
+            ...row.cardSnapshot,
+            card_images: images,
+            card_sets: [
+              {
+                ...currentSet,
+                set_code: row.setCode.trim().toUpperCase(),
+                set_rarity: row.rarity.trim(),
+                rarity_code: row.rarity.trim().toUpperCase(),
+              },
+            ],
+          },
+        },
+      };
     });
-    setEditOpen(false);
+    if (await onUpdateInventory(updates)) {
+      setEditOpen(false);
+      setSelectedIds(new Set());
+    }
   };
   const searchAddCards = async () => setAddResults(await searchOfficialCards(addQuery));
   const chooseAddCard = async (card) => {
@@ -301,12 +486,12 @@ export default function InventoryConsole({
     const firstSet = detailed.card_sets?.[0];
     setAddCode(firstSet?.set_code || "");
     setAddRarity(firstSet?.rarity_code || firstSet?.set_rarity || "");
-    setAddRarityEditing(false);
+    setAddImageIndex(0);
   };
   const closeAddModal = () => {
     setAddModalOpen(false);
     setAddCard(null);
-    setAddRarityEditing(false);
+    setAddMemo("");
   };
 
   const openSellModal = () => {
@@ -355,7 +540,7 @@ export default function InventoryConsole({
         </div>
       </div>
       <div className="inventory-action-buttons">
-        <button className="pack-intake-open" type="button" onClick={() => setPackModalOpen(true)}>
+        <button className="pack-intake-open" type="button" onClick={openPackModal}>
           일괄 재고 추가
         </button>
         <button className="inventory-add-open" type="button" onClick={() => setAddModalOpen(true)}>
@@ -382,13 +567,27 @@ export default function InventoryConsole({
             <option value="name">카드명순</option>
             <option value="quantity">수량 많은순</option>
           </select>
+          <button type="button" onClick={() => importFileRef.current?.click()}>
+            엑셀 업로드
+          </button>
+          <button type="button" onClick={downloadImportTemplate}>
+            양식 다운
+          </button>
+          <input
+            ref={importFileRef}
+            className="inventory-import-input"
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={importSpreadsheet}
+            aria-label="스프레드시트 업로드"
+          />
           <button type="button" onClick={() => exportCsv(false)}>
             <Download size={16} aria-hidden="true" /> 전체 CSV
           </button>
           <button type="button" disabled={!selectedIds.size} onClick={() => exportCsv(true)}>
             <Download size={16} aria-hidden="true" /> 선택 CSV
           </button>
-          <button type="button" disabled={!selectedIds.size} onClick={() => setEditOpen(true)}>
+          <button type="button" disabled={!selectedIds.size || busy} onClick={openEditModal}>
             선택 수정
           </button>
           <button type="button" disabled={!selectedIds.size} onClick={deleteSelected}>
@@ -456,19 +655,6 @@ export default function InventoryConsole({
                       {" "}
                       {column.label}{" "}
                     </span>
-                    <button
-                      className={`column-filter-button ${columnFilters[column.id]?.length ? "active" : ""}`}
-                      type="button"
-                      aria-label={`${column.label} 필터`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setFilterSearch("");
-                        setFilterSelections((current) => ({ ...current, [column.id]: columnFilters[column.id] || [] }));
-                        setOpenFilter((current) => (current === column.id ? null : column.id));
-                      }}
-                    >
-                      <Filter size={13} aria-hidden="true" />
-                    </button>
                     {openFilter === column.id &&
                       (() => {
                         const field =
@@ -619,42 +805,98 @@ export default function InventoryConsole({
       {editOpen && (
         <div className="inventory-edit-modal" role="dialog" aria-modal="true">
           <button className="pack-intake-backdrop" onClick={() => setEditOpen(false)} />
-          <form onSubmit={editSelected}>
+          <form className="inventory-stock-dialog" onSubmit={editSelected}>
             <header>
-              <h3>선택 재고 수정</h3>
-              <button type="button" onClick={() => setEditOpen(false)}>
+              <div>
+                <span>INVENTORY EDIT</span>
+                <h3>선택 재고 수정</h3>
+                <p>선택한 카드의 재고 정보를 수정합니다.</p>
+              </div>
+              <button type="button" aria-label="재고 수정 닫기" onClick={() => setEditOpen(false)}>
                 <X size={18} />
               </button>
             </header>
-            {visibleItems
-              .filter((item) => selectedIds.has(item.id))
-              .map((item) => (
-                <div className="inventory-edit-row" key={item.id}>
-                  <img src={item.card_snapshot?.card_images?.[0]?.image_url_small} alt="" />
-                  <strong>{item.card_name}</strong>
+            {editRows.map((row) => (
+              <fieldset className="inventory-stock-entry inventory-edit-row" key={row.id}>
+                <legend>{row.cardName}</legend>
+                <div className="inventory-stock-images" aria-label={`${row.cardName} 일러스트 선택`}>
+                  {row.images.map((image, index) => (
+                    <button
+                      type="button"
+                      className={row.imageIndex === index ? "selected" : ""}
+                      key={image.id || image.image_url_small}
+                      onClick={() => changeEditRow(row.id, { imageIndex: index })}
+                      aria-label={`일러스트 ${index + 1}`}
+                    >
+                      <img src={image.image_url_small} alt="" />
+                    </button>
+                  ))}
+                  {!row.images.length && <span>일러스트 없음</span>}
+                </div>
+                <label>
+                  코드
+                  <input
+                    value={row.setCode}
+                    onChange={(event) => changeEditRow(row.id, { setCode: event.target.value })}
+                  />
+                </label>
+                <label>
+                  레어도
+                  <input
+                    value={row.rarity}
+                    list="inventory-rarity-options"
+                    onChange={(event) => changeEditRow(row.id, { rarity: event.target.value })}
+                  />
+                </label>
+                <label>
+                  수량
                   <input
                     type="number"
                     min="0"
-                    defaultValue={item.quantity}
-                    onChange={(event) => setEditQuantity(event.target.value)}
+                    value={row.quantity}
+                    onChange={(event) => changeEditRow(row.id, { quantity: event.target.value })}
                   />
-                  <select value={editCondition} onChange={(event) => setEditCondition(event.target.value)}>
+                </label>
+                <label>
+                  가격
+                  <input
+                    type="number"
+                    min="0"
+                    value={row.price}
+                    onChange={(event) => changeEditRow(row.id, { price: event.target.value })}
+                  />
+                </label>
+                <label className="inventory-stock-wide">
+                  상태
+                  <select
+                    value={row.condition}
+                    onChange={(event) => changeEditRow(row.id, { condition: event.target.value })}
+                  >
                     <option>S급 (신품급)</option>
                     <option>S-급 (미품급)</option>
                     <option>A급</option>
                     <option>B급</option>
                     <option>C급</option>
                   </select>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="가격"
-                    value={editPrice}
-                    onChange={(event) => setEditPrice(event.target.value)}
+                </label>
+                <label className="inventory-stock-wide">
+                  비고
+                  <textarea
+                    value={row.memo}
+                    maxLength="500"
+                    onChange={(event) => changeEditRow(row.id, { memo: event.target.value })}
                   />
-                </div>
+                </label>
+              </fieldset>
+            ))}
+            <datalist id="inventory-rarity-options">
+              {ALL_RARITY_CODES.map((rarity) => (
+                <option value={rarity} key={rarity} />
               ))}
-            <button type="submit">선택 항목 저장</button>
+            </datalist>
+            <button type="submit" disabled={busy || editLoading}>
+              {editLoading ? "일러스트 불러오는 중" : "선택 항목 저장"}
+            </button>
           </form>
         </div>
       )}
@@ -686,15 +928,25 @@ export default function InventoryConsole({
               </button>
             </header>
             {!packLoading && (
-              <div className="pack-search pack-modal-search">
-                <input
-                  value={packQuery}
-                  onChange={(event) => setPackQuery(event.target.value)}
-                  onKeyDown={handlePackSearchKeyDown}
-                  placeholder="수록 팩 이름"
-                />
-                <button type="button" onClick={findPacks}>
-                  <Search size={16} aria-hidden="true" /> 찾기
+              <div className="pack-search-controls">
+                <div className="pack-search pack-modal-search">
+                  <input
+                    value={packQuery}
+                    onChange={(event) => setPackQuery(event.target.value)}
+                    onKeyDown={handlePackSearchKeyDown}
+                    placeholder="수록 팩 이름"
+                  />
+                  <button type="button" onClick={findPacks}>
+                    <Search size={16} aria-hidden="true" /> 찾기
+                  </button>
+                </div>
+                <button
+                  className="pack-save pack-search-save"
+                  type="button"
+                  disabled={busy || !packCards.some((item) => item.quantity)}
+                  onClick={savePack}
+                >
+                  <PackagePlus size={17} /> 선택 수량 저장
                 </button>
               </div>
             )}
@@ -768,14 +1020,6 @@ export default function InventoryConsole({
                 ))}
               </div>
             )}
-            <button
-              className="pack-save"
-              type="button"
-              disabled={busy || !packCards.some((item) => item.quantity)}
-              onClick={savePack}
-            >
-              <PackagePlus size={17} /> 선택 수량 저장
-            </button>
             <button
               className="pack-window-resizer resize-right"
               type="button"
@@ -851,10 +1095,61 @@ export default function InventoryConsole({
           </section>
         </div>
       )}
+      {importOpen && (
+        <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="스프레드시트 일괄 입고">
+          <button
+            className="pack-intake-backdrop"
+            type="button"
+            aria-label="업로드 닫기"
+            onClick={() => setImportOpen(false)}
+          />
+          <section className="pack-intake-dialog inventory-import-dialog">
+            <header>
+              <div>
+                <span>SPREADSHEET IMPORT</span>
+                <h3>스프레드시트 일괄 입고</h3>
+                <p>카드명, 수록 코드, 수량, 가격 열을 읽어 공식 카드와 매칭합니다.</p>
+              </div>
+              <button type="button" aria-label="업로드 닫기" onClick={() => setImportOpen(false)}>
+                <X size={19} />
+              </button>
+            </header>
+            {importLoading ? (
+              <div className="inventory-import-status">스프레드시트를 읽고 카드를 매칭하는 중입니다...</div>
+            ) : (
+              <>
+                <div className="inventory-import-summary">
+                  전체 {importRows.length}행 · 성공 {importRows.filter((row) => row.card && !row.error).length}행 · 확인
+                  필요 {importRows.filter((row) => row.error).length}행
+                </div>
+                <div className="inventory-import-preview">
+                  {importRows.map((row, index) => (
+                    <div className={row.error ? "error" : "ok"} key={`${row.name}-${index}`}>
+                      <strong>{row.name || "이름 없음"}</strong>
+                      <span>
+                        {row.setCode || "코드 없음"} · 수량 {row.quantity}
+                      </span>
+                      {row.error && <small>{row.error}</small>}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  className="pack-save inventory-import-save"
+                  type="button"
+                  disabled={busy || !importRows.some((row) => row.card && !row.error)}
+                  onClick={saveImportedRows}
+                >
+                  <PackagePlus size={17} /> 매칭된 항목 입고
+                </button>
+              </>
+            )}
+          </section>
+        </div>
+      )}
       {addModalOpen && (
         <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="재고 추가">
           <button className="pack-intake-backdrop" type="button" aria-label="재고 추가 닫기" onClick={closeAddModal} />
-          <section className="pack-intake-dialog inventory-add-dialog">
+          <section className="pack-intake-dialog inventory-add-dialog inventory-stock-dialog">
             <header>
               <div>
                 <span>INVENTORY ADD</span>
@@ -910,93 +1205,86 @@ export default function InventoryConsole({
                     condition: addCondition,
                     price: addPrice,
                     quantity: addQuantity,
+                    memo: addMemo,
                   });
                   closeAddModal();
                 }}
               >
-                <div className="add-card-preview">
-                  <img src={addCard.card_images?.[addImageIndex]?.image_url_small} alt={addCard.name} />
-                  <div>
+                <fieldset className="inventory-stock-entry">
+                  <legend>{addCard.name}</legend>
+                  <div className="inventory-stock-images" aria-label={`${addCard.name} 일러스트 선택`}>
                     {addCard.card_images?.map((image, index) => (
                       <button
                         type="button"
                         key={image.id}
                         className={index === addImageIndex ? "selected" : ""}
                         onClick={() => setAddImageIndex(index)}
+                        aria-label={`일러스트 ${index + 1}`}
                       >
                         <img src={image.image_url_small} alt="" />
                       </button>
                     ))}
                   </div>
-                </div>
-                <strong>{addCard.name}</strong>
-                <label>
-                  코드
-                  <select
-                    value={addCode}
-                    onChange={(event) => {
-                      setAddCode(event.target.value);
-                      const next = addCard.card_sets?.find((item) => item.set_code === event.target.value);
-                      setAddRarity(next?.rarity_code || next?.set_rarity || "");
-                    }}
-                  >
-                    {[...new Set((addCard.card_sets || []).map((set) => set.set_code).filter(Boolean))].map((code) => (
-                      <option value={code} key={code}>
-                        {code}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  레어도
-                  <div className="rarity-value" ref={rarityFieldRef}>
-                    <span>{addRarity || "-"}</span>
-                    <button type="button" onClick={() => setAddRarityEditing((value) => !value)}>
-                      변경
-                    </button>
-                    {addRarityEditing && (
-                      <ul className="rarity-options">
-                        {ALL_RARITY_CODES.map((rarity) => (
-                          <li key={rarity}>
-                            <button
-                              type="button"
-                              className={rarity === addRarity ? "selected" : ""}
-                              onClick={() => {
-                                setAddRarity(rarity);
-                                setAddRarityEditing(false);
-                              }}
-                            >
-                              {rarity}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </label>
-                <label>
-                  상태
-                  <select value={addCondition} onChange={(event) => setAddCondition(event.target.value)}>
-                    <option>S급 (신품급)</option>
-                    <option>S-급 (미품급)</option>
-                    <option>A급</option>
-                    <option>B급</option>
-                    <option>C급</option>
-                  </select>
-                </label>
-                <label>
-                  가격
-                  <input type="number" min="0" value={addPrice} onChange={(event) => setAddPrice(event.target.value)} />
-                </label>
-                <label>
-                  수량
-                  <input
-                    type="number"
-                    min="1"
-                    value={addQuantity}
-                    onChange={(event) => setAddQuantity(event.target.value)}
-                  />
-                </label>
+                  <label>
+                    코드
+                    <select
+                      value={addCode}
+                      onChange={(event) => {
+                        setAddCode(event.target.value);
+                        const next = addCard.card_sets?.find((item) => item.set_code === event.target.value);
+                        setAddRarity(next?.rarity_code || next?.set_rarity || "");
+                      }}
+                    >
+                      {[...new Set((addCard.card_sets || []).map((set) => set.set_code).filter(Boolean))].map(
+                        (code) => (
+                          <option value={code} key={code}>
+                            {code}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                  <label>
+                    레어도
+                    <input
+                      value={addRarity}
+                      list="inventory-rarity-options"
+                      onChange={(event) => setAddRarity(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    수량
+                    <input
+                      type="number"
+                      min="1"
+                      value={addQuantity}
+                      onChange={(event) => setAddQuantity(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    가격
+                    <input
+                      type="number"
+                      min="0"
+                      value={addPrice}
+                      onChange={(event) => setAddPrice(event.target.value)}
+                    />
+                  </label>
+                  <label className="inventory-stock-wide">
+                    상태
+                    <select value={addCondition} onChange={(event) => setAddCondition(event.target.value)}>
+                      <option>S급 (신품급)</option>
+                      <option>S-급 (미품급)</option>
+                      <option>A급</option>
+                      <option>B급</option>
+                      <option>C급</option>
+                    </select>
+                  </label>
+                  <label className="inventory-stock-wide">
+                    비고
+                    <textarea value={addMemo} maxLength="500" onChange={(event) => setAddMemo(event.target.value)} />
+                  </label>
+                </fieldset>
                 <button className="pack-save" type="submit">
                   재고 저장
                 </button>

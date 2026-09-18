@@ -129,6 +129,14 @@ export default function CardDetail({
     }
   };
 
+  const openPrice = (set) => {
+    setPriceSearch({
+      code: set.set_code,
+      rarity: getRarityLabel(set.set_rarity || set.rarity_code),
+      query: set.set_code,
+    });
+  };
+
   const priceSearchLinks = priceSearch
     ? [
         ["번개장터", `https://m.bunjang.co.kr/search/products?q=${encodeURIComponent(priceSearch.query)}`],
@@ -383,11 +391,7 @@ export default function CardDetail({
                           title="판매처 가격 보기"
                           onClick={(event) => {
                             event.stopPropagation();
-                            setPriceSearch({
-                              code: set.set_code,
-                              rarity: getRarityLabel(set.set_rarity || set.rarity_code),
-                              query: set.set_code,
-                            });
+                            openPrice(set);
                           }}
                         >
                           <CircleDollarSign size={15} aria-hidden="true" />
@@ -419,7 +423,7 @@ export default function CardDetail({
                     <X size={20} aria-hidden="true" />
                   </button>
                 </header>
-                <p className="price-search-query">{priceSearch.query}</p>
+                <p className="price-search-query">판매처를 선택하면 수록 코드로 검색합니다.</p>
                 <div className="price-search-links">
                   {priceSearchLinks.map(([shop, href]) => (
                     <a key={shop} href={href} target="_blank" rel="noreferrer">

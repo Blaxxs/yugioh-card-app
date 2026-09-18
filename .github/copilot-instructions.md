@@ -7,5 +7,5 @@
 
 - Frontend communicates with Supabase using `@supabase/supabase-js` (supabase.js).
 - Row Level Security (RLS) is active; always handle Auth states properly using Supabase Auth.
-- Serverless functions reside in `/api` (or Vercel routes like `naver-shopping.js`, `official-ygo.js`).
+- Serverless functions reside in `/api` (or Vercel routes like `official-ygo.js`).
 - Do NOT expose secret API keys on the client side; proxy through Vercel Functions.

@@ -1,4 +1,5 @@
 const OFFICIAL_SITE_ORIGIN = "https://www.db.yugioh-card.com";
+const USE_CARD_API = !import.meta.env.DEV || import.meta.env.VITE_USE_CARD_API === "true";
 
 const normalizeCardName = (name) => name.replace(/\s+/g, "");
 
@@ -87,6 +88,13 @@ const fetchOfficialHtml = async (url) => {
   return new DOMParser().parseFromString(await response.text(), "text/html");
 };
 
+const fetchCardApi = async (params) => {
+  const response = await fetch(`/api/cards?${new URLSearchParams(params)}`);
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || "카드 데이터 API에 연결할 수 없습니다.");
+  return body;
+};
+
 const createSearchUrl = (keyword) => {
   const url = new URL(`${OFFICIAL_SITE_ORIGIN}/yugiohdb/card_search.action`);
   url.search = new URLSearchParams({
@@ -112,6 +120,13 @@ const createCardNumberSearchUrl = (code) => {
   return url;
 };
 
+const findOfficialImageUrl = (document, cardId) => {
+  const match = document.documentElement.innerHTML.match(
+    new RegExp(`get_image\\.action\\?type=1[^"'\\s<]*?cid=${cardId}[^"'\\s<]*`),
+  );
+  return match ? new URL(match[0].replaceAll("&amp;", "&"), `${OFFICIAL_SITE_ORIGIN}/yugiohdb/`).href : null;
+};
+
 const findCardEntries = (document, term) => {
   const seen = new Set();
   return [...document.querySelectorAll(".t_row.c_normal")]
@@ -128,7 +143,7 @@ const findCardEntries = (document, term) => {
       imageUrl:
         image.getAttribute("src") && image.getAttribute("src") !== "null"
           ? new URL(image.getAttribute("src"), OFFICIAL_SITE_ORIGIN).href
-          : null,
+          : findOfficialImageUrl(document, cardId),
       name: row.querySelector(".card_name")?.textContent.trim() || "",
     }));
 };
@@ -251,6 +266,7 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
 
 export async function fetchOfficialCardById(cardId, fallbackName = "", imageUrl = "") {
   if (!cardId) return null;
+  if (USE_CARD_API) return fetchCardApi({ id: String(cardId) });
   const href = new URL(
     `/yugiohdb/card_search.action?request_locale=ko&ope=2&cid=${encodeURIComponent(cardId)}`,
     OFFICIAL_SITE_ORIGIN,
@@ -265,7 +281,7 @@ export async function fetchOfficialCardBySetCode(setCode) {
 }
 
 export async function hydrateCardPreviews(cards, onHydrated) {
-  const pendingCards = cards.filter((card) => !card.isDetailLoaded && !card.card_images?.length);
+  const pendingCards = cards.filter((card) => !card.isDetailLoaded);
   let nextIndex = 0;
   const worker = async () => {
     while (nextIndex < pendingCards.length) {
@@ -284,6 +300,8 @@ export async function hydrateCardPreviews(cards, onHydrated) {
 export async function searchOfficialCards(searchTerm) {
   const releaseCodeResults = await searchCardsByReleaseCode(searchTerm);
   if (releaseCodeResults) return releaseCodeResults;
+
+  if (USE_CARD_API) return fetchCardApi({ q: searchTerm.trim() });
 
   const term = normalizeCardName(searchTerm);
   let document = await fetchOfficialHtml(createSearchUrl(searchTerm));
