@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, LogIn, LogOut, Search, X } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
-import { fetchOfficialCardById, fetchReleaseCards, fetchReleaseList, searchOfficialCards } from "./lib/officialCardApi";
+import {
+  fetchOfficialCardById,
+  fetchReleaseCards,
+  fetchReleaseList,
+  getReleaseSetVariants,
+  hydrateCardPreviews,
+  isQuarterCenturyChronicleRelease,
+  searchOfficialCards,
+} from "./lib/officialCardApi";
 import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
@@ -155,7 +163,26 @@ export default function App() {
       setReleaseLoading(true);
       try {
         const previews = await fetchReleaseCards(selectedRelease.path);
-        setReleaseCards(previews);
+        if (!isQuarterCenturyChronicleRelease(selectedRelease.name)) {
+          setReleaseCards(previews);
+          return;
+        }
+        const detailedCards = [];
+        await hydrateCardPreviews(previews, (card) => detailedCards.push(card));
+        const detailsById = new Map(detailedCards.map((card) => [card.cardId, card]));
+        setReleaseCards(
+          previews
+            .map((preview) => detailsById.get(preview.cardId) || preview)
+            .flatMap((card) =>
+              getReleaseSetVariants(card.card_sets, selectedRelease.name).length
+                ? getReleaseSetVariants(card.card_sets, selectedRelease.name).map((set) => ({
+                    ...card,
+                    id: `${card.cardId}-${set.set_code}-${set.rarity_code}`,
+                    card_sets: [set],
+                  }))
+                : [card],
+            ),
+        );
       } catch (error) {
         loadedReleasePath.current = null;
         setActionError(error.message);
@@ -740,13 +767,14 @@ export default function App() {
                   <div className="card-grid release-results view-album">
                     {releaseCards.map((card) => (
                       <CardResult
-                        key={card.cardId}
+                        key={card.id || card.cardId}
                         card={card}
                         isFavorite={favoriteIds.has(card.cardId)}
                         onFavorite={toggleFavorite}
                         onOpen={openCardWindow}
                         viewMode="album"
                         showCardName={false}
+                        showSetRarity={isQuarterCenturyChronicleRelease(selectedRelease.name)}
                       />
                     ))}
                   </div>

@@ -9,6 +9,7 @@ import {
   getRarityCode,
   getRarityLabel,
   ALL_RARITY_CODES,
+  getReleaseSetVariants,
   RARITY_SORT_ORDER,
 } from "../lib/officialCardApi";
 import SalesHistory from "./SalesHistory";
@@ -204,7 +205,7 @@ export default function InventoryConsole({
       const detailedCards = [];
       await hydrateCardPreviews(cards, (detailedCard) => detailedCards.push(detailedCard));
       const variants = detailedCards.flatMap((detailedCard) => {
-        const sets = detailedCard.card_sets.filter((set) => set.set_name === release.name);
+        const sets = getReleaseSetVariants(detailedCard.card_sets, release.name);
         return (sets.length ? sets : [null]).flatMap((set) => {
           const rarity = getRarityCode(set?.rarity_code || set?.set_rarity) || "";
           const rarityVariants = rarity === "GMR" ? ["OFUR", "OFPSE", "GMR"] : [rarity];

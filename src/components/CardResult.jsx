@@ -8,6 +8,7 @@ export default function CardResult({
   viewMode,
   showFavorite = true,
   showCardName = true,
+  showSetRarity = false,
 }) {
   const [imageIndex, setImageIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState("next");
@@ -176,6 +177,11 @@ export default function CardResult({
         >
           {nameCopied ? "복사됨" : card.koreanData.cardName}
         </h3>
+      )}
+      {showSetRarity && card.card_sets?.[0] && (
+        <p className="release-card-rarity">
+          {card.card_sets[0].set_code} · {card.card_sets[0].rarity_code || card.card_sets[0].set_rarity}
+        </p>
       )}
       <div className="card-summary">
         <p>

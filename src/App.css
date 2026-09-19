@@ -2348,6 +2348,15 @@ button:disabled {
 .detail-info p {
   margin: 3px 0;
 }
+.release-card-rarity {
+  margin: 7px 4px 2px;
+  overflow: hidden;
+  color: var(--app-primary-strong);
+  font-size: 11px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .card-summary strong,
 .detail-info strong {
   color: var(--app-ink);

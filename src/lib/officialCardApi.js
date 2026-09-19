@@ -54,6 +54,37 @@ const RARITY_KOREAN_BY_ENGLISH = new Map(
 export const ALL_RARITY_CODES = [...RARITY_CODES.values()];
 export const RARITY_SORT_ORDER = new Map(ALL_RARITY_CODES.map((code, index) => [code, index]));
 
+const QUARTER_CENTURY_CHRONICLE_RELEASES = new Set([
+  "쿼터 센추리 크로니클 side: 유니티",
+  "쿼터 센추리 크로니클 side: 프라이드",
+]);
+
+export const isQuarterCenturyChronicleRelease = (releaseName) =>
+  QUARTER_CENTURY_CHRONICLE_RELEASES.has(
+    String(releaseName || "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+
+export const getReleaseSetVariants = (cardSets, releaseName) => {
+  const releaseSets = (cardSets || []).filter((set) => set.set_name === releaseName);
+  if (!isQuarterCenturyChronicleRelease(releaseName)) return releaseSets;
+
+  const variants = [...releaseSets];
+  const seen = new Set(
+    variants.map((set) => `${set.set_code}|${getRarityCode(set.rarity_code || set.set_rarity).toUpperCase()}`),
+  );
+  for (const set of releaseSets) {
+    for (const rarityCode of ["SE", "QCSE"]) {
+      const key = `${set.set_code}|${rarityCode}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      variants.push({ ...set, rarity_code: rarityCode, set_rarity: getRarityLabel(rarityCode) });
+    }
+  }
+  return variants;
+};
+
 export const getRarityLabel = (rarity) => {
   if (!rarity) return "레어도 미상";
   const normalized = String(rarity).replace(/\s+/g, " ").trim();
