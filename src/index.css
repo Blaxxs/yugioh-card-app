@@ -154,6 +154,10 @@
   background: #e1ad36;
   color: #241600;
 }
+.rarity-ofur {
+  background: linear-gradient(135deg, #4d1e16, #f0c05a 48%, #58241a);
+  color: #fff5db;
+}
 .rarity-se {
   background: #c43f4c;
 }
@@ -265,6 +269,10 @@
 }
 .rarity-pse {
   background: #c43f4c;
+}
+.rarity-ofpse {
+  background: linear-gradient(135deg, #3d1738, #df7a94 48%, #44215a);
+  color: #fff4fb;
 }
 .rarity-exse {
   background: #c43f4c;

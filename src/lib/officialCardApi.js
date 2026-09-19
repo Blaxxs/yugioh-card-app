@@ -18,7 +18,9 @@ const RARITY_CODES = new Map([
   ["프리미엄 골드 레어", "PG"],
   ["엑스트라 시크릿 레어", "EXSE"],
   ["패러렐 엑스트라 시크릿 레어", "P+ES"],
+  ["오버프레임 울트라 레어", "OFUR"],
   ["프리즈마틱 시크릿 레어", "PSE"],
+  ["오버프레임 프리즈마틱 시크릿 레어", "OFPSE"],
   ["쿼터 센추리 시크릿 레어", "QCSE"],
   ["그랜드마스터 레어", "GMR"],
 ]);
@@ -38,7 +40,9 @@ const RARITY_ENGLISH = new Map([
   ["프리미엄 골드 레어", "Premium Gold Rare"],
   ["엑스트라 시크릿 레어", "Extra Secret Rare"],
   ["패러렐 엑스트라 시크릿 레어", "Parallel Extra Secret Rare"],
+  ["오버프레임 울트라 레어", "Over Frame Ultra Rare"],
   ["프리즈마틱 시크릿 레어", "Prismatic Secret Rare"],
+  ["오버프레임 프리즈마틱 시크릿 레어", "Over Frame Prismatic Secret Rare"],
   ["쿼터 센추리 시크릿 레어", "Quarter Century Secret Rare"],
   ["그랜드마스터 레어", "Grandmaster Rare"],
 ]);
@@ -48,6 +52,7 @@ const RARITY_KOREAN_BY_ENGLISH = new Map(
 );
 
 export const ALL_RARITY_CODES = [...RARITY_CODES.values()];
+export const RARITY_SORT_ORDER = new Map(ALL_RARITY_CODES.map((code, index) => [code, index]));
 
 export const getRarityLabel = (rarity) => {
   if (!rarity) return "레어도 미상";

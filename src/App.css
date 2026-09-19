@@ -1786,13 +1786,15 @@ button:disabled {
   -moz-appearance: textfield;
 }
 .pack-card-rarity {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid #c4cad5;
   padding: 0 8px;
-}
-.pack-card-rarity:disabled {
   background: #eef0f3;
-  color: #6b7484;
-  cursor: not-allowed;
+}
+.pack-card-rarity .rarity-chip {
+  cursor: help;
 }
 .pack-card small .rarity-chip {
   display: inline-flex;

@@ -9,6 +9,7 @@ import {
   getRarityCode,
   getRarityLabel,
   ALL_RARITY_CODES,
+  RARITY_SORT_ORDER,
 } from "../lib/officialCardApi";
 import SalesHistory from "./SalesHistory";
 
@@ -145,20 +146,32 @@ export default function InventoryConsole({
       await hydrateCardPreviews(cards, (detailedCard) => detailedCards.push(detailedCard));
       const variants = detailedCards.flatMap((detailedCard) => {
         const sets = detailedCard.card_sets.filter((set) => set.set_name === release.name);
-        return (sets.length ? sets : [null]).map((set) => ({
-          card: set
-            ? {
-                ...detailedCard,
-                id: `${detailedCard.cardId}-${set.set_code}-${set.rarity_code || set.set_rarity}`,
-                card_sets: [set],
-              }
-            : detailedCard,
-          quantity: 0,
-          price: "",
-          rarity: getRarityCode(set?.rarity_code || set?.set_rarity) || "",
-        }));
+        return (sets.length ? sets : [null]).flatMap((set) => {
+          const rarity = getRarityCode(set?.rarity_code || set?.set_rarity) || "";
+          const rarityVariants = rarity === "GMR" ? ["OFUR", "OFPSE", "GMR"] : [rarity];
+          return rarityVariants.map((variantRarity) => ({
+            card: set
+              ? {
+                  ...detailedCard,
+                  id: `${detailedCard.cardId}-${set.set_code}-${variantRarity}`,
+                  card_sets: [{ ...set, rarity_code: variantRarity, set_rarity: getRarityLabel(variantRarity) }],
+                }
+              : detailedCard,
+            quantity: 0,
+            price: "",
+            rarity: variantRarity,
+          }));
+        });
       });
-      setPackCards(variants);
+      setPackCards(
+        variants.sort((left, right) => {
+          const leftCode = left.card.card_sets?.[0]?.set_code || "";
+          const rightCode = right.card.card_sets?.[0]?.set_code || "";
+          const codeOrder = leftCode.localeCompare(rightCode, "ko", { numeric: true });
+          if (codeOrder) return codeOrder;
+          return (RARITY_SORT_ORDER.get(left.rarity) ?? Infinity) - (RARITY_SORT_ORDER.get(right.rarity) ?? Infinity);
+        }),
+      );
       setPackMatches([]);
       setPackQuery(release.name);
     } finally {
@@ -993,14 +1006,19 @@ export default function InventoryConsole({
                         value={price}
                         onChange={(event) => changePackPrice(packKey(card), event.target.value)}
                       />
-                      <input
-                        className="pack-card-rarity"
-                        value={rarity}
-                        readOnly
-                        disabled
-                        placeholder="레어도"
-                        aria-label={`${card.name} 레어도 (수정 불가)`}
-                      />
+                      <span
+                        className="pack-card-rarity rarity-tooltip"
+                        data-tooltip={getRarityLabel(rarity)}
+                        aria-label={`${card.name} ${getRarityLabel(rarity)}`}
+                      >
+                        <span
+                          className={`rarity-chip rarity-${getRarityCode(rarity)
+                            .replace(/[^a-z0-9+]/gi, "")
+                            .toLowerCase()}`}
+                        >
+                          {rarity || "-"}
+                        </span>
+                      </span>
                     </div>
                     <strong>{card.name}</strong>
                     <small>
