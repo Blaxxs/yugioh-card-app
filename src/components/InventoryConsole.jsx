@@ -15,6 +15,16 @@ import SalesHistory from "./SalesHistory";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
+const COLUMN_WIDTH_OPTIONS = [
+  [70, "좁게"],
+  [90, "작게"],
+  [100, "기본"],
+  [110, "조금 넓게"],
+  [120, "넓게"],
+  [140, "아주 넓게"],
+  [150, "최대"],
+  [220, "이름용"],
+];
 
 const PackCard = memo(function PackCard({ item, onChangeQuantity, onChangePrice }) {
   const { card, quantity, price, rarity } = item;
@@ -442,9 +452,13 @@ export default function InventoryConsole({
       next.splice(to, 0, item);
       return next;
     });
-  const resizeColumn = (id, width) =>
+  const resizeColumnPair = (leftId, rightId, leftWidth, rightWidth) =>
     setColumns((current) =>
-      current.map((column) => (column.id === id ? { ...column, width: Math.max(60, width) } : column)),
+      current.map((column) => {
+        if (column.id === leftId) return { ...column, width: leftWidth };
+        if (column.id === rightId) return { ...column, width: rightWidth };
+        return column;
+      }),
     );
   const toggleItemSelected = (id) =>
     setSelectedIds((current) => {
@@ -680,18 +694,42 @@ export default function InventoryConsole({
           {columnMenu && (
             <div className="column-menu">
               {columns.map((column) => (
-                <label key={column.id}>
-                  <input
-                    type="checkbox"
-                    checked={column.visible}
-                    onChange={() =>
+                <div className="column-menu-item" key={column.id}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={column.visible}
+                      onChange={() =>
+                        setColumns((current) =>
+                          current.map((item) => (item.id === column.id ? { ...item, visible: !item.visible } : item)),
+                        )
+                      }
+                    />{" "}
+                    {column.label}
+                  </label>
+                  <select
+                    value={COLUMN_WIDTH_OPTIONS.some(([width]) => width === column.width) ? column.width : "custom"}
+                    aria-label={`${column.label} 열 너비`}
+                    onChange={(event) =>
                       setColumns((current) =>
-                        current.map((item) => (item.id === column.id ? { ...item, visible: !item.visible } : item)),
+                        current.map((item) =>
+                          item.id === column.id ? { ...item, width: Number(event.target.value) } : item,
+                        ),
                       )
                     }
-                  />{" "}
-                  {column.label}
-                </label>
+                  >
+                    {!COLUMN_WIDTH_OPTIONS.some(([width]) => width === column.width) && (
+                      <option value="custom" disabled>
+                        사용자
+                      </option>
+                    )}
+                    {COLUMN_WIDTH_OPTIONS.map(([width, label]) => (
+                      <option key={width} value={width}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ))}
             </div>
           )}
@@ -810,20 +848,43 @@ export default function InventoryConsole({
                           </div>
                         );
                       })()}
-                    <span
-                      className="column-resize"
-                      onPointerDown={(event) => {
-                        const start = event.clientX;
-                        const initial = column.width;
-                        const move = (moveEvent) => resizeColumn(column.id, initial + moveEvent.clientX - start);
-                        const stop = () => {
-                          window.removeEventListener("pointermove", move);
-                          window.removeEventListener("pointerup", stop);
-                        };
-                        window.addEventListener("pointermove", move);
-                        window.addEventListener("pointerup", stop);
-                      }}
-                    />
+                    {(() => {
+                      const nextColumn = visibleColumns[visibleColumns.indexOf(column) + 1];
+                      if (!nextColumn) return null;
+                      return (
+                        <span
+                          className="column-resize"
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const start = event.clientX;
+                            const initialWidth = column.width;
+                            const nextInitialWidth = nextColumn.width;
+                            const move = (moveEvent) => {
+                              const nextWidth = Math.max(
+                                60,
+                                Math.min(
+                                  initialWidth + nextInitialWidth - 60,
+                                  initialWidth + moveEvent.clientX - start,
+                                ),
+                              );
+                              resizeColumnPair(
+                                column.id,
+                                nextColumn.id,
+                                nextWidth,
+                                initialWidth + nextInitialWidth - nextWidth,
+                              );
+                            };
+                            const stop = () => {
+                              window.removeEventListener("pointermove", move);
+                              window.removeEventListener("pointerup", stop);
+                            };
+                            window.addEventListener("pointermove", move);
+                            window.addEventListener("pointerup", stop);
+                          }}
+                        />
+                      );
+                    })()}
                   </th>
                 ))}
                 <th className="inventory-view-cell">보기</th>
@@ -831,14 +892,7 @@ export default function InventoryConsole({
             </thead>
             <tbody>
               {visibleItems.map((item) => (
-                <tr
-                  key={item.id}
-                  className={selectedIds.has(item.id) ? "selected" : ""}
-                  onClick={(event) => {
-                    if (event.target.closest("button, input, a")) return;
-                    toggleItemSelected(item.id);
-                  }}
-                >
+                <tr key={item.id} className={selectedIds.has(item.id) ? "selected" : ""}>
                   <td className="inventory-select-cell">
                     <input
                       type="checkbox"
@@ -848,7 +902,13 @@ export default function InventoryConsole({
                     />
                   </td>
                   {visibleColumns.map((column) => (
-                    <td key={column.id}>
+                    <td
+                      key={column.id}
+                      onClick={(event) => {
+                        if (event.target.closest("button, input, a")) return;
+                        toggleItemSelected(item.id);
+                      }}
+                    >
                       {column.id === "quantity" ? <b>{cellValue(item, column.id)}</b> : cellValue(item, column.id)}
                     </td>
                   ))}

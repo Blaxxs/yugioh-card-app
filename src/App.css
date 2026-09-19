@@ -1208,6 +1208,15 @@ button:disabled {
   font-size: 11px;
   font-weight: 600;
 }
+.column-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.column-menu-item select {
+  display: none;
+}
 .spreadsheet-filter-menu {
   display: grid;
   gap: 7px;
@@ -2078,8 +2087,32 @@ button:disabled {
     padding: 0 2px;
   }
   .column-filter-button,
-  .column-filter-popover {
+  .column-filter-popover,
+  .column-resize {
     display: none;
+  }
+  .column-menu {
+    right: 4px;
+    width: min(250px, calc(100vw - 32px));
+  }
+  .column-menu-item {
+    min-height: 34px;
+    border-bottom: 1px solid #e1e5eb;
+    padding-bottom: 5px;
+  }
+  .column-menu-item:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .column-menu-item select {
+    display: block;
+    width: 82px;
+    height: 28px;
+    border: 1px solid #c2c8d2;
+    border-radius: 3px;
+    background: #fff;
+    color: #39465a;
+    font-size: 11px;
   }
   .pack-intake-modal {
     align-items: center;
