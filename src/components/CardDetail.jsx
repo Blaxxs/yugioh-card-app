@@ -27,6 +27,9 @@ export default function CardDetail({
   const touchGesture = useRef("idle");
   const hasGmr = card.card_sets?.some((set) => set.rarity_code === "GMR");
   const gmrBaseImage = card.card_images?.[card.card_images.length - 1];
+  const displayName = String(card.koreanData.cardName || card.name || "")
+    .split(/\r?\n/)[0]
+    .trim();
   const sourceImages = card.card_images || [];
   const detailImages =
     hasGmr && gmrBaseImage
@@ -121,7 +124,7 @@ export default function CardDetail({
 
   const copyCardName = async () => {
     try {
-      await navigator.clipboard.writeText(card.koreanData.cardName);
+      await navigator.clipboard.writeText(displayName);
       setNameCopied(true);
       window.setTimeout(() => setNameCopied(false), 1400);
     } catch {
@@ -180,7 +183,7 @@ export default function CardDetail({
             }}
             title="카드 이름 복사"
           >
-            {nameCopied ? "복사됨" : card.koreanData.cardName}
+            {nameCopied ? "복사됨" : displayName}
           </h2>
         </div>
         <div className="detail-header-actions">

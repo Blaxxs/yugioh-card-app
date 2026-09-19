@@ -60,14 +60,7 @@ const PackCard = memo(function PackCard({ item, onChangeQuantity, onChangePrice 
         </span>
       </div>
       <strong>{card.name}</strong>
-      <small>
-        {card.card_sets?.[0]?.set_code || "코드 확인 중"}
-        {rarity && (
-          <span className={`rarity-chip ${rarityClass}`} title={getRarityLabel(rarity)}>
-            {rarity}
-          </span>
-        )}
-      </small>
+      <small>{card.card_sets?.[0]?.set_code || "코드 확인 중"}</small>
     </article>
   );
 });

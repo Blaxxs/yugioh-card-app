@@ -129,7 +129,15 @@ export const parseCardDetail = (html, cardId, fallbackName = "", fallbackImageUr
   };
   const textNode = root.find(".top .CardText .text_linebreak").first().clone();
   textNode.find("br").replaceWith("\n");
-  const name = root.find("#cardname h1").first().text().trim() || fallbackName;
+  const name =
+    root
+      .find("#cardname h1")
+      .first()
+      .contents()
+      .filter((_index, node) => node.type === "text")
+      .first()
+      .text()
+      .trim() || fallbackName;
   const attribute =
     root.find("img[src*='/attribute/']").first().closest(".item_box").find(".item_box_value").text().trim() || null;
   const level =

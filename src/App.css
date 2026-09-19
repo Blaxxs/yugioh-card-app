@@ -2788,10 +2788,11 @@ button:disabled {
 @media (max-width: 700px) {
   body {
     padding-bottom: env(safe-area-inset-bottom);
+    overflow-x: clip;
   }
   .app-shell {
     width: 100%;
-    padding: 18px 16px calc(88px + env(safe-area-inset-bottom));
+    padding: 14px 12px calc(76px + env(safe-area-inset-bottom));
     overflow: visible;
   }
   .app-header {
@@ -2828,7 +2829,7 @@ button:disabled {
     left: 0;
     z-index: 20;
     display: flex;
-    height: calc(64px + env(safe-area-inset-bottom));
+    height: calc(58px + env(safe-area-inset-bottom));
     margin: 0;
     border-top: 1px solid var(--app-line);
     border-radius: 0;
@@ -2839,7 +2840,7 @@ button:disabled {
   }
   .app-tabs button {
     position: relative;
-    min-height: 48px;
+    min-height: 44px;
     flex-direction: column;
     gap: 1px;
     border-radius: 8px;
@@ -2870,8 +2871,8 @@ button:disabled {
   .search-results.view-album,
   .management-results,
   .release-results {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
   .release-item {
     grid-template-columns: 70px minmax(0, 1fr);
@@ -2883,6 +2884,10 @@ button:disabled {
   .card-result h3 {
     margin: 7px 3px 3px;
     font-size: 13px;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .card-grid .card-result .card-summary {
     display: none;
@@ -2998,5 +3003,71 @@ button:disabled {
   }
   .transaction-row {
     padding: 10px;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font-size: 14px;
+  }
+  button {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .inventory-action-buttons {
+    gap: 5px;
+    margin: 6px;
+  }
+  .pack-intake-open,
+  .inventory-add-open,
+  .inventory-sell-open,
+  .inventory-sales-history-open {
+    min-height: 34px;
+    padding: 4px 7px;
+    font-size: 11px;
+  }
+  .inventory-table-wrap {
+    overflow-x: hidden;
+  }
+  .inventory-table {
+    min-width: 0;
+    table-layout: fixed;
+  }
+  .inventory-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pack-card-album {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px;
+  }
+  .pack-card-album .pack-card {
+    gap: 4px;
+    padding: 6px;
+  }
+  .pack-card-album .pack-card strong,
+  .pack-card-album .pack-card small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.3;
+  }
+  .pack-card-row,
+  .pack-card-price,
+  .pack-card-rarity {
+    height: 30px;
+  }
+  .inventory-edit-images,
+  .inventory-stock-images {
+    flex-wrap: wrap;
+    overflow-x: hidden;
+  }
+  .card-text,
+  textarea {
+    white-space: normal;
   }
 }
