@@ -1789,9 +1789,9 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #c4cad5;
-  padding: 0 8px;
-  background: #eef0f3;
+  border: 0;
+  padding: 0;
+  background: transparent;
 }
 .pack-card-rarity .rarity-chip {
   cursor: help;

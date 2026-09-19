@@ -1,5 +1,5 @@
 import { Download, Minus, PackagePlus, Plus, Search, ShoppingCart, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import {
   fetchOfficialCardById,
   fetchReleaseCards,
@@ -15,6 +15,62 @@ import SalesHistory from "./SalesHistory";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
+
+const PackCard = memo(function PackCard({ item, onChangeQuantity, onChangePrice }) {
+  const { card, quantity, price, rarity } = item;
+  const key = card.id || card.cardId;
+  const rarityClass = `rarity-${getRarityCode(rarity)
+    .replace(/[^a-z0-9+]/gi, "")
+    .toLowerCase()}`;
+
+  return (
+    <article className="pack-card">
+      <div className="pack-card-image">
+        <img src={card.card_images[0]?.image_url_small} alt={card.name} />
+        <div>
+          <button type="button" onClick={() => onChangeQuantity(key, quantity - 1)}>
+            <Minus size={14} />
+          </button>
+          <input
+            type="number"
+            min="0"
+            value={quantity}
+            onChange={(event) => onChangeQuantity(key, event.target.value)}
+          />
+          <button type="button" onClick={() => onChangeQuantity(key, quantity + 1)}>
+            <Plus size={14} />
+          </button>
+        </div>
+      </div>
+      <div className="pack-card-row">
+        <input
+          className="pack-card-price"
+          type="number"
+          min="0"
+          placeholder="가격"
+          value={price}
+          onChange={(event) => onChangePrice(key, event.target.value)}
+        />
+        <span
+          className="pack-card-rarity rarity-tooltip"
+          data-tooltip={getRarityLabel(rarity)}
+          aria-label={`${card.name} ${getRarityLabel(rarity)}`}
+        >
+          <span className={`rarity-chip ${rarityClass}`}>{rarity || "-"}</span>
+        </span>
+      </div>
+      <strong>{card.name}</strong>
+      <small>
+        {card.card_sets?.[0]?.set_code || "코드 확인 중"}
+        {rarity && (
+          <span className={`rarity-chip ${rarityClass}`} title={getRarityLabel(rarity)}>
+            {rarity}
+          </span>
+        )}
+      </small>
+    </article>
+  );
+});
 
 export default function InventoryConsole({
   inventoryItems,
@@ -179,14 +235,28 @@ export default function InventoryConsole({
     }
   };
   const packKey = (card) => card.id || card.cardId;
-  const changePackQuantity = (key, nextQuantity) =>
-    setPackCards((items) =>
-      items.map((item) =>
-        packKey(item.card) === key ? { ...item, quantity: Math.max(0, Number(nextQuantity) || 0) } : item,
-      ),
-    );
-  const changePackPrice = (key, price) =>
-    setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, price } : item)));
+  const changePackQuantity = useCallback(
+    (key, nextQuantity) =>
+      setPackCards((items) => {
+        const index = items.findIndex((item) => packKey(item.card) === key);
+        if (index < 0) return items;
+        const next = [...items];
+        next[index] = { ...next[index], quantity: Math.max(0, Number(nextQuantity) || 0) };
+        return next;
+      }),
+    [],
+  );
+  const changePackPrice = useCallback(
+    (key, price) =>
+      setPackCards((items) => {
+        const index = items.findIndex((item) => packKey(item.card) === key);
+        if (index < 0 || items[index].price === price) return items;
+        const next = [...items];
+        next[index] = { ...next[index], price };
+        return next;
+      }),
+    [],
+  );
   const startPackResize = (event, direction) => {
     const rect = event.currentTarget.parentElement.getBoundingClientRect();
     resizeRef.current = { startX: event.clientX, startY: event.clientY, rect, direction };
@@ -978,63 +1048,13 @@ export default function InventoryConsole({
               </div>
             ) : (
               <div className="pack-card-list pack-card-album">
-                {packCards.map(({ card, quantity, price, rarity }) => (
-                  <article className="pack-card" key={card.id || card.cardId}>
-                    <div className="pack-card-image">
-                      <img src={card.card_images[0]?.image_url_small} alt={card.name} />
-                      <div>
-                        <button type="button" onClick={() => changePackQuantity(packKey(card), quantity - 1)}>
-                          <Minus size={14} />
-                        </button>
-                        <input
-                          type="number"
-                          min="0"
-                          value={quantity}
-                          onChange={(event) => changePackQuantity(packKey(card), event.target.value)}
-                        />
-                        <button type="button" onClick={() => changePackQuantity(packKey(card), quantity + 1)}>
-                          <Plus size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="pack-card-row">
-                      <input
-                        className="pack-card-price"
-                        type="number"
-                        min="0"
-                        placeholder="가격"
-                        value={price}
-                        onChange={(event) => changePackPrice(packKey(card), event.target.value)}
-                      />
-                      <span
-                        className="pack-card-rarity rarity-tooltip"
-                        data-tooltip={getRarityLabel(rarity)}
-                        aria-label={`${card.name} ${getRarityLabel(rarity)}`}
-                      >
-                        <span
-                          className={`rarity-chip rarity-${getRarityCode(rarity)
-                            .replace(/[^a-z0-9+]/gi, "")
-                            .toLowerCase()}`}
-                        >
-                          {rarity || "-"}
-                        </span>
-                      </span>
-                    </div>
-                    <strong>{card.name}</strong>
-                    <small>
-                      {card.card_sets?.[0]?.set_code || "코드 확인 중"}
-                      {rarity && (
-                        <span
-                          className={`rarity-chip rarity-${getRarityCode(rarity)
-                            .replace(/[^a-z0-9+]/gi, "")
-                            .toLowerCase()}`}
-                          title={getRarityLabel(rarity)}
-                        >
-                          {rarity}
-                        </span>
-                      )}
-                    </small>
-                  </article>
+                {packCards.map((item) => (
+                  <PackCard
+                    key={item.card.id || item.card.cardId}
+                    item={item}
+                    onChangeQuantity={changePackQuantity}
+                    onChangePrice={changePackPrice}
+                  />
                 ))}
               </div>
             )}
