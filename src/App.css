@@ -1071,8 +1071,6 @@ button:disabled {
   overflow: auto;
 }
 .inventory-table {
-  width: 100%;
-  max-width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
   color: #2c3747;
@@ -1100,7 +1098,7 @@ button:disabled {
 }
 .column-label {
   display: block;
-  width: calc(100% - 24px);
+  width: 100%;
   min-width: 0;
   align-items: center;
   min-height: 24px;
@@ -1739,9 +1737,6 @@ button:disabled {
   .inventory-table-toolbar select {
     flex: 1 1 100%;
     width: 100%;
-  }
-  .inventory-table {
-    min-width: 0;
   }
   .inventory-select-cell,
   .inventory-view-cell {

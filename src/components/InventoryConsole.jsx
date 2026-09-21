@@ -53,13 +53,13 @@ export default function InventoryConsole({
   const [columns, setColumns] = useState(() => {
     const isMobile = typeof window !== "undefined" && window.innerWidth <= 700;
     return [
-      { id: "language", label: "언어", visible: !isMobile, width: 90 },
-      { id: "group", label: "카드군", visible: !isMobile, width: 90 },
+      { id: "language", label: "언어", visible: !isMobile, width: 104 },
+      { id: "group", label: "카드군", visible: !isMobile, width: 104 },
       { id: "name", label: "이름", visible: true, width: 220 },
-      { id: "rarity", label: "레어도", visible: true, width: 90 },
+      { id: "rarity", label: "레어도", visible: true, width: 104 },
       { id: "code", label: "코드", visible: true, width: 120 },
       { id: "condition", label: "상태", visible: !isMobile, width: 110 },
-      { id: "quantity", label: "수량", visible: true, width: 70 },
+      { id: "quantity", label: "수량", visible: true, width: 84 },
       { id: "price", label: "가격", visible: true, width: 100 },
       { id: "memo", label: "비고", visible: !isMobile, width: 140 },
     ];
@@ -543,7 +543,7 @@ export default function InventoryConsole({
           )}
         </div>
         <div className="inventory-table-wrap">
-          <table className="inventory-table">
+          <table className="inventory-table" style={{ width: tableWidthTotal, minWidth: tableWidthTotal }}>
             <thead>
               <tr>
                 <th className="inventory-select-cell">
@@ -564,7 +564,7 @@ export default function InventoryConsole({
                       moveColumn(event.dataTransfer.getData("column"), column.id);
                     }}
                     onDragOver={(event) => event.preventDefault()}
-                    style={{ width: `${(column.width / tableWidthTotal) * 100}%` }}
+                    style={{ width: column.width }}
                   >
                     <span
                       className="column-label"
