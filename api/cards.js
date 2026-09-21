@@ -5,13 +5,32 @@ import {
   parseCardDetail,
   parseSearchResults,
 } from "./_lib/official-card-parser.js";
-import { fetchProductById, fetchSetCards, fetchSets, searchProducts } from "./_lib/apitcg-client.js";
+import * as pokemonKr from "./_lib/pokemon-kr-parser.js";
+import * as onePieceKr from "./_lib/onepiece-kr-parser.js";
 import { getSupabaseAdmin } from "./_lib/supabase-admin.js";
 
 const DETAIL_CACHE_DAYS = 30;
 const SEARCH_CACHE_DAYS = 1;
 const RELEASE_CACHE_DAYS = 7;
-const GAMES_WITH_EXTERNAL_API = new Set(["pokemon", "onepiece"]);
+
+// Each external game exposes the same shape so api routing stays game-agnostic.
+const EXTERNAL_GAMES = {
+  pokemon: {
+    search: (term) => pokemonKr.searchCards(term),
+    detail: (id, fallbackName) => pokemonKr.fetchCardDetail(id, fallbackName),
+    releaseList: () => pokemonKr.fetchSets(),
+    releaseCards: (packId) => pokemonKr.fetchSetCards(packId),
+    // Pokémon search only returns thumbnails; hydrate real names/packs before caching.
+    hydrateSearchResults: true,
+  },
+  onepiece: {
+    search: (term) => onePieceKr.searchCards(term),
+    detail: (id) => onePieceKr.fetchCardById(id),
+    releaseList: () => onePieceKr.fetchSets(),
+    releaseCards: (packId) => onePieceKr.fetchSetCards(packId),
+    hydrateSearchResults: false,
+  },
+};
 let lastExpiredCacheCleanup = 0;
 
 const fetchOfficialHtml = async (url) => {
@@ -42,7 +61,7 @@ async function getExternalCardDetail(game, cardId, database) {
       .maybeSingle();
     if (data && isFresh(data.updated_at)) return { data: data.data, cache: "HIT" };
   }
-  const card = await fetchProductById(game, cardId);
+  const card = await EXTERNAL_GAMES[game].detail(cardId);
   if (!card) throw new Error("카드를 찾을 수 없습니다.");
   if (database) {
     await database
@@ -70,7 +89,13 @@ async function getExternalSearch(game, query, database) {
       .maybeSingle();
     if (data && new Date(data.expires_at).getTime() > Date.now()) return { data: data.results, cache: "HIT" };
   }
-  const cards = await searchProducts(game, query);
+  const config = EXTERNAL_GAMES[game];
+  let cards = await config.search(query);
+  if (config.hydrateSearchResults && cards.length) {
+    const previews = cards.slice(0, 24);
+    const detailed = await Promise.all(previews.map((card) => config.detail(card.cardId, card.name).catch(() => card)));
+    cards = detailed;
+  }
   if (database) {
     if (cards.length) {
       await database.from("card_catalog").upsert(
@@ -80,7 +105,7 @@ async function getExternalSearch(game, query, database) {
           name: card.name,
           search_name: normalizeSearchTerm(card.name),
           data: card,
-          detail_loaded: true,
+          detail_loaded: card.isDetailLoaded,
         })),
         { onConflict: "game,card_id", ignoreDuplicates: true },
       );
@@ -101,7 +126,7 @@ async function getExternalReleaseList(game, database) {
       .maybeSingle();
     if (data && new Date(data.expires_at).getTime() > Date.now()) return { data: data.results, cache: "HIT" };
   }
-  const releases = await fetchSets(game);
+  const releases = await EXTERNAL_GAMES[game].releaseList();
   if (database) {
     const expiresAt = new Date(Date.now() + RELEASE_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
     await database.from("card_search_cache").upsert({ query_key: queryKey, results: releases, expires_at: expiresAt });
@@ -119,7 +144,7 @@ async function getExternalReleaseCards(game, setId, database) {
       .maybeSingle();
     if (data && new Date(data.expires_at).getTime() > Date.now()) return { data: data.results, cache: "HIT" };
   }
-  const cards = await fetchSetCards(game, setId);
+  const cards = await EXTERNAL_GAMES[game].releaseCards(setId);
   if (database) {
     const expiresAt = new Date(Date.now() + RELEASE_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
     await database.from("card_search_cache").upsert({ query_key: queryKey, results: cards, expires_at: expiresAt });
@@ -214,7 +239,7 @@ export default async function handler(request, response) {
   const setId = requestUrl.searchParams.get("setId")?.trim();
   const cardId = requestUrl.searchParams.get("id")?.trim();
   const query = requestUrl.searchParams.get("q")?.trim();
-  if (game !== "yugioh" && !GAMES_WITH_EXTERNAL_API.has(game)) {
+  if (game !== "yugioh" && !EXTERNAL_GAMES[game]) {
     return response.status(400).json({ error: "지원하지 않는 카드게임입니다." });
   }
   if (!cardId && !query && !releases && !setId) {

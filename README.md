@@ -55,18 +55,14 @@ Supabase와 Google은 무료 사용량 구간에서 시작할 수 있지만, 저
 ## 포켓몬 · 원피스 카드 지원
 
 앱 상단의 게임 선택 UI에서 유희왕/포켓몬/원피스를 전환할 수 있습니다. 포켓몬과 원피스 카드 데이터는
-[apitcg.com](https://apitcg.com/)의 통합 TCG API를 통해 서버(`/api/cards`)에서만 조회하며, 브라우저에는
-API 키가 노출되지 않습니다.
+각 게임의 한국 공식 사이트에서 서버(`/api/cards`)가 직접 조회하여 캐시합니다. 외부 유료 API나 API 키가
+전혀 필요하지 않습니다.
 
-1. [apitcg.com/register](https://apitcg.com/register)에서 무료 계정을 만들고 [Developer Platform](https://apitcg.com/platform/api-key)에서 API 키를 발급받습니다.
-2. Vercel Project Settings → Environment Variables에 추가합니다.
+- 포켓몬: [pokemoncard.co.kr](https://pokemoncard.co.kr/) (포켓몬코리아 공식 카드 검색)
+- 원피스: [onepiece-cardgame.kr](https://onepiece-cardgame.kr/) (반다이 원피스 카드게임 한국 공식 사이트)
 
-```text
-APITCG_API_KEY=<apitcg-api-key>
-```
-
-3. Supabase Dashboard의 SQL Editor에서 `supabase-migration-multi-game-catalog.sql`을 실행합니다. (기존 `card_catalog` 테이블에 `game` 컬럼을 추가해 유희왕/포켓몬/원피스 카드 ID 충돌을 방지합니다.)
-4. `public/card-backs/` 폴더에 다음 파일명을 정확히 맞춰 카드 뒷면 이미지를 넣습니다. 파일이 없으면 게임 선택 버튼에는 이름만 표시됩니다.
+1. Supabase Dashboard의 SQL Editor에서 `supabase-migration-multi-game-catalog.sql`을 실행합니다. (기존 `card_catalog` 테이블에 `game` 컬럼을 추가해 유희왕/포켓몬/원피스 카드 ID 충돌을 방지합니다.)
+2. `public/card-backs/` 폴더에 다음 파일명을 정확히 맞춰 카드 뒷면 이미지를 넣습니다. 파일이 없으면 게임 선택 버튼에는 이름만 표시됩니다.
 
 ```text
 public/card-backs/yugioh_card_back.png
@@ -74,9 +70,10 @@ public/card-backs/pokemon_card_back.png
 public/card-backs/one_piece_card_back.png
 ```
 
-apitcg.com은 여러 TCG를 하나의 API로 제공하는 서드파티 서비스이며, 응답 필드 구성은 게임마다 조금씩 다를 수
-있습니다. 실제 키로 검색·상세·수록 팩 조회를 각각 한 번씩 확인해 필드 매핑(`api/_lib/apitcg-client.js`)이
-정확한지 점검해 주세요.
+두 공식 사이트 모두 비공식 스크래핑이므로, 사이트 구조가 바뀌면 `api/_lib/pokemon-kr-parser.js`,
+`api/_lib/onepiece-kr-parser.js`의 선택자(class명, 폼 필드명)를 다시 확인해야 합니다. 또한 각 사이트의
+이용약관을 반드시 확인하고, 과도한 요청으로 서버에 부담을 주지 않도록 캐시(검색 1일, 상세 30일, 수록 7일)를
+유지한 채로 운영하세요.
 
 ## Scripts
 
