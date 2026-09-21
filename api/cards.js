@@ -5,10 +5,13 @@ import {
   parseCardDetail,
   parseSearchResults,
 } from "./_lib/official-card-parser.js";
+import { fetchProductById, fetchSetCards, fetchSets, searchProducts } from "./_lib/apitcg-client.js";
 import { getSupabaseAdmin } from "./_lib/supabase-admin.js";
 
 const DETAIL_CACHE_DAYS = 30;
 const SEARCH_CACHE_DAYS = 1;
+const RELEASE_CACHE_DAYS = 7;
+const GAMES_WITH_EXTERNAL_API = new Set(["pokemon", "onepiece"]);
 let lastExpiredCacheCleanup = 0;
 
 const fetchOfficialHtml = async (url) => {
@@ -29,12 +32,108 @@ const setResponseCache = (response) => {
   response.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
 };
 
+async function getExternalCardDetail(game, cardId, database) {
+  if (database) {
+    const { data } = await database
+      .from("card_catalog")
+      .select("data, updated_at")
+      .eq("game", game)
+      .eq("card_id", cardId)
+      .maybeSingle();
+    if (data && isFresh(data.updated_at)) return { data: data.data, cache: "HIT" };
+  }
+  const card = await fetchProductById(game, cardId);
+  if (!card) throw new Error("카드를 찾을 수 없습니다.");
+  if (database) {
+    await database
+      .from("card_catalog")
+      .upsert({
+        game,
+        card_id: cardId,
+        name: card.name,
+        search_name: normalizeSearchTerm(card.name),
+        data: card,
+        detail_loaded: true,
+        updated_at: new Date().toISOString(),
+      });
+  }
+  return { data: card, cache: database ? "MISS" : "BYPASS" };
+}
+
+async function getExternalSearch(game, query, database) {
+  const queryKey = `${game}:${normalizeSearchTerm(query)}`;
+  if (database) {
+    const { data } = await database
+      .from("card_search_cache")
+      .select("results, expires_at")
+      .eq("query_key", queryKey)
+      .maybeSingle();
+    if (data && new Date(data.expires_at).getTime() > Date.now()) return { data: data.results, cache: "HIT" };
+  }
+  const cards = await searchProducts(game, query);
+  if (database) {
+    if (cards.length) {
+      await database.from("card_catalog").upsert(
+        cards.map((card) => ({
+          game,
+          card_id: card.cardId,
+          name: card.name,
+          search_name: normalizeSearchTerm(card.name),
+          data: card,
+          detail_loaded: true,
+        })),
+        { onConflict: "game,card_id", ignoreDuplicates: true },
+      );
+    }
+    const expiresAt = new Date(Date.now() + SEARCH_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    await database.from("card_search_cache").upsert({ query_key: queryKey, results: cards, expires_at: expiresAt });
+  }
+  return { data: cards, cache: database ? "MISS" : "BYPASS" };
+}
+
+async function getExternalReleaseList(game, database) {
+  const queryKey = `${game}:releases`;
+  if (database) {
+    const { data } = await database
+      .from("card_search_cache")
+      .select("results, expires_at")
+      .eq("query_key", queryKey)
+      .maybeSingle();
+    if (data && new Date(data.expires_at).getTime() > Date.now()) return { data: data.results, cache: "HIT" };
+  }
+  const releases = await fetchSets(game);
+  if (database) {
+    const expiresAt = new Date(Date.now() + RELEASE_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    await database.from("card_search_cache").upsert({ query_key: queryKey, results: releases, expires_at: expiresAt });
+  }
+  return { data: releases, cache: database ? "MISS" : "BYPASS" };
+}
+
+async function getExternalReleaseCards(game, setId, database) {
+  const queryKey = `${game}:set:${setId}`;
+  if (database) {
+    const { data } = await database
+      .from("card_search_cache")
+      .select("results, expires_at")
+      .eq("query_key", queryKey)
+      .maybeSingle();
+    if (data && new Date(data.expires_at).getTime() > Date.now()) return { data: data.results, cache: "HIT" };
+  }
+  const cards = await fetchSetCards(game, setId);
+  if (database) {
+    const expiresAt = new Date(Date.now() + RELEASE_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    await database.from("card_search_cache").upsert({ query_key: queryKey, results: cards, expires_at: expiresAt });
+  }
+  return { data: cards, cache: database ? "MISS" : "BYPASS" };
+}
+
 async function getCardDetail(cardId, database) {
   let staleCard = null;
   if (database) {
     const { data } = await database
       .from("card_catalog")
       .select("data, detail_loaded, updated_at")
+      .eq("game", "yugioh")
       .eq("card_id", cardId)
       .maybeSingle();
     staleCard = data?.detail_loaded ? data.data : null;
@@ -48,6 +147,7 @@ async function getCardDetail(cardId, database) {
       await database
         .from("card_catalog")
         .upsert({
+          game: "yugioh",
           card_id: cardId,
           name: card.name,
           search_name: normalizeSearchTerm(card.name),
@@ -64,7 +164,8 @@ async function getCardDetail(cardId, database) {
 }
 
 async function searchCards(query, database) {
-  const queryKey = normalizeSearchTerm(query);
+  const normalizedTerm = normalizeSearchTerm(query);
+  const queryKey = `yugioh:${normalizedTerm}`;
   if (database) {
     if (Date.now() - lastExpiredCacheCleanup > 60 * 60 * 1000) {
       lastExpiredCacheCleanup = Date.now();
@@ -80,8 +181,8 @@ async function searchCards(query, database) {
 
   let html = await fetchOfficialHtml(createSearchUrl(query));
   let cards = parseSearchResults(html, query);
-  if (!cards.length && queryKey.length > 1) {
-    html = await fetchOfficialHtml(createSearchUrl(queryKey.slice(0, 2)));
+  if (!cards.length && normalizedTerm.length > 1) {
+    html = await fetchOfficialHtml(createSearchUrl(normalizedTerm.slice(0, 2)));
     cards = parseSearchResults(html, query);
   }
 
@@ -89,13 +190,14 @@ async function searchCards(query, database) {
     if (cards.length) {
       await database.from("card_catalog").upsert(
         cards.map((card) => ({
+          game: "yugioh",
           card_id: card.cardId,
           name: card.name,
           search_name: normalizeSearchTerm(card.name),
           data: card,
           detail_loaded: false,
         })),
-        { onConflict: "card_id", ignoreDuplicates: true },
+        { onConflict: "game,card_id", ignoreDuplicates: true },
       );
     }
     const expiresAt = new Date(Date.now() + SEARCH_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -107,16 +209,36 @@ async function searchCards(query, database) {
 export default async function handler(request, response) {
   if (request.method !== "GET") return response.status(405).json({ error: "GET 요청만 지원합니다." });
   const requestUrl = new URL(request.url, `https://${request.headers.host}`);
+  const game = requestUrl.searchParams.get("game")?.trim() || "yugioh";
+  const releases = requestUrl.searchParams.get("releases");
+  const setId = requestUrl.searchParams.get("setId")?.trim();
   const cardId = requestUrl.searchParams.get("id")?.trim();
   const query = requestUrl.searchParams.get("q")?.trim();
-  if (!cardId && !query) return response.status(400).json({ error: "id 또는 q가 필요합니다." });
-  if (cardId && !/^\d+$/.test(cardId)) return response.status(400).json({ error: "잘못된 카드 ID입니다." });
+  if (game !== "yugioh" && !GAMES_WITH_EXTERNAL_API.has(game)) {
+    return response.status(400).json({ error: "지원하지 않는 카드게임입니다." });
+  }
+  if (!cardId && !query && !releases && !setId) {
+    return response.status(400).json({ error: "id, q, releases, setId 중 하나가 필요합니다." });
+  }
+  if (game === "yugioh" && cardId && !/^\d+$/.test(cardId)) {
+    return response.status(400).json({ error: "잘못된 카드 ID입니다." });
+  }
   if (query && query.length > 80) return response.status(400).json({ error: "검색어가 너무 깁니다." });
 
   try {
-    const result = cardId
-      ? await getCardDetail(cardId, getSupabaseAdmin())
-      : await searchCards(query, getSupabaseAdmin());
+    const database = getSupabaseAdmin();
+    const result =
+      game !== "yugioh"
+        ? releases
+          ? await getExternalReleaseList(game, database)
+          : setId
+            ? await getExternalReleaseCards(game, setId, database)
+            : cardId
+              ? await getExternalCardDetail(game, cardId, database)
+              : await getExternalSearch(game, query, database)
+        : cardId
+          ? await getCardDetail(cardId, database)
+          : await searchCards(query, database);
     setResponseCache(response);
     response.setHeader("X-Card-Cache", result.cache);
     return response.status(200).json(result.data);

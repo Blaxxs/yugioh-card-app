@@ -1,6 +1,7 @@
 import { CircleDollarSign, CircleHelp, ExternalLink, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getRarityCode, getRarityLabel } from "../lib/officialCardApi";
+import { getGameFieldLabels } from "../lib/cardGames";
 
 export default function CardDetail({
   card,
@@ -27,6 +28,8 @@ export default function CardDetail({
   const touchGesture = useRef("idle");
   const hasGmr = card.card_sets?.some((set) => set.rarity_code === "GMR");
   const gmrBaseImage = card.card_images?.[card.card_images.length - 1];
+  const isYugioh = (card.game || "yugioh") === "yugioh";
+  const fieldLabels = getGameFieldLabels(card.game || "yugioh");
   const displayName = String(card.koreanData.cardName || card.name || "")
     .split(/\r?\n/)[0]
     .trim();
@@ -132,27 +135,35 @@ export default function CardDetail({
     }
   };
 
+  const displayRarity = (set) => {
+    if (isYugioh) return getRarityLabel(set.set_rarity || set.rarity_code);
+    return set.set_rarity || set.rarity_code || "레어도 미상";
+  };
+
   const openPrice = (set) => {
-    setPriceSearch({
-      code: set.set_code,
-      rarity: getRarityLabel(set.set_rarity || set.rarity_code),
-      query: set.set_code,
-    });
+    setPriceSearch({ code: set.set_code, rarity: displayRarity(set), query: set.set_code });
   };
 
   const priceSearchLinks = priceSearch
     ? [
         ["번개장터", `https://m.bunjang.co.kr/search/products?q=${encodeURIComponent(priceSearch.query)}`],
-        ["카드모아", `http://cardmoa.com/shop/search.php?search_str=${encodeURIComponent(priceSearch.query)}`],
-        ["카드디씨", `https://carddc.co.kr/product_list.html?search_word=${encodeURIComponent(priceSearch.query)}`],
-        [
-          "카드공구",
-          `https://www.card09.com/search_result.php?search=total&searchstring=${encodeURIComponent(priceSearch.query)}`,
-        ],
-        [
-          "티씨지샵",
-          `http://www.tcgshop.co.kr/search_result.php?search=meta_str&searchstring=${encodeURIComponent(priceSearch.query)}`,
-        ],
+        ...(isYugioh
+          ? [
+              ["카드모아", `http://cardmoa.com/shop/search.php?search_str=${encodeURIComponent(priceSearch.query)}`],
+              [
+                "카드디씨",
+                `https://carddc.co.kr/product_list.html?search_word=${encodeURIComponent(priceSearch.query)}`,
+              ],
+              [
+                "카드공구",
+                `https://www.card09.com/search_result.php?search=total&searchstring=${encodeURIComponent(priceSearch.query)}`,
+              ],
+              [
+                "티씨지샵",
+                `http://www.tcgshop.co.kr/search_result.php?search=meta_str&searchstring=${encodeURIComponent(priceSearch.query)}`,
+              ],
+            ]
+          : []),
       ]
     : [];
 
@@ -269,23 +280,23 @@ export default function CardDetail({
         <div>
           <div className="detail-info">
             <p>
-              <strong>종류</strong>
+              <strong>{fieldLabels.other}</strong>
               {card.koreanData.cardOther || "-"}
             </p>
             <p>
-              <strong>속성</strong>
+              <strong>{fieldLabels.attr}</strong>
               {card.koreanData.cardAttr || "-"}
             </p>
             <p>
-              <strong>레벨/랭크</strong>
+              <strong>{fieldLabels.level}</strong>
               {card.koreanData.cardLevel || "-"}
             </p>
             <p>
-              <strong>공격력</strong>
+              <strong>{fieldLabels.atk}</strong>
               {card.koreanData.cardAtk || "-"}
             </p>
             <p>
-              <strong>수비력</strong>
+              <strong>{fieldLabels.def}</strong>
               {card.koreanData.cardDef || "-"}
             </p>
             <p className="card-text">
@@ -295,12 +306,14 @@ export default function CardDetail({
           </div>
           <div className="section-heading">
             <h3>수록 팩과 레어도</h3>
-            <button className="rarity-guide-button" type="button" onClick={() => setIsRarityGuideOpen(true)}>
-              <CircleHelp size={16} aria-hidden="true" />
-              레어도 안내
-            </button>
+            {isYugioh && (
+              <button className="rarity-guide-button" type="button" onClick={() => setIsRarityGuideOpen(true)}>
+                <CircleHelp size={16} aria-hidden="true" />
+                레어도 안내
+              </button>
+            )}
           </div>
-          {isRarityGuideOpen && (
+          {isYugioh && isRarityGuideOpen && (
             <div className="rarity-guide-modal" role="dialog" aria-modal="true" aria-label="레어도 가이드">
               <button
                 className="rarity-guide-backdrop"
@@ -379,8 +392,8 @@ export default function CardDetail({
                       <div className="set-rarity-actions">
                         <span
                           className="rarity-tooltip"
-                          data-tooltip={getRarityLabel(set.set_rarity || set.rarity_code)}
-                          aria-label={getRarityLabel(set.set_rarity || set.rarity_code)}
+                          data-tooltip={displayRarity(set)}
+                          aria-label={displayRarity(set)}
                         >
                           <span
                             className={`rarity-chip rarity-${getRarityCode(set.rarity_code || set.set_rarity)
@@ -393,7 +406,7 @@ export default function CardDetail({
                         <button
                           className="price-search-button"
                           type="button"
-                          aria-label={`${set.set_code} ${getRarityLabel(set.set_rarity || set.rarity_code)} 가격 보기`}
+                          aria-label={`${set.set_code} ${displayRarity(set)} 가격 보기`}
                           title="판매처 가격 보기"
                           onClick={(event) => {
                             event.stopPropagation();

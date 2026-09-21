@@ -28,6 +28,7 @@ function ViewFilters({ value, onChange }) {
 
 export default function ManagementTabs({
   activeTab,
+  activeGame,
   onTabChange,
   session,
   inventoryItems,
@@ -85,6 +86,7 @@ export default function ManagementTabs({
         <section className="management-panel">
           {activeTab === "inventory" && (
             <InventoryConsole
+              activeGame={activeGame}
               inventoryItems={inventoryItems}
               busy={inventoryBusy}
               onBatchIntake={onBatchIntake}

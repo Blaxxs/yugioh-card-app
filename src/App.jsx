@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, LogIn, LogOut, Search, X } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
-import {
-  fetchOfficialCardById,
-  fetchReleaseCards,
-  fetchReleaseList,
-  getReleaseSetVariants,
-  hydrateCardPreviews,
-  isQuarterCenturyChronicleRelease,
-  searchOfficialCards,
-} from "./lib/officialCardApi";
+import { getReleaseSetVariants, hydrateCardPreviews, isQuarterCenturyChronicleRelease } from "./lib/officialCardApi";
+import { CARD_GAMES, DEFAULT_GAME_ID, getGameById } from "./lib/cardGames";
+import { fetchGameCardById, fetchGameReleaseCards, fetchGameReleaseList, searchGameCards } from "./lib/tcgApi";
 import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
@@ -46,6 +40,13 @@ export default function App() {
   const [selectedRelease, setSelectedRelease] = useState(savedHistory?.selectedRelease || null);
   const [releaseCards, setReleaseCards] = useState([]);
   const [releaseLoading, setReleaseLoading] = useState(false);
+  const [activeGame, setActiveGame] = useState(() => {
+    try {
+      return localStorage.getItem("ygo-active-game") || DEFAULT_GAME_ID;
+    } catch {
+      return DEFAULT_GAME_ID;
+    }
+  });
   const historyIndex = useRef(savedHistory?.index || 0);
   const viewRef = useRef({ activeTab, selectedCard, selectedRelease });
   const loadedReleasePath = useRef(null);
@@ -144,7 +145,7 @@ export default function App() {
       await Promise.resolve();
       setReleaseLoading(true);
       try {
-        setReleases(await fetchReleaseList());
+        setReleases(await fetchGameReleaseList(activeGame));
       } catch (error) {
         setActionError(error.message);
       } finally {
@@ -152,7 +153,7 @@ export default function App() {
       }
     };
     loadReleases();
-  }, [activeTab, releaseLoading, releases.length]);
+  }, [activeTab, releaseLoading, releases.length, activeGame]);
 
   useEffect(() => {
     if (!selectedRelease || loadedReleasePath.current === selectedRelease.path) return;
@@ -162,8 +163,8 @@ export default function App() {
       setReleaseCards([]);
       setReleaseLoading(true);
       try {
-        const previews = await fetchReleaseCards(selectedRelease.path);
-        if (!isQuarterCenturyChronicleRelease(selectedRelease.name)) {
+        const previews = await fetchGameReleaseCards(activeGame, selectedRelease.path);
+        if (activeGame !== "yugioh" || !isQuarterCenturyChronicleRelease(selectedRelease.name)) {
           setReleaseCards(previews);
           return;
         }
@@ -191,7 +192,7 @@ export default function App() {
       }
     };
     loadReleaseCards();
-  }, [selectedRelease]);
+  }, [selectedRelease, activeGame]);
 
   const loginWithGoogle = () =>
     supabase?.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
@@ -220,6 +221,24 @@ export default function App() {
 
   const closeRelease = () => goBack({ selectedRelease: null });
 
+  const changeGame = (gameId) => {
+    if (gameId === activeGame) return;
+    setActiveGame(gameId);
+    try {
+      localStorage.setItem("ygo-active-game", gameId);
+    } catch {
+      // ignore storage failures (private browsing, quota, etc.)
+    }
+    setActionError("");
+    setSearchTerm("");
+    setCards([]);
+    setSelectedCard(null);
+    setReleases([]);
+    setReleaseCards([]);
+    setSelectedRelease(null);
+    loadedReleasePath.current = null;
+  };
+
   const changeTab = (tab) => {
     if (tab === activeTab && !selectedCard && !selectedRelease) return;
     pushView({ activeTab: tab, selectedCard: null, selectedRelease: null });
@@ -234,7 +253,7 @@ export default function App() {
     let release = releases.find((item) => item.name === releaseName);
     if (!release) {
       try {
-        const fetchedReleases = await fetchReleaseList();
+        const fetchedReleases = await fetchGameReleaseList(activeGame);
         setReleases(fetchedReleases);
         release = fetchedReleases.find((item) => item.name === releaseName);
       } catch (error) {
@@ -259,7 +278,12 @@ export default function App() {
     setCardDetailLoading(true);
     setActionError("");
     try {
-      const detailedCard = await fetchOfficialCardById(card.cardId, card.name, card.card_images?.[0]?.image_url_small);
+      const detailedCard = await fetchGameCardById(
+        card.game || activeGame,
+        card.cardId,
+        card.name,
+        card.card_images?.[0]?.image_url_small,
+      );
       if (detailedCard) pushView({ selectedCard: detailedCard });
     } catch (error) {
       setActionError(error.message);
@@ -604,7 +628,7 @@ export default function App() {
     setLoading(true);
     setActionError("");
     try {
-      const results = await searchOfficialCards(searchTerm);
+      const results = await searchGameCards(activeGame, searchTerm);
       setCards(results);
     } catch (error) {
       setActionError(error.message);
@@ -638,6 +662,28 @@ export default function App() {
       {!isSupabaseConfigured && (
         <p className="setup-message">Supabase 환경변수를 설정하면 로그인을 사용할 수 있습니다.</p>
       )}
+      <div className="game-switcher" role="radiogroup" aria-label="카드게임 선택">
+        {CARD_GAMES.map((game) => (
+          <button
+            key={game.id}
+            type="button"
+            role="radio"
+            aria-checked={activeGame === game.id}
+            className={`game-switcher-item ${activeGame === game.id ? "active" : ""}`}
+            onClick={() => changeGame(game.id)}
+          >
+            <img
+              src={game.cardBack}
+              alt=""
+              aria-hidden="true"
+              onError={(event) => {
+                event.currentTarget.style.visibility = "hidden";
+              }}
+            />
+            <span>{game.label}</span>
+          </button>
+        ))}
+      </div>
       <div className="search-slot">
         {activeTab === "search" && (
           <form
@@ -652,7 +698,7 @@ export default function App() {
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="카드 이름을 검색하세요"
+                placeholder={`${getGameById(activeGame).label} 카드 이름을 검색하세요`}
                 aria-label="카드 이름 검색"
               />
             </label>
@@ -664,6 +710,7 @@ export default function App() {
       </div>
       <ManagementTabs
         activeTab={activeTab}
+        activeGame={activeGame}
         onTabChange={changeTab}
         session={session}
         inventoryItems={inventoryItems}
