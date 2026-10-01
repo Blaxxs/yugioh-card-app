@@ -477,52 +477,64 @@ export default function InventoryConsole({
       </div>
       <section className="inventory-table-section">
         <div className="inventory-table-toolbar">
-          <strong>보유 재고</strong>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="카드명 · 코드 · 레어도 검색"
-            aria-label="재고 검색"
-          />
-          <select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="재고 정렬">
-            <option value="updated">최근 수정순</option>
-            <option value="name">카드명순</option>
-            <option value="quantity">수량 많은순</option>
-          </select>
-          <button type="button" onClick={() => importFileRef.current?.click()}>
-            엑셀 업로드
-          </button>
-          <button type="button" onClick={downloadImportTemplate}>
-            양식 다운
-          </button>
-          <input
-            ref={importFileRef}
-            className="inventory-import-input"
-            type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            onChange={importSpreadsheet}
-            aria-label="스프레드시트 업로드"
-          />
-          <button type="button" onClick={() => exportCsv(false)}>
-            <Download size={16} aria-hidden="true" /> 전체 CSV
-          </button>
-          <button type="button" disabled={!selectedIds.size} onClick={() => exportCsv(true)}>
-            <Download size={16} aria-hidden="true" /> 선택 CSV
-          </button>
-          <button type="button" disabled={!selectedIds.size} onClick={() => setEditOpen(true)}>
-            선택 수정
-          </button>
-          <button type="button" disabled={!selectedIds.size} onClick={deleteSelected}>
-            선택 삭제
-          </button>
-          <button type="button" onClick={() => setColumnMenu((value) => !value)}>
-            열 설정
-          </button>
-          <select value={rowDensity} onChange={(event) => setRowDensity(event.target.value)} aria-label="행 높이">
-            <option value="compact">행 높이: 압축</option>
-            <option value="normal">행 높이: 기본</option>
-            <option value="comfortable">행 높이: 여유</option>
-          </select>
+          <div className="inventory-table-toolbar-main">
+            <strong>보유 재고</strong>
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="카드명 · 코드 · 레어도 검색"
+              aria-label="재고 검색"
+            />
+            <select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="재고 정렬">
+              <option value="updated">최근 수정순</option>
+              <option value="name">카드명순</option>
+              <option value="quantity">수량 많은순</option>
+            </select>
+          </div>
+          <div className="inventory-table-toolbar-actions">
+            <div className="inventory-toolbar-group">
+              <button type="button" onClick={() => importFileRef.current?.click()}>
+                엑셀 업로드
+              </button>
+              <button type="button" onClick={downloadImportTemplate}>
+                양식 다운
+              </button>
+              <input
+                ref={importFileRef}
+                className="inventory-import-input"
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={importSpreadsheet}
+                aria-label="스프레드시트 업로드"
+              />
+            </div>
+            <div className="inventory-toolbar-group">
+              <button type="button" onClick={() => exportCsv(false)}>
+                <Download size={16} aria-hidden="true" /> 전체 CSV
+              </button>
+              <button type="button" disabled={!selectedIds.size} onClick={() => exportCsv(true)}>
+                <Download size={16} aria-hidden="true" /> 선택 CSV
+              </button>
+            </div>
+            <div className="inventory-toolbar-group">
+              <button type="button" disabled={!selectedIds.size} onClick={() => setEditOpen(true)}>
+                선택 수정
+              </button>
+              <button type="button" disabled={!selectedIds.size} onClick={deleteSelected}>
+                선택 삭제
+              </button>
+            </div>
+            <div className="inventory-toolbar-group">
+              <button type="button" onClick={() => setColumnMenu((value) => !value)}>
+                열 설정
+              </button>
+              <select value={rowDensity} onChange={(event) => setRowDensity(event.target.value)} aria-label="행 높이">
+                <option value="compact">행 높이: 압축</option>
+                <option value="normal">행 높이: 기본</option>
+                <option value="comfortable">행 높이: 여유</option>
+              </select>
+            </div>
+          </div>
           {columnMenu && (
             <div className="column-menu">
               {columns.map((column) => (
