@@ -24,10 +24,10 @@ const EXTERNAL_GAMES = {
     hydrateSearchResults: true,
   },
   onepiece: {
-    search: (term) => onePieceKr.searchCards(term),
+    search: (term, page) => onePieceKr.searchCards(term, page),
     detail: (id) => onePieceKr.fetchCardById(id),
     releaseList: () => onePieceKr.fetchSets(),
-    releaseCards: (packId) => onePieceKr.fetchSetCards(packId),
+    releaseCards: (packId, page) => onePieceKr.fetchSetCards(packId, page),
     hydrateSearchResults: false,
   },
 };
@@ -91,7 +91,9 @@ async function getExternalCardDetail(game, cardId, database) {
 }
 
 async function getExternalSearch(game, query, database, offset = 0) {
-  const queryKey = pageCacheKey(`${game}:${normalizeSearchTerm(query)}`, offset);
+  const cacheScope =
+    game === "onepiece" ? `${game}:v2:${normalizeSearchTerm(query)}` : `${game}:${normalizeSearchTerm(query)}`;
+  const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {
     const { data } = await database
       .from("card_search_cache")
@@ -152,7 +154,8 @@ async function getExternalReleaseList(game, database) {
 }
 
 async function getExternalReleaseCards(game, setId, database, offset = 0) {
-  const queryKey = pageCacheKey(`${game}:set:${setId}`, offset);
+  const cacheScope = game === "onepiece" ? `${game}:v2:set:${setId}` : `${game}:set:${setId}`;
+  const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {
     const { data } = await database
       .from("card_search_cache")
@@ -288,16 +291,21 @@ export default async function handler(request, response) {
         ? releases
           ? await getExternalReleaseList(game, database)
           : setId
-            ? await getExternalReleaseCards(game, setId, database, game === "pokemon" ? offset : 0)
+            ? await getExternalReleaseCards(
+                game,
+                setId,
+                database,
+                game === "pokemon" || game === "onepiece" ? offset : 0,
+              )
             : cardId
               ? await getExternalCardDetail(game, cardId, database)
-              : await getExternalSearch(game, query, database, game === "pokemon" ? offset : 0)
+              : await getExternalSearch(game, query, database, game === "pokemon" || game === "onepiece" ? offset : 0)
         : cardId
           ? await getCardDetail(cardId, database)
           : await searchCards(query, database);
     setResponseCache(response);
     response.setHeader("X-Card-Cache", result.cache);
-    if (game === "pokemon" && Number.isSafeInteger(result.nextOffset)) {
+    if ((game === "pokemon" || game === "onepiece") && Number.isSafeInteger(result.nextOffset)) {
       response.setHeader("X-Card-Next-Offset", String(result.nextOffset));
     }
     return response.status(200).json(result.data);

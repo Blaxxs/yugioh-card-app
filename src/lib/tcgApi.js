@@ -23,13 +23,25 @@ const fetchGameApi = async (params, includePageInfo = false) => {
 };
 
 export async function searchGameCards(game, term) {
-  if (game === "yugioh") return searchOfficialCards(term);
-  return fetchGameApi({ game, q: term.trim() });
+  const query = String(term || "").trim();
+  if (!query) return [];
+  if (game === "yugioh") return searchOfficialCards(query);
+  return fetchGameApi({ game, q: query, ...(game === "onepiece" ? { series: "all" } : {}) });
 }
 
 export async function searchGameCardsPage(game, term, offset = 0) {
-  if (game === "yugioh") return { cards: await searchOfficialCards(term), nextOffset: null };
-  return fetchGameApi({ game, q: term.trim(), ...(game === "pokemon" ? { offset } : {}) }, true);
+  const query = String(term || "").trim();
+  if (!query) return { cards: [], nextOffset: null };
+  if (game === "yugioh") return { cards: await searchOfficialCards(query), nextOffset: null };
+  return fetchGameApi(
+    {
+      game,
+      q: query,
+      ...(game === "pokemon" || game === "onepiece" ? { offset } : {}),
+      ...(game === "onepiece" ? { series: "all" } : {}),
+    },
+    true,
+  );
 }
 
 export async function fetchGameCardById(game, cardId, fallbackName = "", imageUrl = "") {
@@ -46,11 +58,21 @@ export async function fetchGameReleaseList(game) {
 export async function fetchGameReleaseCards(game, path) {
   if (!path) return [];
   if (game === "yugioh") return fetchYugiohReleaseCards(path);
+  if (game === "onepiece") {
+    const cards = [];
+    let offset = 0;
+    while (offset != null) {
+      const page = await fetchGameReleaseCardsPage(game, path, offset);
+      cards.push(...page.cards);
+      offset = page.nextOffset;
+    }
+    return cards;
+  }
   return fetchGameApi({ game, setId: path });
 }
 
 export async function fetchGameReleaseCardsPage(game, path, offset = 0) {
   if (!path) return { cards: [], nextOffset: null };
   if (game === "yugioh") return { cards: await fetchYugiohReleaseCards(path), nextOffset: null };
-  return fetchGameApi({ game, setId: path, ...(game === "pokemon" ? { offset } : {}) }, true);
+  return fetchGameApi({ game, setId: path, ...(game === "pokemon" || game === "onepiece" ? { offset } : {}) }, true);
 }

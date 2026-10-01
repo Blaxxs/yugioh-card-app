@@ -1,6 +1,7 @@
 import { load } from "cheerio";
 
 const ORIGIN = "https://onepiece-cardgame.kr";
+const PAGE_SIZE = 20;
 
 const headers = () => ({ "User-Agent": "Mozilla/5.0 YuGiOhCardApp/1.0" });
 
@@ -55,34 +56,42 @@ function parseItem($, element) {
   };
 }
 
-async function fetchCardList(params) {
+async function fetchCardList(params, page = 0) {
   const url = new URL(`${ORIGIN}/cardlist.do`);
   Object.entries({
-    page: "0",
-    size: "100",
+    page: String(page),
+    size: String(PAGE_SIZE),
     freewords: "",
     categories: "",
     illustrations: "",
     colors: "",
     blockIcons: "",
-    series: "",
+    series: "all",
     ...params,
   }).forEach(([key, value]) => url.searchParams.set(key, value));
   const response = await fetch(url, { headers: headers() });
   if (!response.ok) throw new Error(`원피스 카드 DB 요청 실패 (${response.status})`);
   const $ = load(await response.text());
-  return $(".card_sch_list .item")
+  const cards = $(".card_sch_list .item")
     .map((_index, element) => parseItem($, element))
     .get()
     .filter(Boolean);
+  const pageIndexes = $("a[href*='cardlist.do?page=']")
+    .map((_index, element) => {
+      const href = $(element).attr("href");
+      return Number(new URL(href, ORIGIN).searchParams.get("page"));
+    })
+    .get()
+    .filter(Number.isSafeInteger);
+  return { cards, nextOffset: pageIndexes.some((pageIndex) => pageIndex > page) ? page + 1 : null };
 }
 
-export async function searchCards(term) {
-  return fetchCardList({ freewords: term });
+export async function searchCards(term, page = 0) {
+  return fetchCardList({ freewords: term, series: "all" }, page);
 }
 
 export async function fetchCardById(cardNumber) {
-  const cards = await fetchCardList({ freewords: cardNumber });
+  const { cards } = await fetchCardList({ freewords: cardNumber, series: "all" });
   return cards.find((card) => card.cardId.toUpperCase() === String(cardNumber).toUpperCase()) || cards[0] || null;
 }
 
@@ -101,6 +110,6 @@ export async function fetchSets() {
   return packs;
 }
 
-export async function fetchSetCards(seriesName) {
-  return fetchCardList({ series: seriesName });
+export async function fetchSetCards(seriesName, page = 0) {
+  return fetchCardList({ series: seriesName }, page);
 }

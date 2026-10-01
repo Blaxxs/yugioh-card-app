@@ -118,6 +118,7 @@ export default function App() {
     const restoreHistoryView = (event) => {
       const view = event.state?.ygoView;
       if (!view) return;
+      setActionError("");
       historyIndex.current = view.index || 0;
       setActiveTab(view.activeTab);
       setSelectedCard(view.selectedCard || null);
@@ -212,7 +213,7 @@ export default function App() {
       setReleaseLoading(true);
       try {
         const page =
-          activeGame === "pokemon"
+          activeGame === "pokemon" || activeGame === "onepiece"
             ? await fetchGameReleaseCardsPage(activeGame, selectedRelease.path)
             : { cards: await fetchGameReleaseCards(activeGame, selectedRelease.path), nextOffset: null };
         const previews = page.cards;
@@ -248,7 +249,13 @@ export default function App() {
   }, [selectedRelease, activeGame]);
 
   const loadMoreReleaseCards = async () => {
-    if (activeGame !== "pokemon" || !selectedRelease || releaseNextOffset == null || releaseMoreLoading) return;
+    if (
+      (activeGame !== "pokemon" && activeGame !== "onepiece") ||
+      !selectedRelease ||
+      releaseNextOffset == null ||
+      releaseMoreLoading
+    )
+      return;
     setReleaseMoreLoading(true);
     setActionError("");
     try {
@@ -316,6 +323,7 @@ export default function App() {
 
   const changeTab = (tab) => {
     if (tab === activeTab && !selectedCard && !selectedRelease) return;
+    setActionError("");
     pushView({ activeTab: tab, selectedCard: null, selectedRelease: null });
   };
 
@@ -704,7 +712,7 @@ export default function App() {
     setLoading(true);
     setActionError("");
     try {
-      if (activeGame === "pokemon") {
+      if (activeGame === "pokemon" || activeGame === "onepiece") {
         const page = await searchGameCardsPage(activeGame, searchTerm);
         setCards(page.cards);
         setSearchNextOffset(page.nextOffset);
@@ -720,7 +728,8 @@ export default function App() {
   };
 
   const loadMoreSearchCards = async () => {
-    if (activeGame !== "pokemon" || searchNextOffset == null || searchMoreLoading) return;
+    if ((activeGame !== "pokemon" && activeGame !== "onepiece") || searchNextOffset == null || searchMoreLoading)
+      return;
     setSearchMoreLoading(true);
     setActionError("");
     try {
@@ -763,6 +772,28 @@ export default function App() {
         <p className="setup-message">Supabase 환경변수를 설정하면 로그인을 사용할 수 있습니다.</p>
       )}
       {!gameSelectionComplete && <GameSwitcher activeGame={activeGame} onSelect={changeGame} />}
+      <ManagementTabs
+        activeTab={activeTab}
+        activeGame={activeGame}
+        onTabChange={changeTab}
+        session={session}
+        inventoryItems={inventoryItems}
+        favoriteCards={favoriteCards}
+        onOpenCard={openCardWindow}
+        viewMode={viewModes[activeTab]}
+        onViewModeChange={(mode) => setViewModes((current) => ({ ...current, [activeTab]: mode }))}
+        favoriteIds={favoriteIds}
+        onFavorite={toggleFavorite}
+        showContent={!selectedCard}
+        inventoryBusy={inventoryBusy}
+        onBatchIntake={batchIntake}
+        onAddInventory={addInventoryVariant}
+        onDeleteInventory={deleteInventoryItems}
+        onUpdateInventory={updateInventoryItems}
+        onSellInventory={sellInventoryItems}
+        salesHistory={salesHistory}
+        onCancelSales={cancelSalesTransactions}
+      />
       <div className={`search-slot ${activeTab === "search" ? "has-search" : ""}`}>
         {activeTab === "search" && (
           <form
@@ -787,28 +818,6 @@ export default function App() {
           </form>
         )}
       </div>
-      <ManagementTabs
-        activeTab={activeTab}
-        activeGame={activeGame}
-        onTabChange={changeTab}
-        session={session}
-        inventoryItems={inventoryItems}
-        favoriteCards={favoriteCards}
-        onOpenCard={openCardWindow}
-        viewMode={viewModes[activeTab]}
-        onViewModeChange={(mode) => setViewModes((current) => ({ ...current, [activeTab]: mode }))}
-        favoriteIds={favoriteIds}
-        onFavorite={toggleFavorite}
-        showContent={!selectedCard}
-        inventoryBusy={inventoryBusy}
-        onBatchIntake={batchIntake}
-        onAddInventory={addInventoryVariant}
-        onDeleteInventory={deleteInventoryItems}
-        onUpdateInventory={updateInventoryItems}
-        onSellInventory={sellInventoryItems}
-        salesHistory={salesHistory}
-        onCancelSales={cancelSalesTransactions}
-      />
       {loading && <p>카드를 검색하고 있습니다...</p>}
       {cardDetailLoading && <p>카드 상세를 불러오는 중입니다...</p>}
       {actionError && (
@@ -859,7 +868,7 @@ export default function App() {
               />
             ))}
           </section>
-          {activeGame === "pokemon" && searchNextOffset != null && (
+          {(activeGame === "pokemon" || activeGame === "onepiece") && searchNextOffset != null && (
             <button
               className="pokemon-load-more"
               type="button"
@@ -914,7 +923,7 @@ export default function App() {
                       />
                     ))}
                   </div>
-                  {activeGame === "pokemon" && releaseNextOffset != null && (
+                  {(activeGame === "pokemon" || activeGame === "onepiece") && releaseNextOffset != null && (
                     <button
                       className="pokemon-load-more"
                       type="button"

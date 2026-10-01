@@ -401,7 +401,14 @@ export default function InventoryConsole({
     });
     setEditOpen(false);
   };
-  const searchAddCards = async () => setAddResults(await searchGameCards(activeGame, addQuery));
+  const searchAddCards = async () => {
+    const query = addQuery.trim();
+    if (!query) {
+      setAddResults([]);
+      return;
+    }
+    setAddResults(await searchGameCards(activeGame, query));
+  };
   const chooseAddCard = async (card) => {
     const detailed = card.isDetailLoaded
       ? card
@@ -1066,7 +1073,7 @@ export default function InventoryConsole({
                     }}
                     placeholder="카드명 검색"
                   />
-                  <button type="button" onClick={searchAddCards}>
+                  <button type="button" disabled={!addQuery.trim()} onClick={searchAddCards}>
                     <Search size={16} /> 검색
                   </button>
                 </div>
