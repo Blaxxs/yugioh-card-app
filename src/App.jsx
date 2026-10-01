@@ -3,10 +3,46 @@ import { LoaderCircle, LogIn, LogOut, Search, X } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { getReleaseSetVariants, hydrateCardPreviews, isQuarterCenturyChronicleRelease } from "./lib/officialCardApi";
 import { CARD_GAMES, DEFAULT_GAME_ID, getGameById } from "./lib/cardGames";
-import { fetchGameCardById, fetchGameReleaseCards, fetchGameReleaseList, searchGameCards } from "./lib/tcgApi";
+import {
+  fetchGameCardById,
+  fetchGameReleaseCards,
+  fetchGameReleaseCardsPage,
+  fetchGameReleaseList,
+  searchGameCards,
+  searchGameCardsPage,
+} from "./lib/tcgApi";
 import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
+
+function GameSwitcher({ activeGame, compact = false, onSelect }) {
+  return (
+    <div className={`game-switcher ${compact ? "compact" : "expanded"}`} role="radiogroup" aria-label="카드게임 선택">
+      {CARD_GAMES.map((game) => (
+        <button
+          key={game.id}
+          type="button"
+          role="radio"
+          aria-checked={activeGame === game.id}
+          className={`game-switcher-item ${activeGame === game.id ? "active" : ""}`}
+          aria-label={game.label}
+          title={game.label}
+          onClick={() => onSelect(game.id)}
+        >
+          <img
+            src={game.cardBack}
+            alt=""
+            aria-hidden="true"
+            onError={(event) => {
+              event.currentTarget.style.visibility = "hidden";
+            }}
+          />
+          <span>{game.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function App() {
   const savedHistory = window.history.state?.ygoView;
@@ -20,6 +56,8 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState(savedView.searchTerm || "");
   const [cards, setCards] = useState(savedView.cards || []);
   const [loading, setLoading] = useState(false);
+  const [searchNextOffset, setSearchNextOffset] = useState(null);
+  const [searchMoreLoading, setSearchMoreLoading] = useState(false);
   const [cardDetailLoading, setCardDetailLoading] = useState(false);
   const [session, setSession] = useState(null);
   const [selectedCard, setSelectedCard] = useState(savedHistory?.selectedCard || savedView.selectedCard || null);
@@ -40,11 +78,20 @@ export default function App() {
   const [selectedRelease, setSelectedRelease] = useState(savedHistory?.selectedRelease || null);
   const [releaseCards, setReleaseCards] = useState([]);
   const [releaseLoading, setReleaseLoading] = useState(false);
+  const [releaseNextOffset, setReleaseNextOffset] = useState(null);
+  const [releaseMoreLoading, setReleaseMoreLoading] = useState(false);
   const [activeGame, setActiveGame] = useState(() => {
     try {
       return localStorage.getItem("ygo-active-game") || DEFAULT_GAME_ID;
     } catch {
       return DEFAULT_GAME_ID;
+    }
+  });
+  const [gameSelectionComplete, setGameSelectionComplete] = useState(() => {
+    try {
+      return localStorage.getItem("ygo-game-selection-complete") === "true";
+    } catch {
+      return false;
     }
   });
   const historyIndex = useRef(savedHistory?.index || 0);
@@ -161,9 +208,15 @@ export default function App() {
       await Promise.resolve();
       loadedReleasePath.current = selectedRelease.path;
       setReleaseCards([]);
+      setReleaseNextOffset(null);
       setReleaseLoading(true);
       try {
-        const previews = await fetchGameReleaseCards(activeGame, selectedRelease.path);
+        const page =
+          activeGame === "pokemon"
+            ? await fetchGameReleaseCardsPage(activeGame, selectedRelease.path)
+            : { cards: await fetchGameReleaseCards(activeGame, selectedRelease.path), nextOffset: null };
+        const previews = page.cards;
+        setReleaseNextOffset(page.nextOffset);
         if (activeGame !== "yugioh" || !isQuarterCenturyChronicleRelease(selectedRelease.name)) {
           setReleaseCards(previews);
           return;
@@ -194,6 +247,24 @@ export default function App() {
     loadReleaseCards();
   }, [selectedRelease, activeGame]);
 
+  const loadMoreReleaseCards = async () => {
+    if (activeGame !== "pokemon" || !selectedRelease || releaseNextOffset == null || releaseMoreLoading) return;
+    setReleaseMoreLoading(true);
+    setActionError("");
+    try {
+      const page = await fetchGameReleaseCardsPage(activeGame, selectedRelease.path, releaseNextOffset);
+      setReleaseCards((current) => {
+        const seen = new Set(current.map((card) => card.cardId));
+        return [...current, ...page.cards.filter((card) => !seen.has(card.cardId))];
+      });
+      setReleaseNextOffset(page.nextOffset);
+    } catch (error) {
+      setActionError(error.message);
+    } finally {
+      setReleaseMoreLoading(false);
+    }
+  };
+
   const loginWithGoogle = () =>
     supabase?.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
   const logout = () => supabase?.auth.signOut();
@@ -222,19 +293,23 @@ export default function App() {
   const closeRelease = () => goBack({ selectedRelease: null });
 
   const changeGame = (gameId) => {
-    if (gameId === activeGame) return;
-    setActiveGame(gameId);
+    setGameSelectionComplete(true);
     try {
       localStorage.setItem("ygo-active-game", gameId);
+      localStorage.setItem("ygo-game-selection-complete", "true");
     } catch {
       // ignore storage failures (private browsing, quota, etc.)
     }
+    if (gameId === activeGame) return;
+    setActiveGame(gameId);
     setActionError("");
     setSearchTerm("");
     setCards([]);
+    setSearchNextOffset(null);
     setSelectedCard(null);
     setReleases([]);
     setReleaseCards([]);
+    setReleaseNextOffset(null);
     setSelectedRelease(null);
     loadedReleasePath.current = null;
   };
@@ -624,17 +699,41 @@ export default function App() {
   const searchCard = async () => {
     setSelectedCard(null);
     setActiveTab("search");
+    setSearchNextOffset(null);
     if (!searchTerm.trim()) return;
     setLoading(true);
     setActionError("");
     try {
-      const results = await searchGameCards(activeGame, searchTerm);
-      setCards(results);
+      if (activeGame === "pokemon") {
+        const page = await searchGameCardsPage(activeGame, searchTerm);
+        setCards(page.cards);
+        setSearchNextOffset(page.nextOffset);
+      } else {
+        setCards(await searchGameCards(activeGame, searchTerm));
+      }
     } catch (error) {
       setActionError(error.message);
       setCards([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMoreSearchCards = async () => {
+    if (activeGame !== "pokemon" || searchNextOffset == null || searchMoreLoading) return;
+    setSearchMoreLoading(true);
+    setActionError("");
+    try {
+      const page = await searchGameCardsPage(activeGame, searchTerm, searchNextOffset);
+      setCards((current) => {
+        const seen = new Set(current.map((card) => card.cardId));
+        return [...current, ...page.cards.filter((card) => !seen.has(card.cardId))];
+      });
+      setSearchNextOffset(page.nextOffset);
+    } catch (error) {
+      setActionError(error.message);
+    } finally {
+      setSearchMoreLoading(false);
     }
   };
 
@@ -647,6 +746,7 @@ export default function App() {
           </span>
           <h1>카드 도감</h1>
         </div>
+        {gameSelectionComplete && <GameSwitcher activeGame={activeGame} compact onSelect={changeGame} />}
         {session ? (
           <button className="auth-button logout-button" onClick={logout} title="로그아웃">
             <LogOut size={18} aria-hidden="true" />
@@ -662,29 +762,8 @@ export default function App() {
       {!isSupabaseConfigured && (
         <p className="setup-message">Supabase 환경변수를 설정하면 로그인을 사용할 수 있습니다.</p>
       )}
-      <div className="game-switcher" role="radiogroup" aria-label="카드게임 선택">
-        {CARD_GAMES.map((game) => (
-          <button
-            key={game.id}
-            type="button"
-            role="radio"
-            aria-checked={activeGame === game.id}
-            className={`game-switcher-item ${activeGame === game.id ? "active" : ""}`}
-            onClick={() => changeGame(game.id)}
-          >
-            <img
-              src={game.cardBack}
-              alt=""
-              aria-hidden="true"
-              onError={(event) => {
-                event.currentTarget.style.visibility = "hidden";
-              }}
-            />
-            <span>{game.label}</span>
-          </button>
-        ))}
-      </div>
-      <div className="search-slot">
+      {!gameSelectionComplete && <GameSwitcher activeGame={activeGame} onSelect={changeGame} />}
+      <div className={`search-slot ${activeTab === "search" ? "has-search" : ""}`}>
         {activeTab === "search" && (
           <form
             className="search-bar"
@@ -780,6 +859,16 @@ export default function App() {
               />
             ))}
           </section>
+          {activeGame === "pokemon" && searchNextOffset != null && (
+            <button
+              className="pokemon-load-more"
+              type="button"
+              disabled={searchMoreLoading}
+              onClick={loadMoreSearchCards}
+            >
+              {searchMoreLoading ? "카드를 불러오는 중..." : "카드 더 불러오기"}
+            </button>
+          )}
         </>
       )}
       {activeTab === "releases" && !selectedCard && (
@@ -825,6 +914,16 @@ export default function App() {
                       />
                     ))}
                   </div>
+                  {activeGame === "pokemon" && releaseNextOffset != null && (
+                    <button
+                      className="pokemon-load-more"
+                      type="button"
+                      disabled={releaseMoreLoading}
+                      onClick={loadMoreReleaseCards}
+                    >
+                      {releaseMoreLoading ? "카드를 불러오는 중..." : "카드 더 불러오기"}
+                    </button>
+                  )}
                 </>
               )}
             </>

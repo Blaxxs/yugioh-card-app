@@ -87,6 +87,12 @@ export default function SalesHistory({ open, onClose, salesHistory, busy, onCanc
           </button>
           {columnMenu && (
             <div className="column-menu">
+              <div className="column-menu-heading">
+                <strong>표시할 열</strong>
+                <button type="button" aria-label="열 설정 닫기" onClick={() => setColumnMenu(false)}>
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
               {columns.map((column) => (
                 <label key={column.id}>
                   <input
@@ -108,9 +114,11 @@ export default function SalesHistory({ open, onClose, salesHistory, busy, onCanc
           <table className="inventory-table">
             <thead>
               <tr>
-                <th />
+                <th className="sales-history-select-cell" />
                 {visibleColumns.map((column) => (
-                  <th key={column.id}>{column.label}</th>
+                  <th className={`sales-history-column-${column.id}`} key={column.id}>
+                    {column.label}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -121,8 +129,15 @@ export default function SalesHistory({ open, onClose, salesHistory, busy, onCanc
                 </tr>
               ) : (
                 salesHistory.map((entry) => (
-                  <tr key={entry.id} className={entry.canceled_at ? "sale-canceled-row" : ""}>
-                    <td>
+                  <tr
+                    key={entry.id}
+                    className={`${entry.canceled_at ? "sale-canceled-row " : ""}${selectedIds.has(entry.id) ? "selected" : ""}`}
+                    onClick={(event) => {
+                      if (entry.canceled_at || event.target.closest("button, input, a")) return;
+                      toggleSelected(entry.id);
+                    }}
+                  >
+                    <td className="sales-history-select-cell">
                       <input
                         type="checkbox"
                         aria-label="판매 내역 선택"
@@ -132,7 +147,9 @@ export default function SalesHistory({ open, onClose, salesHistory, busy, onCanc
                       />
                     </td>
                     {visibleColumns.map((column) => (
-                      <td key={column.id}>{cellValue(entry, column.id)}</td>
+                      <td className={`sales-history-column-${column.id}`} key={column.id}>
+                        {cellValue(entry, column.id)}
+                      </td>
                     ))}
                   </tr>
                 ))

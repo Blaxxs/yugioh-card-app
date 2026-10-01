@@ -5,7 +5,7 @@ import {
   searchOfficialCards,
 } from "./officialCardApi";
 
-const fetchGameApi = async (params) => {
+const fetchGameApi = async (params, includePageInfo = false) => {
   const response = await fetch(`/api/cards?${new URLSearchParams(params)}`);
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
@@ -17,12 +17,19 @@ const fetchGameApi = async (params) => {
   }
   const body = await response.json();
   if (!response.ok) throw new Error(body.error || "카드 데이터를 불러오지 못했습니다.");
-  return body;
+  if (!includePageInfo) return body;
+  const nextOffset = response.headers.get("X-Card-Next-Offset");
+  return { cards: body, nextOffset: nextOffset == null ? null : Number(nextOffset) };
 };
 
 export async function searchGameCards(game, term) {
   if (game === "yugioh") return searchOfficialCards(term);
   return fetchGameApi({ game, q: term.trim() });
+}
+
+export async function searchGameCardsPage(game, term, offset = 0) {
+  if (game === "yugioh") return { cards: await searchOfficialCards(term), nextOffset: null };
+  return fetchGameApi({ game, q: term.trim(), ...(game === "pokemon" ? { offset } : {}) }, true);
 }
 
 export async function fetchGameCardById(game, cardId, fallbackName = "", imageUrl = "") {
@@ -40,4 +47,10 @@ export async function fetchGameReleaseCards(game, path) {
   if (!path) return [];
   if (game === "yugioh") return fetchYugiohReleaseCards(path);
   return fetchGameApi({ game, setId: path });
+}
+
+export async function fetchGameReleaseCardsPage(game, path, offset = 0) {
+  if (!path) return { cards: [], nextOffset: null };
+  if (game === "yugioh") return { cards: await fetchYugiohReleaseCards(path), nextOffset: null };
+  return fetchGameApi({ game, setId: path, ...(game === "pokemon" ? { offset } : {}) }, true);
 }

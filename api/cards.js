@@ -16,10 +16,10 @@ const RELEASE_CACHE_DAYS = 7;
 // Each external game exposes the same shape so api routing stays game-agnostic.
 const EXTERNAL_GAMES = {
   pokemon: {
-    search: (term) => pokemonKr.searchCards(term),
+    search: (term, offset) => pokemonKr.searchCards(term, offset),
     detail: (id, fallbackName) => pokemonKr.fetchCardDetail(id, fallbackName),
     releaseList: () => pokemonKr.fetchSets(),
-    releaseCards: (packId) => pokemonKr.fetchSetCards(packId),
+    releaseCards: (packId, offset) => pokemonKr.fetchSetCards(packId, offset),
     // Pokémon search only returns thumbnails; hydrate real names/packs before caching.
     hydrateSearchResults: true,
   },
@@ -32,6 +32,17 @@ const EXTERNAL_GAMES = {
   },
 };
 let lastExpiredCacheCleanup = 0;
+
+const normalizeExternalPage = (result, game, offset) => {
+  if (!Array.isArray(result) && Array.isArray(result?.cards)) {
+    const nextOffset = Number(result.nextOffset);
+    return { cards: result.cards, nextOffset: Number.isFinite(nextOffset) && nextOffset > offset ? nextOffset : null };
+  }
+  const cards = Array.isArray(result) ? result : [];
+  return { cards, nextOffset: game === "pokemon" && cards.length ? offset + cards.length : null };
+};
+
+const pageCacheKey = (baseKey, offset) => (offset ? `${baseKey}:offset:${offset}` : baseKey);
 
 const fetchOfficialHtml = async (url) => {
   const upstream = await fetch(url, {
@@ -79,18 +90,22 @@ async function getExternalCardDetail(game, cardId, database) {
   return { data: card, cache: database ? "MISS" : "BYPASS" };
 }
 
-async function getExternalSearch(game, query, database) {
-  const queryKey = `${game}:${normalizeSearchTerm(query)}`;
+async function getExternalSearch(game, query, database, offset = 0) {
+  const queryKey = pageCacheKey(`${game}:${normalizeSearchTerm(query)}`, offset);
   if (database) {
     const { data } = await database
       .from("card_search_cache")
       .select("results, expires_at")
       .eq("query_key", queryKey)
       .maybeSingle();
-    if (data && new Date(data.expires_at).getTime() > Date.now()) return { data: data.results, cache: "HIT" };
+    if (data && new Date(data.expires_at).getTime() > Date.now()) {
+      const page = normalizeExternalPage(data.results, game, offset);
+      return { data: page.cards, nextOffset: page.nextOffset, cache: "HIT" };
+    }
   }
   const config = EXTERNAL_GAMES[game];
-  let cards = await config.search(query);
+  const page = normalizeExternalPage(await config.search(query, offset), game, offset);
+  let cards = page.cards;
   if (config.hydrateSearchResults && cards.length) {
     const previews = cards.slice(0, 24);
     const detailed = await Promise.all(previews.map((card) => config.detail(card.cardId, card.name).catch(() => card)));
@@ -111,9 +126,11 @@ async function getExternalSearch(game, query, database) {
       );
     }
     const expiresAt = new Date(Date.now() + SEARCH_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    await database.from("card_search_cache").upsert({ query_key: queryKey, results: cards, expires_at: expiresAt });
+    await database
+      .from("card_search_cache")
+      .upsert({ query_key: queryKey, results: { cards, nextOffset: page.nextOffset }, expires_at: expiresAt });
   }
-  return { data: cards, cache: database ? "MISS" : "BYPASS" };
+  return { data: cards, nextOffset: page.nextOffset, cache: database ? "MISS" : "BYPASS" };
 }
 
 async function getExternalReleaseList(game, database) {
@@ -134,22 +151,31 @@ async function getExternalReleaseList(game, database) {
   return { data: releases, cache: database ? "MISS" : "BYPASS" };
 }
 
-async function getExternalReleaseCards(game, setId, database) {
-  const queryKey = `${game}:set:${setId}`;
+async function getExternalReleaseCards(game, setId, database, offset = 0) {
+  const queryKey = pageCacheKey(`${game}:set:${setId}`, offset);
   if (database) {
     const { data } = await database
       .from("card_search_cache")
       .select("results, expires_at")
       .eq("query_key", queryKey)
       .maybeSingle();
-    if (data && new Date(data.expires_at).getTime() > Date.now()) return { data: data.results, cache: "HIT" };
+    if (data && new Date(data.expires_at).getTime() > Date.now()) {
+      const page = normalizeExternalPage(data.results, game, offset);
+      return { data: page.cards, nextOffset: page.nextOffset, cache: "HIT" };
+    }
   }
-  const cards = await EXTERNAL_GAMES[game].releaseCards(setId);
+  const page = normalizeExternalPage(await EXTERNAL_GAMES[game].releaseCards(setId, offset), game, offset);
   if (database) {
     const expiresAt = new Date(Date.now() + RELEASE_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    await database.from("card_search_cache").upsert({ query_key: queryKey, results: cards, expires_at: expiresAt });
+    await database
+      .from("card_search_cache")
+      .upsert({
+        query_key: queryKey,
+        results: { cards: page.cards, nextOffset: page.nextOffset },
+        expires_at: expiresAt,
+      });
   }
-  return { data: cards, cache: database ? "MISS" : "BYPASS" };
+  return { data: page.cards, nextOffset: page.nextOffset, cache: database ? "MISS" : "BYPASS" };
 }
 
 async function getCardDetail(cardId, database) {
@@ -239,6 +265,8 @@ export default async function handler(request, response) {
   const setId = requestUrl.searchParams.get("setId")?.trim();
   const cardId = requestUrl.searchParams.get("id")?.trim();
   const query = requestUrl.searchParams.get("q")?.trim();
+  const requestedOffset = requestUrl.searchParams.get("offset");
+  const offset = requestedOffset === null ? 0 : Number(requestedOffset);
   if (game !== "yugioh" && !EXTERNAL_GAMES[game]) {
     return response.status(400).json({ error: "지원하지 않는 카드게임입니다." });
   }
@@ -249,6 +277,9 @@ export default async function handler(request, response) {
     return response.status(400).json({ error: "잘못된 카드 ID입니다." });
   }
   if (query && query.length > 80) return response.status(400).json({ error: "검색어가 너무 깁니다." });
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) {
+    return response.status(400).json({ error: "잘못된 카드 페이지 위치입니다." });
+  }
 
   try {
     const database = getSupabaseAdmin();
@@ -257,15 +288,18 @@ export default async function handler(request, response) {
         ? releases
           ? await getExternalReleaseList(game, database)
           : setId
-            ? await getExternalReleaseCards(game, setId, database)
+            ? await getExternalReleaseCards(game, setId, database, game === "pokemon" ? offset : 0)
             : cardId
               ? await getExternalCardDetail(game, cardId, database)
-              : await getExternalSearch(game, query, database)
+              : await getExternalSearch(game, query, database, game === "pokemon" ? offset : 0)
         : cardId
           ? await getCardDetail(cardId, database)
           : await searchCards(query, database);
     setResponseCache(response);
     response.setHeader("X-Card-Cache", result.cache);
+    if (game === "pokemon" && Number.isSafeInteger(result.nextOffset)) {
+      response.setHeader("X-Card-Next-Offset", String(result.nextOffset));
+    }
     return response.status(200).json(result.data);
   } catch (error) {
     return response.status(502).json({ error: error.message || "카드 데이터를 불러오지 못했습니다." });

@@ -32,6 +32,7 @@ export default function InventoryConsole({
   const [importOpen, setImportOpen] = useState(false);
   const [importRows, setImportRows] = useState([]);
   const [importLoading, setImportLoading] = useState(false);
+  const [importFileName, setImportFileName] = useState("");
   const importFileRef = useRef(null);
   const resizeRef = useRef(null);
   const dragRef = useRef(null);
@@ -282,6 +283,7 @@ export default function InventoryConsole({
   const importSpreadsheet = async (event) => {
     const [file] = event.target.files || [];
     if (!file) return;
+    setImportFileName(file.name);
     setImportLoading(true);
     setImportOpen(true);
     try {
@@ -499,6 +501,9 @@ export default function InventoryConsole({
               <button type="button" onClick={downloadImportTemplate}>
                 양식 다운
               </button>
+              <span className="inventory-import-filename" title={importFileName || "선택된 파일 없음"}>
+                {importFileName || "선택된 파일 없음"}
+              </span>
               <input
                 ref={importFileRef}
                 className="inventory-import-input"
@@ -506,6 +511,7 @@ export default function InventoryConsole({
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onChange={importSpreadsheet}
                 aria-label="스프레드시트 업로드"
+                hidden
               />
             </div>
             <div className="inventory-toolbar-group">
@@ -537,6 +543,12 @@ export default function InventoryConsole({
           </div>
           {columnMenu && (
             <div className="column-menu">
+              <div className="column-menu-heading">
+                <strong>표시할 열</strong>
+                <button type="button" aria-label="열 설정 닫기" onClick={() => setColumnMenu(false)}>
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
               {columns.map((column) => (
                 <label key={column.id}>
                   <input
@@ -571,6 +583,7 @@ export default function InventoryConsole({
                 {visibleColumns.map((column) => (
                   <th
                     key={column.id}
+                    className={`inventory-column-${column.id}`}
                     onDrop={(event) => {
                       event.preventDefault();
                       moveColumn(event.dataTransfer.getData("column"), column.id);
@@ -706,7 +719,7 @@ export default function InventoryConsole({
                     />
                   </td>
                   {visibleColumns.map((column) => (
-                    <td key={column.id}>
+                    <td key={column.id} className={`inventory-column-${column.id}`}>
                       {column.id === "quantity" ? <b>{cellValue(item, column.id)}</b> : cellValue(item, column.id)}
                     </td>
                   ))}
@@ -766,6 +779,7 @@ export default function InventoryConsole({
                     <option>C급</option>
                   </select>
                   <input
+                    className="price-input"
                     type="number"
                     min="0"
                     placeholder="가격"
@@ -864,7 +878,7 @@ export default function InventoryConsole({
                     </div>
                     <div className="pack-card-row">
                       <input
-                        className="pack-card-price"
+                        className="pack-card-price price-input"
                         type="number"
                         min="0"
                         placeholder="가격"
@@ -1159,7 +1173,13 @@ export default function InventoryConsole({
                 </label>
                 <label>
                   가격
-                  <input type="number" min="0" value={addPrice} onChange={(event) => setAddPrice(event.target.value)} />
+                  <input
+                    className="price-input"
+                    type="number"
+                    min="0"
+                    value={addPrice}
+                    onChange={(event) => setAddPrice(event.target.value)}
+                  />
                 </label>
                 <label>
                   수량
@@ -1200,7 +1220,7 @@ export default function InventoryConsole({
                   </div>
                   <div className="pack-card-row">
                     <input
-                      className="pack-card-price"
+                      className="pack-card-price price-input"
                       type="number"
                       min="0"
                       placeholder="가격"

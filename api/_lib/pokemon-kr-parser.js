@@ -29,7 +29,7 @@ async function postAjax(fields) {
   if (!response.ok) throw new Error(`포켓몬 카드 DB 요청 실패 (${response.status})`);
   const body = await response.json();
   if (!body.status) throw new Error(body.msg || "포켓몬 카드 검색에 실패했습니다.");
-  return Object.values(body.result || {});
+  return body;
 }
 
 const toImageUrl = (path) =>
@@ -48,14 +48,18 @@ const previewCard = ({ CardNum, feature_image: featureImage }) => ({
   isDetailLoaded: false,
 });
 
-export async function searchCards(term, limit = 0) {
-  const items = await postAjax({
+export async function searchCards(term, offset = 0) {
+  const response = await postAjax({
     action: "search_text_cards",
     search_text: term,
     search_params: "all",
-    limit: String(limit),
+    limit: String(offset),
   });
-  return items.map(previewCard);
+  const nextOffset = Number(response.limit);
+  return {
+    cards: Object.values(response.result || {}).map(previewCard),
+    nextOffset: Number.isFinite(nextOffset) && nextOffset > offset ? nextOffset : null,
+  };
 }
 
 export async function fetchSets() {
@@ -73,14 +77,18 @@ export async function fetchSets() {
   return packs;
 }
 
-export async function fetchSetCards(packName, limit = 0) {
-  const items = await postAjax({
+export async function fetchSetCards(packName, offset = 0) {
+  const response = await postAjax({
     action: "get_more_cards",
-    limit: String(limit),
+    limit: String(offset),
     GoodsName: packName,
     ...BROWSE_DEFAULTS,
   });
-  return items.map(previewCard);
+  const nextOffset = Number(response.limit);
+  return {
+    cards: Object.values(response.result || {}).map(previewCard),
+    nextOffset: Number.isFinite(nextOffset) && nextOffset > offset ? nextOffset : null,
+  };
 }
 
 const textOf = ($, selector) => $(selector).first().text().trim() || null;
