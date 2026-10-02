@@ -422,6 +422,180 @@ button:disabled {
 .game-switcher.compact .game-switcher-item span {
   display: none;
 }
+.game-switcher.pending {
+  visibility: hidden;
+  pointer-events: none;
+}
+.game-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 24px;
+  background: rgba(244, 247, 246, 0.97);
+  backdrop-filter: blur(10px);
+}
+.game-picker-panel {
+  display: flex;
+  width: min(100%, 620px);
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.game-picker-eyebrow {
+  margin: 0;
+  color: var(--app-primary);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+.game-picker-panel h2 {
+  margin: 0;
+  color: var(--app-ink);
+  font-size: 24px;
+  font-weight: 800;
+}
+.game-picker-stage {
+  position: relative;
+  display: grid;
+  width: min(100%, 480px);
+  height: 370px;
+  place-items: center;
+  perspective: 1100px;
+  touch-action: pan-y;
+  user-select: none;
+}
+.game-picker-card {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  display: block;
+  width: clamp(190px, 30vw, 250px);
+  aspect-ratio: 0.68;
+  overflow: hidden;
+  border: 2px solid var(--app-line);
+  border-radius: 15px;
+  padding: 7px;
+  background: #fff;
+  box-shadow: 0 16px 34px rgba(25, 61, 55, 0.2);
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    transform 360ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+}
+.game-picker-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  object-fit: cover;
+  pointer-events: none;
+}
+.game-picker-card span {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  left: 7px;
+  border-radius: 0 0 10px 10px;
+  padding: 10px 8px 9px;
+  background: rgba(18, 35, 34, 0.82);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  pointer-events: none;
+}
+.game-picker-card.is-selected {
+  border-color: var(--app-primary);
+  box-shadow: 0 20px 42px rgba(20, 95, 86, 0.28);
+}
+.game-picker-card.is-dragging {
+  cursor: grabbing;
+  transition:
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+}
+.game-picker-overlay.is-confirming .game-picker-card.is-selected {
+  visibility: hidden;
+}
+.game-picker-selection {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.game-picker-selection strong {
+  min-width: 88px;
+  color: var(--app-ink);
+  font-size: 17px;
+  font-weight: 800;
+}
+.game-picker-arrow {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--app-line);
+  border-radius: 50%;
+  background: var(--app-surface);
+  color: var(--app-primary-strong);
+  cursor: pointer;
+}
+.game-picker-confirm {
+  display: inline-flex;
+  min-width: 220px;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 20px;
+  background: var(--app-primary);
+  box-shadow: 0 5px 14px rgba(20, 123, 112, 0.2);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.game-picker-confirm:hover:not(:disabled) {
+  background: var(--app-primary-strong);
+}
+.game-picker-arrow:disabled,
+.game-picker-confirm:disabled {
+  cursor: wait;
+}
+.game-selection-flight {
+  position: fixed;
+  z-index: 101;
+  border: 2px solid #fff;
+  border-radius: 15px;
+  box-shadow: 0 16px 34px rgba(25, 61, 55, 0.24);
+  object-fit: cover;
+  pointer-events: none;
+  transform-origin: center;
+  animation: game-card-to-header 520ms cubic-bezier(0.2, 0.78, 0.24, 1) forwards;
+}
+@keyframes game-card-to-header {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.96;
+    transform: translate3d(var(--flight-x), var(--flight-y), 0) scale(var(--flight-scale-x), var(--flight-scale-y));
+  }
+}
 
 .search-bar {
   display: flex;
@@ -522,22 +696,23 @@ button:disabled {
 .results-toolbar strong {
   font-size: 15px;
 }
-.pokemon-load-more {
-  display: flex;
-  min-height: 42px;
-  align-items: center;
-  justify-content: center;
-  margin: 18px auto 0;
-  border: 1px solid var(--app-primary);
-  padding: 0 24px;
-  background: var(--app-surface);
-  color: var(--app-primary-strong);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
+.auto-load-sentinel {
+  display: grid;
+  min-height: 12px;
+  place-items: center;
+  margin-top: 12px;
 }
-.pokemon-load-more:hover:not(:disabled) {
-  background: var(--app-soft);
+.auto-load-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+.auto-load-status svg {
+  animation: release-spin 900ms linear infinite;
 }
 .view-filters {
   display: inline-flex;
@@ -2750,6 +2925,28 @@ button:disabled {
     width: 18px;
     height: 25px;
   }
+  .game-picker-overlay {
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+  .game-picker-panel {
+    gap: 10px;
+  }
+  .game-picker-panel h2 {
+    font-size: 21px;
+  }
+  .game-picker-stage {
+    width: min(100%, 360px);
+    height: 320px;
+  }
+  .game-picker-card {
+    width: clamp(178px, 56vw, 220px);
+  }
+  .game-picker-selection {
+    gap: 14px;
+  }
+  .game-picker-confirm {
+    width: min(100%, 300px);
+  }
   .auth-button {
     width: 42px;
     padding: 0;
@@ -2942,5 +3139,11 @@ button:disabled {
   }
   .transaction-row {
     padding: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-selection-flight {
+    animation-duration: 1ms;
   }
 }

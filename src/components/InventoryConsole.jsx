@@ -1,7 +1,13 @@
 import { Download, Minus, PackagePlus, Plus, Search, ShoppingCart, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { hydrateCardPreviews, getRarityCode, getRarityLabel, ALL_RARITY_CODES } from "../lib/officialCardApi";
-import { fetchGameCardById, fetchGameReleaseCards, fetchGameReleaseList, searchGameCards } from "../lib/tcgApi";
+import {
+  fetchGameCardById,
+  fetchGameReleaseCards,
+  fetchGameReleaseCardsPage,
+  fetchGameReleaseList,
+  searchGameCards,
+} from "../lib/tcgApi";
 import SalesHistory from "./SalesHistory";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024;
@@ -144,7 +150,20 @@ export default function InventoryConsole({
     setPackCards([]);
     setPackModalOpen(true);
     try {
-      const cards = await fetchGameReleaseCards(activeGame, release.path);
+      let cards;
+      if (activeGame === "pokemon" || activeGame === "onepiece") {
+        cards = [];
+        let offset = 0;
+        while (offset != null) {
+          const page = await fetchGameReleaseCardsPage(activeGame, release.path, offset);
+          cards.push(...page.cards);
+          if (!page.cards.length) break;
+          offset = page.nextOffset;
+        }
+        cards = [...new Map(cards.map((card) => [card.cardId, card])).values()];
+      } else {
+        cards = await fetchGameReleaseCards(activeGame, release.path);
+      }
       let detailedCards = cards;
       if (activeGame === "yugioh") {
         detailedCards = [];
@@ -165,6 +184,13 @@ export default function InventoryConsole({
           rarity: getRarityCode(set?.rarity_code || set?.set_rarity) || "",
         }));
       });
+      if (activeGame === "yugioh") {
+        variants.sort((left, right) => {
+          const leftCode = left.card.card_sets?.[0]?.set_code || left.card.cardId;
+          const rightCode = right.card.card_sets?.[0]?.set_code || right.card.cardId;
+          return leftCode.localeCompare(rightCode, "en", { numeric: true, sensitivity: "base" });
+        });
+      }
       setPackCards(variants);
       setPackMatches([]);
       setPackQuery(release.name);

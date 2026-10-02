@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { LoaderCircle, LogIn, LogOut, Search, X } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, LoaderCircle, LogIn, LogOut, Search, X } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { getReleaseSetVariants, hydrateCardPreviews, isQuarterCenturyChronicleRelease } from "./lib/officialCardApi";
 import { CARD_GAMES, DEFAULT_GAME_ID, getGameById } from "./lib/cardGames";
@@ -15,15 +15,21 @@ import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
 
-function GameSwitcher({ activeGame, compact = false, onSelect }) {
+function GameSwitcher({ activeGame, compact = false, pending = false, onSelect }) {
   return (
-    <div className={`game-switcher ${compact ? "compact" : "expanded"}`} role="radiogroup" aria-label="카드게임 선택">
+    <div
+      className={`game-switcher ${compact ? "compact" : "expanded"}${pending ? " pending" : ""}`}
+      role="radiogroup"
+      aria-label="카드 선택"
+      aria-hidden={pending || undefined}
+    >
       {CARD_GAMES.map((game) => (
         <button
           key={game.id}
           type="button"
           role="radio"
           aria-checked={activeGame === game.id}
+          data-game-id={game.id}
           className={`game-switcher-item ${activeGame === game.id ? "active" : ""}`}
           aria-label={game.label}
           title={game.label}
@@ -44,6 +50,131 @@ function GameSwitcher({ activeGame, compact = false, onSelect }) {
   );
 }
 
+function GamePicker({ activeGame, isConfirming, onConfirm }) {
+  const [selectedGameId, setSelectedGameId] = useState(activeGame);
+  const [dragOffset, setDragOffset] = useState(0);
+  const pointerStart = useRef(null);
+  const suppressClick = useRef(false);
+  const selectedCardRef = useRef(null);
+  const selectedGame = CARD_GAMES.find((game) => game.id === selectedGameId) || CARD_GAMES[0];
+  const selectedIndex = CARD_GAMES.findIndex((game) => game.id === selectedGame.id);
+
+  const moveSelection = (direction) => {
+    const nextIndex = (selectedIndex + direction + CARD_GAMES.length) % CARD_GAMES.length;
+    setSelectedGameId(CARD_GAMES[nextIndex].id);
+    setDragOffset(0);
+  };
+
+  const handlePointerDown = (event, gameIndex) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    pointerStart.current = { pointerId: event.pointerId, startX: event.clientX, gameIndex };
+    setSelectedGameId(CARD_GAMES[gameIndex].id);
+    setDragOffset(0);
+  };
+
+  const handlePointerMove = (event) => {
+    if (pointerStart.current?.pointerId === event.pointerId) {
+      setDragOffset(event.clientX - pointerStart.current.startX);
+    }
+  };
+
+  const handlePointerEnd = (event) => {
+    const start = pointerStart.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const distance = event.clientX - start.startX;
+    pointerStart.current = null;
+    setDragOffset(0);
+    if (Math.abs(distance) < 55) return;
+    suppressClick.current = true;
+    const direction = distance < 0 ? 1 : -1;
+    setSelectedGameId(CARD_GAMES[(start.gameIndex + direction + CARD_GAMES.length) % CARD_GAMES.length].id);
+    window.setTimeout(() => {
+      suppressClick.current = false;
+    }, 0);
+  };
+
+  const confirmSelection = () => {
+    if (!isConfirming) onConfirm(selectedGame.id, selectedCardRef.current?.getBoundingClientRect());
+  };
+
+  return (
+    <div
+      className={`game-picker-overlay ${isConfirming ? "is-confirming" : ""}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label="카드 선택"
+    >
+      <section className="game-picker-panel">
+        <h2>카드를 선택하세요.</h2>
+        <div className="game-picker-stage">
+          {CARD_GAMES.map((game, index) => {
+            const isSelected = game.id === selectedGame.id;
+            const relativePosition = isSelected ? 0 : index === (selectedIndex + 1) % CARD_GAMES.length ? 1 : -1;
+            const spread = window.innerWidth <= 700 ? 72 : 112;
+            const horizontalOffset = relativePosition * spread + (isSelected ? dragOffset : 0);
+            const verticalOffset = Math.abs(relativePosition) * 18;
+            const rotation = relativePosition * 8 + (isSelected ? dragOffset * 0.035 : 0);
+            const scale = isSelected ? 1 : 0.86;
+            return (
+              <button
+                key={game.id}
+                ref={isSelected ? selectedCardRef : null}
+                className={`game-picker-card ${isSelected ? "is-selected" : ""} ${isSelected && dragOffset ? "is-dragging" : ""}`}
+                type="button"
+                aria-pressed={isSelected}
+                aria-label={`${game.label} 카드 선택`}
+                disabled={isConfirming}
+                style={{
+                  zIndex: isSelected ? 3 : 2,
+                  transform: `translate3d(calc(-50% + ${horizontalOffset}px), ${verticalOffset}px, 0) rotate(${rotation}deg) scale(${scale})`,
+                }}
+                onPointerDown={(event) => handlePointerDown(event, index)}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerEnd}
+                onPointerCancel={handlePointerEnd}
+                onClick={() => {
+                  if (suppressClick.current) return;
+                  setSelectedGameId(game.id);
+                  setDragOffset(0);
+                }}
+              >
+                <img src={game.cardBack} alt="" draggable="false" />
+                <span>{game.label} 카드 선택</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="game-picker-selection">
+          <button
+            className="game-picker-arrow"
+            type="button"
+            aria-label="이전 카드"
+            disabled={isConfirming}
+            onClick={() => moveSelection(-1)}
+          >
+            <ChevronLeft size={20} aria-hidden="true" />
+          </button>
+          <strong>{selectedGame.label}</strong>
+          <button
+            className="game-picker-arrow"
+            type="button"
+            aria-label="다음 카드"
+            disabled={isConfirming}
+            onClick={() => moveSelection(1)}
+          >
+            <ChevronRight size={20} aria-hidden="true" />
+          </button>
+        </div>
+        <button className="game-picker-confirm" type="button" disabled={isConfirming} onClick={confirmSelection}>
+          {selectedGame.label} 카드 선택
+          <ArrowRight size={18} aria-hidden="true" />
+        </button>
+      </section>
+    </div>
+  );
+}
+
 export default function App() {
   const savedHistory = window.history.state?.ygoView;
   const savedView = (() => {
@@ -58,6 +189,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [searchNextOffset, setSearchNextOffset] = useState(null);
   const [searchMoreLoading, setSearchMoreLoading] = useState(false);
+  const searchLoadMoreSentinelRef = useRef(null);
+  const searchMoreLockRef = useRef(false);
   const [cardDetailLoading, setCardDetailLoading] = useState(false);
   const [session, setSession] = useState(null);
   const [selectedCard, setSelectedCard] = useState(savedHistory?.selectedCard || savedView.selectedCard || null);
@@ -80,6 +213,10 @@ export default function App() {
   const [releaseLoading, setReleaseLoading] = useState(false);
   const [releaseNextOffset, setReleaseNextOffset] = useState(null);
   const [releaseMoreLoading, setReleaseMoreLoading] = useState(false);
+  const releaseLoadMoreSentinelRef = useRef(null);
+  const releaseMoreLockRef = useRef(false);
+  const searchMoreHandlerRef = useRef(null);
+  const releaseMoreHandlerRef = useRef(null);
   const [activeGame, setActiveGame] = useState(() => {
     try {
       return localStorage.getItem("ygo-active-game") || DEFAULT_GAME_ID;
@@ -87,13 +224,9 @@ export default function App() {
       return DEFAULT_GAME_ID;
     }
   });
-  const [gameSelectionComplete, setGameSelectionComplete] = useState(() => {
-    try {
-      return localStorage.getItem("ygo-game-selection-complete") === "true";
-    } catch {
-      return false;
-    }
-  });
+  const [gameSelectionComplete, setGameSelectionComplete] = useState(false);
+  const [gameSelectionFlight, setGameSelectionFlight] = useState(null);
+  const gameSelectionTimer = useRef(null);
   const historyIndex = useRef(savedHistory?.index || 0);
   const viewRef = useRef({ activeTab, selectedCard, selectedRelease });
   const loadedReleasePath = useRef(null);
@@ -105,6 +238,13 @@ export default function App() {
   useEffect(() => {
     viewRef.current = { activeTab, selectedCard, selectedRelease };
   }, [activeTab, selectedCard, selectedRelease]);
+
+  useEffect(
+    () => () => {
+      if (gameSelectionTimer.current) window.clearTimeout(gameSelectionTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (window.location.search) window.history.replaceState({}, "", window.location.pathname);
@@ -253,9 +393,11 @@ export default function App() {
       (activeGame !== "pokemon" && activeGame !== "onepiece") ||
       !selectedRelease ||
       releaseNextOffset == null ||
-      releaseMoreLoading
+      releaseMoreLoading ||
+      releaseMoreLockRef.current
     )
       return;
+    releaseMoreLockRef.current = true;
     setReleaseMoreLoading(true);
     setActionError("");
     try {
@@ -268,6 +410,7 @@ export default function App() {
     } catch (error) {
       setActionError(error.message);
     } finally {
+      releaseMoreLockRef.current = false;
       setReleaseMoreLoading(false);
     }
   };
@@ -299,11 +442,39 @@ export default function App() {
 
   const closeRelease = () => goBack({ selectedRelease: null });
 
+  const confirmInitialGame = (gameId, sourceRect) => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !sourceRect) {
+      changeGame(gameId);
+      return;
+    }
+    const target = document.querySelector(`.app-header .game-switcher-item[data-game-id="${gameId}"]`);
+    if (!target) {
+      changeGame(gameId);
+      return;
+    }
+    const targetRect = target.getBoundingClientRect();
+    setGameSelectionFlight({
+      gameId,
+      left: sourceRect.left,
+      top: sourceRect.top,
+      width: sourceRect.width,
+      height: sourceRect.height,
+      x: targetRect.left + targetRect.width / 2 - (sourceRect.left + sourceRect.width / 2),
+      y: targetRect.top + targetRect.height / 2 - (sourceRect.top + sourceRect.height / 2),
+      scaleX: targetRect.width / sourceRect.width,
+      scaleY: targetRect.height / sourceRect.height,
+    });
+    gameSelectionTimer.current = window.setTimeout(() => {
+      changeGame(gameId);
+      setGameSelectionFlight(null);
+      gameSelectionTimer.current = null;
+    }, 520);
+  };
+
   const changeGame = (gameId) => {
     setGameSelectionComplete(true);
     try {
       localStorage.setItem("ygo-active-game", gameId);
-      localStorage.setItem("ygo-game-selection-complete", "true");
     } catch {
       // ignore storage failures (private browsing, quota, etc.)
     }
@@ -728,8 +899,14 @@ export default function App() {
   };
 
   const loadMoreSearchCards = async () => {
-    if ((activeGame !== "pokemon" && activeGame !== "onepiece") || searchNextOffset == null || searchMoreLoading)
+    if (
+      (activeGame !== "pokemon" && activeGame !== "onepiece") ||
+      searchNextOffset == null ||
+      searchMoreLoading ||
+      searchMoreLockRef.current
+    )
       return;
+    searchMoreLockRef.current = true;
     setSearchMoreLoading(true);
     setActionError("");
     try {
@@ -742,9 +919,59 @@ export default function App() {
     } catch (error) {
       setActionError(error.message);
     } finally {
+      searchMoreLockRef.current = false;
       setSearchMoreLoading(false);
     }
   };
+
+  useEffect(() => {
+    searchMoreHandlerRef.current = loadMoreSearchCards;
+    releaseMoreHandlerRef.current = loadMoreReleaseCards;
+  });
+
+  useEffect(() => {
+    if (
+      activeTab !== "search" ||
+      selectedCard ||
+      (activeGame !== "pokemon" && activeGame !== "onepiece") ||
+      searchNextOffset == null ||
+      loading ||
+      searchMoreLoading ||
+      !searchLoadMoreSentinelRef.current ||
+      typeof IntersectionObserver === "undefined"
+    )
+      return undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) searchMoreHandlerRef.current?.();
+      },
+      { rootMargin: "480px 0px" },
+    );
+    observer.observe(searchLoadMoreSentinelRef.current);
+    return () => observer.disconnect();
+  }, [activeTab, selectedCard, activeGame, searchNextOffset, loading, searchMoreLoading]);
+
+  useEffect(() => {
+    if (
+      activeTab !== "releases" ||
+      !selectedRelease ||
+      (activeGame !== "pokemon" && activeGame !== "onepiece") ||
+      releaseNextOffset == null ||
+      releaseLoading ||
+      releaseMoreLoading ||
+      !releaseLoadMoreSentinelRef.current ||
+      typeof IntersectionObserver === "undefined"
+    )
+      return undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) releaseMoreHandlerRef.current?.();
+      },
+      { rootMargin: "480px 0px" },
+    );
+    observer.observe(releaseLoadMoreSentinelRef.current);
+    return () => observer.disconnect();
+  }, [activeTab, selectedRelease, activeGame, releaseNextOffset, releaseLoading, releaseMoreLoading]);
 
   return (
     <main className={`app-shell auth-state ${session ? "logged-in" : "logged-out"}`}>
@@ -755,7 +982,7 @@ export default function App() {
           </span>
           <h1>카드 도감</h1>
         </div>
-        {gameSelectionComplete && <GameSwitcher activeGame={activeGame} compact onSelect={changeGame} />}
+        <GameSwitcher activeGame={activeGame} compact pending={!gameSelectionComplete} onSelect={changeGame} />
         {session ? (
           <button className="auth-button logout-button" onClick={logout} title="로그아웃">
             <LogOut size={18} aria-hidden="true" />
@@ -771,7 +998,31 @@ export default function App() {
       {!isSupabaseConfigured && (
         <p className="setup-message">Supabase 환경변수를 설정하면 로그인을 사용할 수 있습니다.</p>
       )}
-      {!gameSelectionComplete && <GameSwitcher activeGame={activeGame} onSelect={changeGame} />}
+      {!gameSelectionComplete && (
+        <GamePicker
+          activeGame={activeGame}
+          isConfirming={Boolean(gameSelectionFlight)}
+          onConfirm={confirmInitialGame}
+        />
+      )}
+      {gameSelectionFlight && (
+        <img
+          className="game-selection-flight"
+          src={getGameById(gameSelectionFlight.gameId).cardBack}
+          alt=""
+          aria-hidden="true"
+          style={{
+            left: gameSelectionFlight.left,
+            top: gameSelectionFlight.top,
+            width: gameSelectionFlight.width,
+            height: gameSelectionFlight.height,
+            "--flight-x": `${gameSelectionFlight.x}px`,
+            "--flight-y": `${gameSelectionFlight.y}px`,
+            "--flight-scale-x": gameSelectionFlight.scaleX,
+            "--flight-scale-y": gameSelectionFlight.scaleY,
+          }}
+        />
+      )}
       <ManagementTabs
         activeTab={activeTab}
         activeGame={activeGame}
@@ -869,14 +1120,13 @@ export default function App() {
             ))}
           </section>
           {(activeGame === "pokemon" || activeGame === "onepiece") && searchNextOffset != null && (
-            <button
-              className="pokemon-load-more"
-              type="button"
-              disabled={searchMoreLoading}
-              onClick={loadMoreSearchCards}
-            >
-              {searchMoreLoading ? "카드를 불러오는 중..." : "카드 더 불러오기"}
-            </button>
+            <div className="auto-load-sentinel" ref={searchLoadMoreSentinelRef}>
+              {searchMoreLoading && (
+                <p className="auto-load-status" role="status">
+                  <LoaderCircle size={17} aria-hidden="true" /> 카드를 불러오는 중...
+                </p>
+              )}
+            </div>
           )}
         </>
       )}
@@ -924,14 +1174,13 @@ export default function App() {
                     ))}
                   </div>
                   {(activeGame === "pokemon" || activeGame === "onepiece") && releaseNextOffset != null && (
-                    <button
-                      className="pokemon-load-more"
-                      type="button"
-                      disabled={releaseMoreLoading}
-                      onClick={loadMoreReleaseCards}
-                    >
-                      {releaseMoreLoading ? "카드를 불러오는 중..." : "카드 더 불러오기"}
-                    </button>
+                    <div className="auto-load-sentinel" ref={releaseLoadMoreSentinelRef}>
+                      {releaseMoreLoading && (
+                        <p className="auto-load-status" role="status">
+                          <LoaderCircle size={17} aria-hidden="true" /> 카드를 불러오는 중...
+                        </p>
+                      )}
+                    </div>
                   )}
                 </>
               )}
