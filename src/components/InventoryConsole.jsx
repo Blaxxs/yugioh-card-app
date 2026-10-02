@@ -918,14 +918,6 @@ export default function InventoryConsole({
                         value={price}
                         onChange={(event) => changePackPrice(packKey(card), event.target.value)}
                       />
-                      <input
-                        className="pack-card-rarity"
-                        value={rarity}
-                        readOnly
-                        disabled
-                        placeholder="레어도"
-                        aria-label={`${card.name} 레어도 (수정 불가)`}
-                      />
                     </div>
                     <strong>{card.name}</strong>
                     <small>
