@@ -78,17 +78,30 @@ export async function fetchSets() {
 }
 
 export async function fetchSetCards(packName, offset = 0) {
-  const response = await postAjax({
-    action: "get_more_cards",
-    limit: String(offset),
-    GoodsName: packName,
-    ...BROWSE_DEFAULTS,
-  });
-  const nextOffset = Number(response.limit);
-  return {
-    cards: Object.values(response.result || {}).map(previewCard),
-    nextOffset: Number.isFinite(nextOffset) && nextOffset > offset ? nextOffset : null,
-  };
+  const pages = await Promise.all(
+    ["1", "2", "3"].map(async (cardTypeNum) => {
+      const response = await postAjax({
+        action: "get_more_cards",
+        limit: String(offset),
+        GoodsName: packName,
+        ...BROWSE_DEFAULTS,
+        CardTypeNum: cardTypeNum,
+      });
+      const cards = Object.values(response.result || {}).map(previewCard);
+      const requestedNextOffset = Number(response.limit);
+      return {
+        cards,
+        nextOffset:
+          cards.length && Number.isFinite(requestedNextOffset) && requestedNextOffset > offset
+            ? requestedNextOffset
+            : null,
+      };
+    }),
+  );
+  const cards = [...new Map(pages.flatMap((page) => page.cards).map((card) => [card.cardId, card])).values()];
+  const nextOffsets = pages.map((page) => page.nextOffset).filter((value) => value != null);
+  const nextOffset = nextOffsets.length ? Math.max(...nextOffsets) : null;
+  return { cards, nextOffset: Number.isFinite(nextOffset) && nextOffset > offset ? nextOffset : null };
 }
 
 const textOf = ($, selector) => $(selector).first().text().trim() || null;

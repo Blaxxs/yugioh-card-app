@@ -58,6 +58,7 @@ function GamePicker({ activeGame, isConfirming, onConfirm }) {
   const selectedCardRef = useRef(null);
   const selectedGame = CARD_GAMES.find((game) => game.id === selectedGameId) || CARD_GAMES[0];
   const selectedIndex = CARD_GAMES.findIndex((game) => game.id === selectedGame.id);
+  const dragAdvanceThreshold = window.innerWidth <= 700 ? 58 : 72;
 
   const moveSelection = (direction) => {
     const nextIndex = (selectedIndex + direction + CARD_GAMES.length) % CARD_GAMES.length;
@@ -74,9 +75,19 @@ function GamePicker({ activeGame, isConfirming, onConfirm }) {
   };
 
   const handlePointerMove = (event) => {
-    if (pointerStart.current?.pointerId === event.pointerId) {
-      setDragOffset(event.clientX - pointerStart.current.startX);
+    const start = pointerStart.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const distance = event.clientX - start.startX;
+    if (Math.abs(distance) >= dragAdvanceThreshold) {
+      const direction = distance < 0 ? 1 : -1;
+      const nextIndex = (start.gameIndex + direction + CARD_GAMES.length) % CARD_GAMES.length;
+      pointerStart.current = { ...start, startX: event.clientX, gameIndex: nextIndex, advanced: true };
+      suppressClick.current = true;
+      setSelectedGameId(CARD_GAMES[nextIndex].id);
+      setDragOffset(0);
+      return;
     }
+    setDragOffset(Math.max(-dragAdvanceThreshold, Math.min(dragAdvanceThreshold, distance)));
   };
 
   const handlePointerEnd = (event) => {
@@ -85,10 +96,12 @@ function GamePicker({ activeGame, isConfirming, onConfirm }) {
     const distance = event.clientX - start.startX;
     pointerStart.current = null;
     setDragOffset(0);
-    if (Math.abs(distance) < 55) return;
+    if (!start.advanced && Math.abs(distance) >= dragAdvanceThreshold) {
+      const direction = distance < 0 ? 1 : -1;
+      setSelectedGameId(CARD_GAMES[(start.gameIndex + direction + CARD_GAMES.length) % CARD_GAMES.length].id);
+    }
+    if (!start.advanced && Math.abs(distance) < dragAdvanceThreshold) return;
     suppressClick.current = true;
-    const direction = distance < 0 ? 1 : -1;
-    setSelectedGameId(CARD_GAMES[(start.gameIndex + direction + CARD_GAMES.length) % CARD_GAMES.length].id);
     window.setTimeout(() => {
       suppressClick.current = false;
     }, 0);

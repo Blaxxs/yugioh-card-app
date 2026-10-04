@@ -154,7 +154,12 @@ async function getExternalReleaseList(game, database) {
 }
 
 async function getExternalReleaseCards(game, setId, database, offset = 0) {
-  const cacheScope = game === "onepiece" ? `${game}:v2:set:${setId}` : `${game}:set:${setId}`;
+  const cacheScope =
+    game === "onepiece"
+      ? `${game}:v2:set:${setId}`
+      : game === "pokemon"
+        ? `${game}:v2:set:${setId}`
+        : `${game}:set:${setId}`;
   const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {
     const { data } = await database
