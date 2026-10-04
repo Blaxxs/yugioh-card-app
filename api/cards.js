@@ -73,6 +73,21 @@ async function mapWithConcurrency(items, concurrency, mapItem) {
   return results;
 }
 
+const getJapaneseNameTokens = (cards) => {
+  const frequencies = new Map();
+  for (const card of cards) {
+    const tokens = new Set(String(card.name || "").match(/[\u3040-\u30ff\u3400-\u9fff]+/g) || []);
+    for (const token of tokens) {
+      if (token.length < 2) continue;
+      frequencies.set(token, (frequencies.get(token) || 0) + 1);
+    }
+  }
+  return [...frequencies.entries()]
+    .sort((left, right) => right[1] - left[1] || right[0].length - left[0].length)
+    .slice(0, 3)
+    .map(([token]) => token);
+};
+
 const pageCacheKey = (baseKey, offset) => (offset ? `${baseKey}:offset:${offset}` : baseKey);
 
 const fetchOfficialHtml = async (url, language = "ko") => {
@@ -139,7 +154,7 @@ async function getExternalCardDetail(game, cardId, database, language) {
 }
 
 async function getExternalSearch(game, query, database, offset = 0, language = "ko") {
-  const cacheVersion = game === "onepiece" ? "v6" : "v4";
+  const cacheVersion = game === "onepiece" ? "v7" : "v4";
   const cacheScope = `${game}:${language}:${cacheVersion}:${normalizeSearchTerm(query)}`;
   const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {
@@ -177,8 +192,21 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
     const japaneseCards = await mapWithConcurrency(koreanPage.cards, 6, (card) =>
       onePieceJa.fetchCardById(card.cardId).catch(() => null),
     );
-    cards = [...new Map(japaneseCards.filter(Boolean).map((card) => [card.cardId.toUpperCase(), card])).values()];
-    nextOffset = koreanPage.nextOffset;
+    const mappedCards = japaneseCards.filter(Boolean);
+    const mappedIds = new Set(mappedCards.map((card) => card.cardId.toUpperCase()));
+    const searchTerms = getJapaneseNameTokens(mappedCards);
+    const relatedResults = await mapWithConcurrency(searchTerms, 3, (term) =>
+      onePieceJa.searchCards(term).catch(() => ({ cards: [] })),
+    );
+    const expandedCards = relatedResults
+      .filter((result) => result.cards.some((card) => mappedIds.has(card.cardId.toUpperCase())))
+      .flatMap((result) => result.cards);
+    cards = [
+      ...new Map(
+        [...cards, ...mappedCards, ...expandedCards].map((card) => [card.cardId.toUpperCase(), card]),
+      ).values(),
+    ];
+    nextOffset = expandedCards.length ? null : koreanPage.nextOffset;
   }
   if (config.hydrateSearchResults && language === "ko" && cards.length) {
     const previews = cards.slice(0, 24);
