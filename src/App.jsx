@@ -15,6 +15,23 @@ import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
 
+const getPokemonCollectorNumber = (card) => {
+  if (Number.isFinite(card.collectorNumber)) return card.collectorNumber;
+  const setCode = card.card_sets?.[0]?.set_code || "";
+  const match = String(setCode).match(/^(\d+)/);
+  return match ? Number(match[1]) : null;
+};
+
+const sortPokemonReleaseCards = (cards) =>
+  [...cards].sort((left, right) => {
+    const leftNumber = getPokemonCollectorNumber(left);
+    const rightNumber = getPokemonCollectorNumber(right);
+    if (leftNumber == null && rightNumber != null) return 1;
+    if (leftNumber != null && rightNumber == null) return -1;
+    if (leftNumber != null && rightNumber != null && leftNumber !== rightNumber) return leftNumber - rightNumber;
+    return String(left.cardId).localeCompare(String(right.cardId), "en", { numeric: true, sensitivity: "base" });
+  });
+
 function GameSwitcher({ activeGame, compact = false, pending = false, onSelect }) {
   return (
     <div
@@ -372,7 +389,7 @@ export default function App() {
         const previews = page.cards;
         setReleaseNextOffset(page.nextOffset);
         if (activeGame !== "yugioh" || !isQuarterCenturyChronicleRelease(selectedRelease.name)) {
-          setReleaseCards(previews);
+          setReleaseCards(activeGame === "pokemon" ? sortPokemonReleaseCards(previews) : previews);
           return;
         }
         const detailedCards = [];
@@ -417,7 +434,8 @@ export default function App() {
       const page = await fetchGameReleaseCardsPage(activeGame, selectedRelease.path, releaseNextOffset);
       setReleaseCards((current) => {
         const seen = new Set(current.map((card) => card.cardId));
-        return [...current, ...page.cards.filter((card) => !seen.has(card.cardId))];
+        const cards = [...current, ...page.cards.filter((card) => !seen.has(card.cardId))];
+        return activeGame === "pokemon" ? sortPokemonReleaseCards(cards) : cards;
       });
       setReleaseNextOffset(page.nextOffset);
     } catch (error) {

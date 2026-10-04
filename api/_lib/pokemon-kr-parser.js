@@ -37,11 +37,21 @@ const toImageUrl = (path) =>
     ? path
     : `${ORIGIN.replace("pokemoncard.co.kr", "cards.image.pokemonkorea.co.kr")}/data/${path}`;
 
+const getCollectionNumber = (imagePath) => {
+  const filename = String(imagePath || "")
+    .split("?")[0]
+    .split("/")
+    .pop();
+  const match = filename.match(/_(\d+)(?:_[^.]+)?\.(?:png|jpe?g|webp)$/i);
+  return match ? Number(match[1]) : null;
+};
+
 const previewCard = ({ CardNum, feature_image: featureImage }) => ({
   id: CardNum,
   cardId: CardNum,
   game: "pokemon",
   name: "",
+  collectorNumber: getCollectionNumber(featureImage),
   card_images: featureImage ? [{ id: `${CardNum}-1`, image_url_small: toImageUrl(featureImage) }] : [],
   koreanData: { cardName: "" },
   card_sets: [],
