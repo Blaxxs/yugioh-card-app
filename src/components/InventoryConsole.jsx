@@ -15,6 +15,7 @@ const MAX_IMPORT_ROWS = 500;
 
 export default function InventoryConsole({
   activeGame,
+  activeLanguage,
   inventoryItems,
   busy,
   onBatchIntake,
@@ -128,7 +129,7 @@ export default function InventoryConsole({
     link.click();
   };
   const findPacks = async () => {
-    const releases = await fetchGameReleaseList(activeGame);
+    const releases = await fetchGameReleaseList(activeGame, activeLanguage);
     setPackMatches(releases.filter((release) => release.name.includes(packQuery)).slice(0, 12));
   };
   useEffect(() => {
@@ -155,19 +156,19 @@ export default function InventoryConsole({
         cards = [];
         let offset = 0;
         while (offset != null) {
-          const page = await fetchGameReleaseCardsPage(activeGame, release.path, offset);
+          const page = await fetchGameReleaseCardsPage(activeGame, release.path, offset, activeLanguage);
           cards.push(...page.cards);
           if (!page.cards.length) break;
           offset = page.nextOffset;
         }
         cards = [...new Map(cards.map((card) => [card.cardId, card])).values()];
       } else {
-        cards = await fetchGameReleaseCards(activeGame, release.path);
+        cards = await fetchGameReleaseCards(activeGame, release.path, activeLanguage);
       }
       let detailedCards = cards;
       if (activeGame === "yugioh") {
         detailedCards = [];
-        await hydrateCardPreviews(cards, (detailedCard) => detailedCards.push(detailedCard));
+        await hydrateCardPreviews(cards, (detailedCard) => detailedCards.push(detailedCard), activeLanguage);
       }
       const variants = detailedCards.flatMap((detailedCard) => {
         const sets = detailedCard.card_sets.filter((set) => set.set_name === release.name);
@@ -331,8 +332,8 @@ export default function InventoryConsole({
           continue;
         }
         try {
-          const [match] = await searchGameCards(activeGame, row.setCode || row.name);
-          const candidates = match ? [match] : await searchGameCards(activeGame, row.name);
+          const [match] = await searchGameCards(activeGame, row.setCode || row.name, activeLanguage);
+          const candidates = match ? [match] : await searchGameCards(activeGame, row.name, activeLanguage);
           const preview = candidates[0];
           if (!preview) {
             resolved.push({ ...row, error: "공식 카드 검색 결과가 없습니다." });
@@ -343,6 +344,7 @@ export default function InventoryConsole({
             preview.cardId,
             preview.name,
             preview.card_images?.[0]?.image_url_small,
+            activeLanguage,
           );
           const set =
             detail.card_sets?.find((item) => row.setCode && item.set_code === row.setCode) || detail.card_sets?.[0];
@@ -433,12 +435,18 @@ export default function InventoryConsole({
       setAddResults([]);
       return;
     }
-    setAddResults(await searchGameCards(activeGame, query));
+    setAddResults(await searchGameCards(activeGame, query, activeLanguage));
   };
   const chooseAddCard = async (card) => {
     const detailed = card.isDetailLoaded
       ? card
-      : await fetchGameCardById(activeGame, card.cardId, card.name, card.card_images?.[0]?.image_url_small);
+      : await fetchGameCardById(
+          activeGame,
+          card.cardId,
+          card.name,
+          card.card_images?.[0]?.image_url_small,
+          activeLanguage,
+        );
     setAddCard(detailed);
     const firstSet = detailed.card_sets?.[0];
     setAddCode(firstSet?.set_code || "");

@@ -64,10 +64,10 @@ const findImageUrls = (html, cardId, imageType = 1) =>
     ),
   ].map((path) => new URL(path, `${OFFICIAL_SITE_ORIGIN}/yugiohdb/`).href);
 
-export const createSearchUrl = (keyword) => {
+export const createSearchUrl = (keyword, language = "ko") => {
   const url = new URL(`${OFFICIAL_SITE_ORIGIN}/yugiohdb/card_search.action`);
   url.search = new URLSearchParams({
-    request_locale: "ko",
+    request_locale: language === "ja" ? "ja" : "ko",
     ope: "1",
     sess: "1",
     rp: "100",
@@ -83,9 +83,9 @@ export const createSearchUrl = (keyword) => {
   return url;
 };
 
-export const createDetailUrl = (cardId) =>
+export const createDetailUrl = (cardId, language = "ko") =>
   new URL(
-    `/yugiohdb/card_search.action?request_locale=ko&ope=2&cid=${encodeURIComponent(cardId)}`,
+    `/yugiohdb/card_search.action?request_locale=${language === "ja" ? "ja" : "ko"}&ope=2&cid=${encodeURIComponent(cardId)}`,
     OFFICIAL_SITE_ORIGIN,
   );
 

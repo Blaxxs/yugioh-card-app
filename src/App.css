@@ -426,6 +426,33 @@ button:disabled {
   visibility: hidden;
   pointer-events: none;
 }
+.language-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin: -8px 0 12px;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.language-switcher span {
+  margin-right: 3px;
+}
+.language-switcher button {
+  min-height: 32px;
+  border: 1px solid var(--app-line);
+  padding: 0 10px;
+  background: var(--app-surface);
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.language-switcher button.active {
+  border-color: var(--app-primary);
+  background: var(--app-primary);
+  color: #fff;
+}
 .game-picker-overlay {
   position: fixed;
   inset: 0;
@@ -2903,6 +2930,9 @@ button:disabled {
     align-items: center;
     gap: 8px;
     margin-bottom: 18px;
+  }
+  .language-switcher {
+    margin: -8px 0 10px;
   }
   .app-mark {
     width: 34px;

@@ -133,10 +133,10 @@ const fetchCardApi = async (params) => {
   return body;
 };
 
-const createSearchUrl = (keyword) => {
+const createSearchUrl = (keyword, language = "ko") => {
   const url = new URL(`${OFFICIAL_SITE_ORIGIN}/yugiohdb/card_search.action`);
   url.search = new URLSearchParams({
-    request_locale: "ko",
+    request_locale: language === "ja" ? "ja" : "ko",
     ope: "1",
     sess: "1",
     rp: "100",
@@ -152,8 +152,8 @@ const createSearchUrl = (keyword) => {
   return url;
 };
 
-const createCardNumberSearchUrl = (code) => {
-  const url = createSearchUrl(code);
+const createCardNumberSearchUrl = (code, language = "ko") => {
+  const url = createSearchUrl(code, language);
   url.searchParams.set("stype", "4");
   return url;
 };
@@ -165,7 +165,7 @@ const findOfficialImageUrl = (document, cardId) => {
   return match ? new URL(match[0].replaceAll("&amp;", "&"), `${OFFICIAL_SITE_ORIGIN}/yugiohdb/`).href : null;
 };
 
-const findCardEntries = (document, term) => {
+const findCardEntries = (document, term, language = "ko") => {
   const seen = new Set();
   return [...document.querySelectorAll(".t_row.c_normal")]
     .filter((row) => normalizeCardName(row.querySelector(".card_name")?.textContent || "").includes(term))
@@ -177,7 +177,10 @@ const findCardEntries = (document, term) => {
     .filter(({ cardId, image }) => image && cardId && !seen.has(cardId) && seen.add(cardId))
     .map(({ row, cardId, image }) => ({
       cardId,
-      href: new URL(`/yugiohdb/card_search.action?request_locale=ko&ope=2&cid=${cardId}`, OFFICIAL_SITE_ORIGIN),
+      href: new URL(
+        `/yugiohdb/card_search.action?request_locale=${language === "ja" ? "ja" : "ko"}&ope=2&cid=${cardId}`,
+        OFFICIAL_SITE_ORIGIN,
+      ),
       imageUrl:
         image.getAttribute("src") && image.getAttribute("src") !== "null"
           ? new URL(image.getAttribute("src"), OFFICIAL_SITE_ORIGIN).href
@@ -196,9 +199,9 @@ const createCardPreview = ({ cardId, name, imageUrl }) => ({
   isDetailLoaded: false,
 });
 
-export async function fetchReleaseList() {
+export async function fetchReleaseList(language = "ko") {
   const url = new URL(`${OFFICIAL_SITE_ORIGIN}/yugiohdb/card_list.action`);
-  url.searchParams.set("request_locale", "ko");
+  url.searchParams.set("request_locale", language === "ja" ? "ja" : "ko");
   const document = await fetchOfficialHtml(url);
   const seen = new Set();
 
@@ -302,30 +305,30 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
   };
 };
 
-export async function fetchOfficialCardById(cardId, fallbackName = "", imageUrl = "") {
+export async function fetchOfficialCardById(cardId, fallbackName = "", imageUrl = "", language = "ko") {
   if (!cardId) return null;
-  if (USE_CARD_API) return fetchCardApi({ id: String(cardId) });
+  if (USE_CARD_API) return fetchCardApi({ id: String(cardId), lang: language });
   const href = new URL(
-    `/yugiohdb/card_search.action?request_locale=ko&ope=2&cid=${encodeURIComponent(cardId)}`,
+    `/yugiohdb/card_search.action?request_locale=${language === "ja" ? "ja" : "ko"}&ope=2&cid=${encodeURIComponent(cardId)}`,
     OFFICIAL_SITE_ORIGIN,
   );
   return parseOfficialCard(await fetchOfficialHtml(href), fallbackName, imageUrl, String(cardId));
 }
 
-export async function fetchOfficialCardBySetCode(setCode) {
-  const document = await fetchOfficialHtml(createCardNumberSearchUrl(setCode.trim().toUpperCase()));
-  const [entry] = findCardEntries(document, "");
-  return entry ? fetchOfficialCardById(entry.cardId, entry.name, entry.imageUrl) : null;
+export async function fetchOfficialCardBySetCode(setCode, language = "ko") {
+  const document = await fetchOfficialHtml(createCardNumberSearchUrl(setCode.trim().toUpperCase(), language));
+  const [entry] = findCardEntries(document, "", language);
+  return entry ? fetchOfficialCardById(entry.cardId, entry.name, entry.imageUrl, language) : null;
 }
 
-export async function hydrateCardPreviews(cards, onHydrated) {
+export async function hydrateCardPreviews(cards, onHydrated, language = "ko") {
   const pendingCards = cards.filter((card) => !card.isDetailLoaded);
   let nextIndex = 0;
   const worker = async () => {
     while (nextIndex < pendingCards.length) {
       const card = pendingCards[nextIndex++];
       try {
-        const detailedCard = await fetchOfficialCardById(card.cardId, card.name);
+        const detailedCard = await fetchOfficialCardById(card.cardId, card.name, "", language);
         if (detailedCard) onHydrated(detailedCard);
       } catch {
         // Leave the preview empty if the official detail page is temporarily unavailable.
@@ -335,32 +338,32 @@ export async function hydrateCardPreviews(cards, onHydrated) {
   await Promise.all(Array.from({ length: Math.min(6, pendingCards.length) }, worker));
 }
 
-export async function searchOfficialCards(searchTerm) {
-  const releaseCodeResults = await searchCardsByReleaseCode(searchTerm);
+export async function searchOfficialCards(searchTerm, language = "ko") {
+  const releaseCodeResults = language === "ko" ? await searchCardsByReleaseCode(searchTerm, language) : null;
   if (releaseCodeResults) return releaseCodeResults;
 
-  if (USE_CARD_API) return fetchCardApi({ q: searchTerm.trim() });
+  if (USE_CARD_API) return fetchCardApi({ q: searchTerm.trim(), lang: language });
 
   const term = normalizeCardName(searchTerm);
-  let document = await fetchOfficialHtml(createSearchUrl(searchTerm));
-  let entries = findCardEntries(document, term);
+  let document = await fetchOfficialHtml(createSearchUrl(searchTerm, language));
+  let entries = findCardEntries(document, term, language);
   if (!entries.length && term.length > 1) {
-    document = await fetchOfficialHtml(createSearchUrl(term.slice(0, 2)));
-    entries = findCardEntries(document, term);
+    document = await fetchOfficialHtml(createSearchUrl(term.slice(0, 2), language));
+    entries = findCardEntries(document, term, language);
   }
   return entries.map(createCardPreview);
 }
 
-export async function fetchReleaseCards(path) {
+export async function fetchReleaseCards(path, language = "ko") {
   if (!path) return [];
   const url = new URL(path, OFFICIAL_SITE_ORIGIN);
-  url.searchParams.set("request_locale", "ko");
+  url.searchParams.set("request_locale", language === "ja" ? "ja" : "ko");
   const document = await fetchOfficialHtml(url);
-  const entries = findCardEntries(document, "");
+  const entries = findCardEntries(document, "", language);
   return entries.map(createCardPreview);
 }
 
-const searchCardsByReleaseCode = async (searchTerm) => {
+const searchCardsByReleaseCode = async (searchTerm, language) => {
   const rawTerm = searchTerm.trim();
   if (!/^[a-z0-9-]+$/i.test(rawTerm)) return null;
   const normalized = rawTerm.replace(/\s+/g, "").toUpperCase();
@@ -372,17 +375,17 @@ const searchCardsByReleaseCode = async (searchTerm) => {
 
   for (const cardNumber of cardNumbers) {
     const code = `${prefix}-KR${cardNumber}`;
-    const document = await fetchOfficialHtml(createCardNumberSearchUrl(code));
-    const [entry] = findCardEntries(document, "");
+    const document = await fetchOfficialHtml(createCardNumberSearchUrl(code, language));
+    const [entry] = findCardEntries(document, "", language);
     if (!entry) continue;
 
-    const card = await fetchOfficialCardById(entry.cardId, entry.name, entry.imageUrl);
+    const card = await fetchOfficialCardById(entry.cardId, entry.name, entry.imageUrl, language);
     const setName = card?.card_sets?.find((set) => set.set_code?.toUpperCase().startsWith(`${prefix}-`))?.set_name;
     if (!setName) return card ? [card] : [];
 
-    const releases = await fetchReleaseList();
+    const releases = await fetchReleaseList(language);
     const release = releases.find((item) => item.name === setName);
-    return release ? fetchReleaseCards(release.path) : [card];
+    return release ? fetchReleaseCards(release.path, language) : [card];
   }
 
   return [];

@@ -22,20 +22,21 @@ const fetchGameApi = async (params, includePageInfo = false) => {
   return { cards: body, nextOffset: nextOffset == null ? null : Number(nextOffset) };
 };
 
-export async function searchGameCards(game, term) {
+export async function searchGameCards(game, term, language = "ko") {
   const query = String(term || "").trim();
   if (!query) return [];
-  if (game === "yugioh") return searchOfficialCards(query);
-  return fetchGameApi({ game, q: query, ...(game === "onepiece" ? { series: "all" } : {}) });
+  if (game === "yugioh") return searchOfficialCards(query, language);
+  return fetchGameApi({ game, lang: language, q: query, ...(game === "onepiece" ? { series: "all" } : {}) });
 }
 
-export async function searchGameCardsPage(game, term, offset = 0) {
+export async function searchGameCardsPage(game, term, offset = 0, language = "ko") {
   const query = String(term || "").trim();
   if (!query) return { cards: [], nextOffset: null };
-  if (game === "yugioh") return { cards: await searchOfficialCards(query), nextOffset: null };
+  if (game === "yugioh") return { cards: await searchOfficialCards(query, language), nextOffset: null };
   return fetchGameApi(
     {
       game,
+      lang: language,
       q: query,
       ...(game === "pokemon" || game === "onepiece" ? { offset } : {}),
       ...(game === "onepiece" ? { series: "all" } : {}),
@@ -44,35 +45,35 @@ export async function searchGameCardsPage(game, term, offset = 0) {
   );
 }
 
-export async function fetchGameCardById(game, cardId, fallbackName = "", imageUrl = "") {
+export async function fetchGameCardById(game, cardId, fallbackName = "", imageUrl = "", language = "ko") {
   if (!cardId) return null;
-  if (game === "yugioh") return fetchOfficialCardById(cardId, fallbackName, imageUrl);
-  return fetchGameApi({ game, id: String(cardId) });
+  if (game === "yugioh") return fetchOfficialCardById(cardId, fallbackName, imageUrl, language);
+  return fetchGameApi({ game, id: String(cardId), lang: language });
 }
 
-export async function fetchGameReleaseList(game) {
-  if (game === "yugioh") return fetchYugiohReleaseList();
-  return fetchGameApi({ game, releases: "1" });
+export async function fetchGameReleaseList(game, language = "ko") {
+  if (game === "yugioh") return fetchYugiohReleaseList(language);
+  return fetchGameApi({ game, lang: language, releases: "1" });
 }
 
-export async function fetchGameReleaseCards(game, path) {
+export async function fetchGameReleaseCards(game, path, language = "ko") {
   if (!path) return [];
-  if (game === "yugioh") return fetchYugiohReleaseCards(path);
+  if (game === "yugioh") return fetchYugiohReleaseCards(path, language);
   if (game === "onepiece") {
     const cards = [];
     let offset = 0;
     while (offset != null) {
-      const page = await fetchGameReleaseCardsPage(game, path, offset);
+      const page = await fetchGameReleaseCardsPage(game, path, offset, language);
       cards.push(...page.cards);
       offset = page.nextOffset;
     }
     return cards;
   }
-  return fetchGameApi({ game, setId: path });
+  return fetchGameApi({ game, lang: language, setId: path });
 }
 
-export async function fetchGameReleaseCardsPage(game, path, offset = 0) {
+export async function fetchGameReleaseCardsPage(game, path, offset = 0, language = "ko") {
   if (!path) return { cards: [], nextOffset: null };
-  if (game === "yugioh") return { cards: await fetchYugiohReleaseCards(path), nextOffset: null };
-  return fetchGameApi({ game, setId: path, ...(game === "pokemon" || game === "onepiece" ? { offset } : {}) }, true);
+  if (game === "yugioh") return { cards: await fetchYugiohReleaseCards(path, language), nextOffset: null };
+  return fetchGameApi({ game, lang: language, setId: path, ...(game === "pokemon" || game === "onepiece" ? { offset } : {}) }, true);
 }

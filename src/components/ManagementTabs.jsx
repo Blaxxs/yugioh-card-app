@@ -29,6 +29,7 @@ function ViewFilters({ value, onChange }) {
 export default function ManagementTabs({
   activeTab,
   activeGame,
+  activeLanguage,
   onTabChange,
   session,
   inventoryItems,
@@ -87,6 +88,7 @@ export default function ManagementTabs({
           {activeTab === "inventory" && (
             <InventoryConsole
               activeGame={activeGame}
+              activeLanguage={activeLanguage}
               inventoryItems={inventoryItems}
               busy={inventoryBusy}
               onBatchIntake={onBatchIntake}

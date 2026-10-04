@@ -67,6 +67,25 @@ function GameSwitcher({ activeGame, compact = false, pending = false, onSelect }
   );
 }
 
+function LanguageSwitcher({ activeLanguage, onSelect }) {
+  return (
+    <div className="language-switcher" role="group" aria-label="카드 판본">
+      <span>판본</span>
+      {[{ id: "ko", label: "한글판" }, { id: "ja", label: "일본판" }].map((language) => (
+        <button
+          key={language.id}
+          type="button"
+          aria-pressed={activeLanguage === language.id}
+          className={activeLanguage === language.id ? "active" : ""}
+          onClick={() => onSelect(language.id)}
+        >
+          {language.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function GamePicker({ activeGame, isConfirming, onConfirm }) {
   const [selectedGameId, setSelectedGameId] = useState(activeGame);
   const [dragOffset, setDragOffset] = useState(0);
@@ -254,6 +273,13 @@ export default function App() {
       return DEFAULT_GAME_ID;
     }
   });
+  const [activeLanguage, setActiveLanguage] = useState(() => {
+    try {
+      return localStorage.getItem("ygo-active-language") === "ja" ? "ja" : "ko";
+    } catch {
+      return "ko";
+    }
+  });
   const [gameSelectionComplete, setGameSelectionComplete] = useState(false);
   const [gameSelectionFlight, setGameSelectionFlight] = useState(null);
   const gameSelectionTimer = useRef(null);
@@ -262,8 +288,11 @@ export default function App() {
   const loadedReleasePath = useRef(null);
 
   useEffect(() => {
-    sessionStorage.setItem("ygo-view-state", JSON.stringify({ searchTerm, cards, selectedCard, activeTab, viewModes }));
-  }, [searchTerm, cards, selectedCard, activeTab, viewModes]);
+    sessionStorage.setItem(
+      "ygo-view-state",
+      JSON.stringify({ searchTerm, cards, selectedCard, activeTab, viewModes, activeLanguage }),
+    );
+  }, [searchTerm, cards, selectedCard, activeTab, viewModes, activeLanguage]);
 
   useEffect(() => {
     viewRef.current = { activeTab, selectedCard, selectedRelease };
@@ -363,7 +392,7 @@ export default function App() {
       await Promise.resolve();
       setReleaseLoading(true);
       try {
-        setReleases(await fetchGameReleaseList(activeGame));
+        setReleases(await fetchGameReleaseList(activeGame, activeLanguage));
       } catch (error) {
         setActionError(error.message);
       } finally {
@@ -371,29 +400,32 @@ export default function App() {
       }
     };
     loadReleases();
-  }, [activeTab, releaseLoading, releases.length, activeGame]);
+  }, [activeTab, releaseLoading, releases.length, activeGame, activeLanguage]);
 
   useEffect(() => {
-    if (!selectedRelease || loadedReleasePath.current === selectedRelease.path) return;
+    const releaseLoadKey = `${activeGame}:${activeLanguage}:${selectedRelease?.path || ""}`;
+    if (!selectedRelease || loadedReleasePath.current === releaseLoadKey) return;
     const loadReleaseCards = async () => {
       await Promise.resolve();
-      loadedReleasePath.current = selectedRelease.path;
+      loadedReleasePath.current = releaseLoadKey;
       setReleaseCards([]);
       setReleaseNextOffset(null);
       setReleaseLoading(true);
       try {
         const page =
           activeGame === "pokemon" || activeGame === "onepiece"
-            ? await fetchGameReleaseCardsPage(activeGame, selectedRelease.path)
-            : { cards: await fetchGameReleaseCards(activeGame, selectedRelease.path), nextOffset: null };
+            ? await fetchGameReleaseCardsPage(activeGame, selectedRelease.path, 0, activeLanguage)
+            : { cards: await fetchGameReleaseCards(activeGame, selectedRelease.path, activeLanguage), nextOffset: null };
         const previews = page.cards;
         setReleaseNextOffset(page.nextOffset);
         if (activeGame !== "yugioh" || !isQuarterCenturyChronicleRelease(selectedRelease.name)) {
-          setReleaseCards(activeGame === "pokemon" ? sortPokemonReleaseCards(previews) : previews);
+          setReleaseCards(
+            activeGame === "pokemon" && activeLanguage === "ko" ? sortPokemonReleaseCards(previews) : previews,
+          );
           return;
         }
         const detailedCards = [];
-        await hydrateCardPreviews(previews, (card) => detailedCards.push(card));
+        await hydrateCardPreviews(previews, (card) => detailedCards.push(card), activeLanguage);
         const detailsById = new Map(detailedCards.map((card) => [card.cardId, card]));
         setReleaseCards(
           previews
@@ -416,7 +448,7 @@ export default function App() {
       }
     };
     loadReleaseCards();
-  }, [selectedRelease, activeGame]);
+  }, [selectedRelease, activeGame, activeLanguage]);
 
   const loadMoreReleaseCards = async () => {
     if (
@@ -431,11 +463,11 @@ export default function App() {
     setReleaseMoreLoading(true);
     setActionError("");
     try {
-      const page = await fetchGameReleaseCardsPage(activeGame, selectedRelease.path, releaseNextOffset);
+      const page = await fetchGameReleaseCardsPage(activeGame, selectedRelease.path, releaseNextOffset, activeLanguage);
       setReleaseCards((current) => {
         const seen = new Set(current.map((card) => card.cardId));
         const cards = [...current, ...page.cards.filter((card) => !seen.has(card.cardId))];
-        return activeGame === "pokemon" ? sortPokemonReleaseCards(cards) : cards;
+        return activeGame === "pokemon" && activeLanguage === "ko" ? sortPokemonReleaseCards(cards) : cards;
       });
       setReleaseNextOffset(page.nextOffset);
     } catch (error) {
@@ -538,7 +570,7 @@ export default function App() {
     let release = releases.find((item) => item.name === releaseName);
     if (!release) {
       try {
-        const fetchedReleases = await fetchGameReleaseList(activeGame);
+        const fetchedReleases = await fetchGameReleaseList(activeGame, activeLanguage);
         setReleases(fetchedReleases);
         release = fetchedReleases.find((item) => item.name === releaseName);
       } catch (error) {
@@ -568,6 +600,7 @@ export default function App() {
         card.cardId,
         card.name,
         card.card_images?.[0]?.image_url_small,
+        card.language || activeLanguage,
       );
       if (detailedCard) pushView({ selectedCard: detailedCard });
     } catch (error) {
@@ -906,7 +939,7 @@ export default function App() {
     );
   };
 
-  const searchCard = async () => {
+  const searchCard = async (language = activeLanguage) => {
     setSelectedCard(null);
     setActiveTab("search");
     setSearchNextOffset(null);
@@ -915,17 +948,52 @@ export default function App() {
     setActionError("");
     try {
       if (activeGame === "pokemon" || activeGame === "onepiece") {
-        const page = await searchGameCardsPage(activeGame, searchTerm);
+        const page = await searchGameCardsPage(activeGame, searchTerm, 0, language);
         setCards(page.cards);
         setSearchNextOffset(page.nextOffset);
       } else {
-        setCards(await searchGameCards(activeGame, searchTerm));
+        setCards(await searchGameCards(activeGame, searchTerm, language));
       }
     } catch (error) {
       setActionError(error.message);
       setCards([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const changeLanguage = async (language) => {
+    if (language === activeLanguage) return;
+    setActiveLanguage(language);
+    try {
+      localStorage.setItem("ygo-active-language", language);
+    } catch {
+      // ignore storage failures
+    }
+    setActionError("");
+    setCards([]);
+    setSearchNextOffset(null);
+    setSelectedCard(null);
+    setReleases([]);
+    setReleaseCards([]);
+    setReleaseNextOffset(null);
+    setSelectedRelease(null);
+    loadedReleasePath.current = null;
+    if (activeTab === "search" && searchTerm.trim()) {
+      setLoading(true);
+      try {
+        if (activeGame === "pokemon" || activeGame === "onepiece") {
+          const page = await searchGameCardsPage(activeGame, searchTerm, 0, language);
+          setCards(page.cards);
+          setSearchNextOffset(page.nextOffset);
+        } else {
+          setCards(await searchGameCards(activeGame, searchTerm, language));
+        }
+      } catch (error) {
+        setActionError(error.message);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -1054,9 +1122,11 @@ export default function App() {
           }}
         />
       )}
+      <LanguageSwitcher activeLanguage={activeLanguage} onSelect={changeLanguage} />
       <ManagementTabs
         activeTab={activeTab}
         activeGame={activeGame}
+        activeLanguage={activeLanguage}
         onTabChange={changeTab}
         session={session}
         inventoryItems={inventoryItems}
@@ -1191,7 +1261,7 @@ export default function App() {
                     <strong>수록 카드 {releaseCards.length}장</strong>
                   </div>
                   <div className="card-grid release-results view-album">
-                    {releaseCards.map((card) => (
+                    {releaseCards.map((card, index) => (
                       <CardResult
                         key={card.id || card.cardId}
                         card={card}
@@ -1201,6 +1271,7 @@ export default function App() {
                         viewMode="album"
                         showCardName={false}
                         showSetRarity={isQuarterCenturyChronicleRelease(selectedRelease.name)}
+                        prioritizeImage={index < 8}
                       />
                     ))}
                   </div>

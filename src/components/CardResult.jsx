@@ -9,6 +9,7 @@ export default function CardResult({
   showFavorite = true,
   showCardName = true,
   showSetRarity = false,
+  prioritizeImage = false,
 }) {
   const [imageIndex, setImageIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState("next");
@@ -140,7 +141,7 @@ export default function CardResult({
             className={`carousel-image slide-${slideDirection}`}
             src={images[imageIndex].image_url_small}
             alt={`${card.name} 일러스트 ${imageIndex + 1}`}
-            loading="lazy"
+            loading={prioritizeImage ? "eager" : "lazy"}
             decoding="async"
             draggable="false"
           />
