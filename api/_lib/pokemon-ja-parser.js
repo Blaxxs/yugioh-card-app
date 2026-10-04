@@ -6,6 +6,8 @@ const CARD_TYPES = ["pokemon", "trainer", "energy"];
 let setListPromise;
 const setPagePromises = new Map();
 const cardDetailPromises = new Map();
+const requestWaiters = [];
+let activeRequests = 0;
 
 const headers = () => ({
   Accept: "application/json, text/html",
@@ -13,6 +15,18 @@ const headers = () => ({
   Referer: `${ORIGIN}/card-search/`,
   "User-Agent": "Mozilla/5.0 YuGiOhCardApp/1.0",
 });
+
+async function fetchOfficial(url, options) {
+  if (activeRequests >= 2) await new Promise((resolve) => requestWaiters.push(resolve));
+  else activeRequests += 1;
+  try {
+    return await fetch(url, options);
+  } finally {
+    const next = requestWaiters.shift();
+    if (next) next();
+    else activeRequests -= 1;
+  }
+}
 
 const createPreview = (entry, pack) => {
   const name = String(entry.cardNameViewText || entry.cardNameAltText || "").trim();
@@ -44,7 +58,7 @@ async function requestCards({ term = "", packId = "", page = 0 }) {
         sm_and_keyword: "true",
         page: String(page + 1),
       });
-      const response = await fetch(`${SEARCH_URL}?${params}`, { headers: headers() });
+      const response = await fetchOfficial(`${SEARCH_URL}?${params}`, { headers: headers() });
       if (!response.ok) throw new Error(`일본 포켓몬 카드 검색 실패 (${response.status})`);
       const body = await response.json();
       if (body.result !== 1) throw new Error(body.errMsg || "일본 포켓몬 카드 검색에 실패했습니다.");
@@ -70,7 +84,7 @@ export async function searchCards(term, page = 0) {
 export async function fetchSets() {
   if (!setListPromise) {
     setListPromise = (async () => {
-      const response = await fetch(`${ORIGIN}/card-search/index.php`, { headers: headers() });
+      const response = await fetchOfficial(`${ORIGIN}/card-search/index.php`, { headers: headers() });
       if (!response.ok) throw new Error(`일본 포켓몬 팩 목록 요청 실패 (${response.status})`);
       const html = await response.text();
       const section = html.match(/"pg"\s*:\s*\{[\s\S]*?list:\s*\[([\s\S]*?)\]\s*,?\s*\}/)?.[1] || "";
@@ -154,9 +168,10 @@ export async function fetchCardBySetNumber(packId, setCode) {
 }
 
 export async function fetchCardDetail(cardId) {
-  const response = await fetch(`${ORIGIN}/card-search/details.php/card/${encodeURIComponent(cardId)}/regu/all`, {
-    headers: headers(),
-  });
+  const response = await fetchOfficial(
+    `${ORIGIN}/card-search/details.php/card/${encodeURIComponent(cardId)}/regu/all`,
+    { headers: headers() },
+  );
   if (!response.ok) throw new Error(`일본 포켓몬 카드 상세 요청 실패 (${response.status})`);
   const $ = load(await response.text());
   const name = $("h1.Heading1").first().text().trim();
