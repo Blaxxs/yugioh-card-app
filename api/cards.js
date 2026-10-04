@@ -139,7 +139,7 @@ async function getExternalCardDetail(game, cardId, database, language) {
 }
 
 async function getExternalSearch(game, query, database, offset = 0, language = "ko") {
-  const cacheVersion = game === "onepiece" ? "v5" : "v4";
+  const cacheVersion = game === "onepiece" ? "v6" : "v4";
   const cacheScope = `${game}:${language}:${cacheVersion}:${normalizeSearchTerm(query)}`;
   const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {

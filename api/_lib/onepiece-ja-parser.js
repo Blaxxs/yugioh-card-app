@@ -2,6 +2,10 @@ import { load } from "cheerio";
 
 const ORIGIN = "https://www.onepiece-cardgame.com";
 const CARD_LIST_URL = `${ORIGIN}/cardlist/`;
+const KOREAN_SEARCH_ALIASES = [
+  [/몽키\s*D\.?\s*루피/gi, "モンキー・D・ルフィ"],
+  [/루피/gi, "ルフィ"],
+];
 
 const baseHeaders = {
   Accept: "text/html",
@@ -88,7 +92,11 @@ async function fetchCardList({ term = "", series = "" }) {
 }
 
 export async function searchCards(term) {
-  return fetchCardList({ term: String(term || "").trim() });
+  let searchTerm = String(term || "").trim();
+  if (/[\uac00-\ud7a3]/.test(searchTerm)) {
+    for (const [pattern, replacement] of KOREAN_SEARCH_ALIASES) searchTerm = searchTerm.replace(pattern, replacement);
+  }
+  return fetchCardList({ term: searchTerm });
 }
 
 export async function fetchCardById(cardId) {

@@ -1015,7 +1015,7 @@ export default function App() {
     setSearchMoreLoading(true);
     setActionError("");
     try {
-      const page = await searchGameCardsPage(activeGame, searchTerm, searchNextOffset);
+      const page = await searchGameCardsPage(activeGame, searchTerm, searchNextOffset, activeLanguage);
       setCards((current) => {
         const seen = new Set(current.map((card) => card.cardId));
         return [...current, ...page.cards.filter((card) => !seen.has(card.cardId))];
