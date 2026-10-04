@@ -76,6 +76,15 @@ async function mapWithConcurrency(items, concurrency, mapItem) {
 
 const pageCacheKey = (baseKey, offset) => (offset ? `${baseKey}:offset:${offset}` : baseKey);
 
+const matchesJapaneseCardName = (game, cardName, term) => {
+  const name = normalizeSearchTerm(cardName);
+  const candidate = normalizeSearchTerm(term);
+  if (!name || !candidate) return false;
+  if (game === "onepiece") return true;
+  if (game === "pokemon") return name === candidate || name.startsWith(candidate);
+  return name.includes(candidate);
+};
+
 const fetchOfficialHtml = async (url, language = "ko") => {
   const upstream = await fetch(url, {
     headers: {
@@ -140,7 +149,7 @@ async function getExternalCardDetail(game, cardId, database, language) {
 }
 
 async function getExternalSearch(game, query, database, offset = 0, language = "ko") {
-  const cacheVersion = game === "onepiece" ? "v11" : game === "pokemon" ? "v8" : "v4";
+  const cacheVersion = game === "onepiece" ? "v13" : game === "pokemon" ? "v10" : "v4";
   const cacheScope = `${game}:${language}:${cacheVersion}:${normalizeSearchTerm(query)}`;
   const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {
@@ -179,15 +188,14 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
       .filter((value) => value != null)
       .sort((a, b) => b - a)[0] ?? null;
   if (translatedTerms.length) {
+    cards = cards.filter((card) => translatedTerms.some((term) => matchesJapaneseCardName(game, card.name, term)));
     const getMatchRank = (card) => {
       const name = normalizeSearchTerm(card.name);
-      const text = normalizeSearchTerm(card.koreanData?.cardText);
       return Math.min(
         ...translatedTerms.map((term, index) => {
           const candidate = normalizeSearchTerm(term);
           if (name === candidate) return index * 3;
           if (name.includes(candidate)) return index * 3 + 1;
-          if (text.includes(candidate)) return index * 3 + 2;
           return 100;
         }),
       );

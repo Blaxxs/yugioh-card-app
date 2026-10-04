@@ -1,5 +1,5 @@
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
-const NVIDIA_MODEL = process.env.NVIDIA_NIM_MODEL || "nvidia/riva-translate-4b-instruct-v2";
+const NVIDIA_MODEL = process.env.NVIDIA_NIM_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const translationCache = new Map();
 
@@ -14,10 +14,12 @@ const SEARCH_DICTIONARY = {
   ]),
   pokemon: new Map([
     ["피카츄", ["ピカチュウ"]],
+    ["빛나", ["ヒカリ"]],
     ["리자몽", ["リザードン"]],
     ["뮤츠", ["ミュウツー"]],
     ["이브이", ["イーブイ"]],
     ["따라큐", ["ミミッキュ"]],
+    ["빛나", ["ヒカリ"]],
   ]),
   onepiece: new Map([
     ["루피", ["ルフィ"]],
@@ -65,20 +67,29 @@ const normalizeJapaneseTerms = (value) => {
   ].slice(0, 3);
 };
 
-async function translateWithNvidia(query) {
+async function translateWithNvidia(query, game, gameLabel) {
   const apiKey = process.env.NVIDIA_API_KEY;
   if (!apiKey) return [];
+  const gameContext =
+    game === "pokemon"
+      ? 'For Pokemon, Korean "빛나" refers to the character Dawn; her official Japanese name is "ヒカリ", not the literal word for shining.'
+      : game === "onepiece"
+        ? "Resolve names as One Piece characters or cards, not literal dictionary translations."
+        : "Resolve names as Yu-Gi-Oh! characters, monsters, archetypes, or official card names, not literal dictionary translations.";
   const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: NVIDIA_MODEL,
       messages: [
-        { role: "system", content: "ko-ja" },
+        {
+          role: "system",
+          content: `You are a Japanese official card-database entity resolver for ${gameLabel}. Identify the intended card or character from Korean game context; do not translate ambiguous names literally. ${gameContext} Return up to 3 Japanese official card-name search terms as JSON only: {"terms":["..."]}.`,
+        },
         { role: "user", content: query },
       ],
-      temperature: 0,
-      max_tokens: 64,
+      temperature: 0.1,
+      max_tokens: 128,
       stream: false,
     }),
     signal: AbortSignal.timeout(2000),
@@ -88,12 +99,13 @@ async function translateWithNvidia(query) {
   return normalizeJapaneseTerms(body.choices?.[0]?.message?.content);
 }
 
-async function translateWithGemini(query, gameLabel) {
+async function translateWithGemini(query, game, gameLabel) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return [];
   const prompt = [
     `Translate the Korean search term into Japanese names or search keywords used in the official ${gameLabel} card database.`,
-    "Treat it as a card name, character name, archetype, or game keyword, not ordinary prose.",
+    `Resolve it as a specific ${gameLabel} card or character name, not as a literal dictionary translation.`,
+    ...(game === "pokemon" ? ['For example, Pokemon character "빛나" is officially named "ヒカリ" in Japanese.'] : []),
     "Return up to 3 short Japanese search queries ordered by confidence. Include common Japanese aliases when useful.",
     'Return only JSON in this shape: {"terms":["...", "..."]}. Do not add explanations.',
     `Korean search term: ${query}`,
@@ -135,10 +147,10 @@ export async function translateJapaneseSearchTerms(game, query) {
   const gameLabel =
     game === "pokemon" ? "포켓몬 카드 게임" : game === "onepiece" ? "원피스 카드 게임" : "유희왕 오피셜 카드 게임";
   try {
-    const nvidiaTerms = await translateWithNvidia(String(query).trim().slice(0, 80)).catch(() => []);
+    const nvidiaTerms = await translateWithNvidia(String(query).trim().slice(0, 80), game, gameLabel).catch(() => []);
     const geminiTerms = nvidiaTerms.length
       ? []
-      : await translateWithGemini(String(query).trim().slice(0, 80), gameLabel).catch(() => []);
+      : await translateWithGemini(String(query).trim().slice(0, 80), game, gameLabel).catch(() => []);
     const terms = nvidiaTerms.length ? nvidiaTerms : geminiTerms;
     if (terms.length) translationCache.set(cacheKey, { terms, expiresAt: Date.now() + CACHE_TTL });
     return terms;
