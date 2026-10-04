@@ -154,7 +154,7 @@ async function getExternalCardDetail(game, cardId, database, language) {
 }
 
 async function getExternalSearch(game, query, database, offset = 0, language = "ko") {
-  const cacheVersion = game === "onepiece" ? "v7" : "v4";
+  const cacheVersion = game === "onepiece" ? "v7" : game === "pokemon" ? "v5" : "v4";
   const cacheScope = `${game}:${language}:${cacheVersion}:${normalizeSearchTerm(query)}`;
   const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {
@@ -169,20 +169,21 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
     }
   }
   const config = EXTERNAL_GAMES[game];
-  const page = normalizeExternalPage(await config[language].search(query, offset), game, offset);
+  const koreanPokemonQuery = game === "pokemon" && language === "ja" && /[\uac00-\ud7a3]/i.test(query);
+  const page = koreanPokemonQuery
+    ? { cards: [], nextOffset: null }
+    : normalizeExternalPage(await config[language].search(query, offset), game, offset);
   let cards = page.cards;
   let nextOffset = page.nextOffset;
-  if (game === "pokemon" && language === "ja" && /[\uac00-\ud7a3]/i.test(query) && !cards.length) {
+  if (koreanPokemonQuery) {
     const koreanPage = normalizeExternalPage(await pokemonKr.searchCards(query, offset), game, offset);
     const japaneseCards = await mapWithConcurrency(koreanPage.cards, 6, async (preview) => {
-      const koreanCard = await pokemonKr.fetchCardDetail(preview.cardId).catch(() => null);
-      const setCode = koreanCard?.card_sets?.[0]?.set_code;
       const imagePath = preview.card_images?.[0]?.image_url_small
         ? new URL(preview.card_images[0].image_url_small).pathname
         : "";
       const packCode = imagePath.split("/").at(-2);
-      if (!setCode || !packCode) return null;
-      return pokemonJa.fetchCardBySetNumber(packCode, setCode).catch(() => null);
+      if (!preview.collectorNumber || !packCode) return null;
+      return pokemonJa.fetchCardBySetNumber(packCode, preview.collectorNumber).catch(() => null);
     });
     cards = [...new Map(japaneseCards.filter(Boolean).map((card) => [card.cardId, card])).values()];
     nextOffset = koreanPage.nextOffset;

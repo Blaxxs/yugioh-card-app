@@ -5,7 +5,6 @@ const SEARCH_URL = `${ORIGIN}/card-search/resultAPI.php`;
 const CARD_TYPES = ["pokemon", "trainer", "energy"];
 let setListPromise;
 const setPagePromises = new Map();
-const cardDetailPromises = new Map();
 const requestWaiters = [];
 let activeRequests = 0;
 
@@ -112,10 +111,10 @@ export async function fetchSetCards(packId, page = 0) {
 }
 
 export async function fetchCardBySetNumber(packId, setCode) {
-  const match = String(setCode || "").match(/^(\d{1,3})\s*\/\s*(\d{1,3})$/);
+  const match = String(setCode || "").match(/^(\d{1,3})(?:\s*\/\s*(\d{1,3}))?$/);
   if (!match || !packId) return null;
   const number = Number(match[1]);
-  const expectedCode = `${number}/${Number(match[2])}`;
+  const expectedCode = match[2] ? `${number}/${Number(match[2])}` : null;
   const pageIndex = Math.floor((number - 1) / 39);
   const cacheKey = `${packId}:${pageIndex}`;
   if (!setPagePromises.has(cacheKey)) {
@@ -130,41 +129,18 @@ export async function fetchCardBySetNumber(packId, setCode) {
   const page = await setPagePromises.get(cacheKey);
   const expectedIndex = (number - 1) % 39;
   const likelyCard = page.cards[expectedIndex];
-  const loadDetail = (cardId) => {
-    if (!cardDetailPromises.has(cardId)) {
-      cardDetailPromises.set(
-        cardId,
-        fetchCardDetail(cardId).catch((error) => {
-          cardDetailPromises.delete(cardId);
-          throw error;
-        }),
-      );
-    }
-    return cardDetailPromises.get(cardId);
+  if (!likelyCard) return null;
+  return {
+    ...likelyCard,
+    collectorNumber: number,
+    card_sets: [
+      {
+        set_date: null,
+        set_code: expectedCode || String(number),
+        set_name: likelyCard.card_sets?.[0]?.set_name || packId,
+      },
+    ],
   };
-  const matches = (card) =>
-    card?.card_sets?.some((set) => {
-      const code = String(set.set_code || "").match(/^(\d{1,3})\s*\/\s*(\d{1,3})$/);
-      return code && `${Number(code[1])}/${Number(code[2])}` === expectedCode;
-    });
-
-  if (likelyCard) {
-    const detail = await loadDetail(likelyCard.cardId).catch(() => null);
-    if (matches(detail)) return detail;
-  }
-
-  let nextIndex = 0;
-  let found = null;
-  const candidates = page.cards.filter((card) => card.cardId !== likelyCard?.cardId);
-  const worker = async () => {
-    while (!found && nextIndex < candidates.length) {
-      const candidate = candidates[nextIndex++];
-      const detail = await loadDetail(candidate.cardId).catch(() => null);
-      if (matches(detail)) found = detail;
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(6, candidates.length) }, worker));
-  return found;
 }
 
 export async function fetchCardDetail(cardId) {
