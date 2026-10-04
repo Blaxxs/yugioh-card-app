@@ -65,10 +65,11 @@ export async function searchCards(term, offset = 0) {
     search_params: "all",
     limit: String(offset),
   });
+  const cards = Object.values(response.result || {}).map(previewCard);
   const nextOffset = Number(response.limit);
   return {
-    cards: Object.values(response.result || {}).map(previewCard),
-    nextOffset: Number.isFinite(nextOffset) && nextOffset > offset ? nextOffset : null,
+    cards,
+    nextOffset: cards.length > 0 && Number.isFinite(nextOffset) && nextOffset > offset ? nextOffset : null,
   };
 }
 

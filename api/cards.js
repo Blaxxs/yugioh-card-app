@@ -19,7 +19,7 @@ const EXTERNAL_GAMES = {
     search: (term, offset) => pokemonKr.searchCards(term, offset),
     detail: (id, fallbackName) => pokemonKr.fetchCardDetail(id, fallbackName),
     releaseList: () => pokemonKr.fetchSets(),
-    releaseCards: (packId, offset) => pokemonKr.fetchSetCards(packId, offset),
+    releaseCards: (packId, offset) => pokemonKr.searchCards(packId, offset),
     // Pokémon search only returns thumbnails; hydrate real names/packs before caching.
     hydrateSearchResults: true,
   },
@@ -158,7 +158,7 @@ async function getExternalReleaseCards(game, setId, database, offset = 0) {
     game === "onepiece"
       ? `${game}:v2:set:${setId}`
       : game === "pokemon"
-        ? `${game}:v4:set:${setId}`
+        ? `${game}:v5:set:${setId}`
         : `${game}:set:${setId}`;
   const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {
