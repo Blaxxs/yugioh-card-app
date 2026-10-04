@@ -264,7 +264,7 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId, language = 
       id: `${name}-${index}`,
       image_url_small:
         source && source !== "null"
-            ? toOfficialImageUrl(new URL(source, OFFICIAL_SITE_ORIGIN).href, language)
+          ? toOfficialImageUrl(new URL(source, OFFICIAL_SITE_ORIGIN).href, language)
           : toOfficialImageUrl(
               `${OFFICIAL_SITE_ORIGIN}/yugiohdb/get_image.action?type=2&cid=${cardId}&ciid=${ciid}&enc=${auth}`,
               language,
@@ -306,9 +306,7 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId, language = 
     id: cardId,
     cardId,
     name,
-    card_images: images.length
-      ? images
-      : [{ id: imageUrl, image_url_small: toOfficialImageUrl(imageUrl, language) }],
+    card_images: images.length ? images : [{ id: imageUrl, image_url_small: toOfficialImageUrl(imageUrl, language) }],
     koreanData: {
       cardName: name,
       cardAttr: attribute,

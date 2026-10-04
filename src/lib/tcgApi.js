@@ -75,5 +75,8 @@ export async function fetchGameReleaseCards(game, path, language = "ko") {
 export async function fetchGameReleaseCardsPage(game, path, offset = 0, language = "ko") {
   if (!path) return { cards: [], nextOffset: null };
   if (game === "yugioh") return { cards: await fetchYugiohReleaseCards(path, language), nextOffset: null };
-  return fetchGameApi({ game, lang: language, setId: path, ...(game === "pokemon" || game === "onepiece" ? { offset } : {}) }, true);
+  return fetchGameApi(
+    { game, lang: language, setId: path, ...(game === "pokemon" || game === "onepiece" ? { offset } : {}) },
+    true,
+  );
 }

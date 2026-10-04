@@ -60,6 +60,19 @@ const normalizeExternalPage = (result, game, offset) => {
   return { cards, nextOffset: game === "pokemon" && cards.length ? offset + cards.length : null };
 };
 
+async function mapWithConcurrency(items, concurrency, mapItem) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await mapItem(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
+
 const pageCacheKey = (baseKey, offset) => (offset ? `${baseKey}:offset:${offset}` : baseKey);
 
 const fetchOfficialHtml = async (url, language = "ko") => {
@@ -126,10 +139,8 @@ async function getExternalCardDetail(game, cardId, database, language) {
 }
 
 async function getExternalSearch(game, query, database, offset = 0, language = "ko") {
-  const cacheScope =
-    game === "onepiece"
-      ? `${game}:${language}:v3:${normalizeSearchTerm(query)}`
-      : `${game}:${language}:${normalizeSearchTerm(query)}`;
+  const cacheVersion = game === "onepiece" ? "v5" : "v4";
+  const cacheScope = `${game}:${language}:${cacheVersion}:${normalizeSearchTerm(query)}`;
   const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {
     const { data } = await database
@@ -145,9 +156,35 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
   const config = EXTERNAL_GAMES[game];
   const page = normalizeExternalPage(await config[language].search(query, offset), game, offset);
   let cards = page.cards;
+  let nextOffset = page.nextOffset;
+  if (game === "pokemon" && language === "ja" && /[\uac00-\ud7a3]/i.test(query) && !cards.length) {
+    const koreanPage = normalizeExternalPage(await pokemonKr.searchCards(query, offset), game, offset);
+    const japaneseCards = await mapWithConcurrency(koreanPage.cards, 6, async (preview) => {
+      const koreanCard = await pokemonKr.fetchCardDetail(preview.cardId).catch(() => null);
+      const setCode = koreanCard?.card_sets?.[0]?.set_code;
+      const imagePath = preview.card_images?.[0]?.image_url_small
+        ? new URL(preview.card_images[0].image_url_small).pathname
+        : "";
+      const packCode = imagePath.split("/").at(-2);
+      if (!setCode || !packCode) return null;
+      return pokemonJa.fetchCardBySetNumber(packCode, setCode).catch(() => null);
+    });
+    cards = [...new Map(japaneseCards.filter(Boolean).map((card) => [card.cardId, card])).values()];
+    nextOffset = koreanPage.nextOffset;
+  }
+  if (game === "onepiece" && language === "ja" && /[\uac00-\ud7a3]/i.test(query) && !cards.length) {
+    const koreanPage = normalizeExternalPage(await onePieceKr.searchCards(query, offset), game, offset);
+    const japaneseCards = await mapWithConcurrency(koreanPage.cards, 6, (card) =>
+      onePieceJa.fetchCardById(card.cardId).catch(() => null),
+    );
+    cards = [...new Map(japaneseCards.filter(Boolean).map((card) => [card.cardId.toUpperCase(), card])).values()];
+    nextOffset = koreanPage.nextOffset;
+  }
   if (config.hydrateSearchResults && language === "ko" && cards.length) {
     const previews = cards.slice(0, 24);
-    const detailed = await Promise.all(previews.map((card) => config[language].detail(card.cardId, card.name).catch(() => card)));
+    const detailed = await Promise.all(
+      previews.map((card) => config[language].detail(card.cardId, card.name).catch(() => card)),
+    );
     cards = detailed;
   }
   if (database) {
@@ -167,9 +204,9 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
     const expiresAt = new Date(Date.now() + SEARCH_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
     await database
       .from("card_search_cache")
-      .upsert({ query_key: queryKey, results: { cards, nextOffset: page.nextOffset }, expires_at: expiresAt });
+      .upsert({ query_key: queryKey, results: { cards, nextOffset }, expires_at: expiresAt });
   }
-  return { data: cards, nextOffset: page.nextOffset, cache: database ? "MISS" : "BYPASS" };
+  return { data: cards, nextOffset, cache: database ? "MISS" : "BYPASS" };
 }
 
 async function getExternalReleaseList(game, database, language) {
@@ -238,7 +275,7 @@ async function getCardDetail(cardId, database, language) {
 
   try {
     const html = await fetchOfficialHtml(createDetailUrl(cardId, language), language);
-      const card = parseCardDetail(html, cardId, staleCard?.name, staleCard?.card_images?.[0]?.image_url_small, language);
+    const card = parseCardDetail(html, cardId, staleCard?.name, staleCard?.card_images?.[0]?.image_url_small, language);
     if (database && language === "ko") {
       await database
         .from("card_catalog")

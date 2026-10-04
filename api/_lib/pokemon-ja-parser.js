@@ -4,6 +4,8 @@ const ORIGIN = "https://www.pokemon-card.com";
 const SEARCH_URL = `${ORIGIN}/card-search/resultAPI.php`;
 const CARD_TYPES = ["pokemon", "trainer", "energy"];
 let setListPromise;
+const setPagePromises = new Map();
+const cardDetailPromises = new Map();
 
 const headers = () => ({
   Accept: "application/json, text/html",
@@ -74,7 +76,9 @@ export async function fetchSets() {
       const section = html.match(/"pg"\s*:\s*\{[\s\S]*?list:\s*\[([\s\S]*?)\]\s*,?\s*\}/)?.[1] || "";
       const packs = [];
       const seen = new Set();
-      for (const match of section.matchAll(/\{\s*name:\s*"pg",\s*value:\s*"([^"]*)",\s*group:\s*"[^"]*",\s*label:\s*"([^"]*)"\s*\}/g)) {
+      for (const match of section.matchAll(
+        /\{\s*name:\s*"pg",\s*value:\s*"([^"]*)",\s*group:\s*"[^"]*",\s*label:\s*"([^"]*)"\s*\}/g,
+      )) {
         const [, id, name] = match;
         if (!id || seen.has(id)) continue;
         seen.add(id);
@@ -91,6 +95,62 @@ export async function fetchSets() {
 
 export async function fetchSetCards(packId, page = 0) {
   return requestCards({ packId: String(packId), page });
+}
+
+export async function fetchCardBySetNumber(packId, setCode) {
+  const match = String(setCode || "").match(/^(\d{1,3})\s*\/\s*(\d{1,3})$/);
+  if (!match || !packId) return null;
+  const number = Number(match[1]);
+  const expectedCode = `${number}/${Number(match[2])}`;
+  const pageIndex = Math.floor((number - 1) / 39);
+  const cacheKey = `${packId}:${pageIndex}`;
+  if (!setPagePromises.has(cacheKey)) {
+    setPagePromises.set(
+      cacheKey,
+      requestCards({ packId: String(packId), page: pageIndex }).catch((error) => {
+        setPagePromises.delete(cacheKey);
+        throw error;
+      }),
+    );
+  }
+  const page = await setPagePromises.get(cacheKey);
+  const expectedIndex = (number - 1) % 39;
+  const likelyCard = page.cards[expectedIndex];
+  const loadDetail = (cardId) => {
+    if (!cardDetailPromises.has(cardId)) {
+      cardDetailPromises.set(
+        cardId,
+        fetchCardDetail(cardId).catch((error) => {
+          cardDetailPromises.delete(cardId);
+          throw error;
+        }),
+      );
+    }
+    return cardDetailPromises.get(cardId);
+  };
+  const matches = (card) =>
+    card?.card_sets?.some((set) => {
+      const code = String(set.set_code || "").match(/^(\d{1,3})\s*\/\s*(\d{1,3})$/);
+      return code && `${Number(code[1])}/${Number(code[2])}` === expectedCode;
+    });
+
+  if (likelyCard) {
+    const detail = await loadDetail(likelyCard.cardId).catch(() => null);
+    if (matches(detail)) return detail;
+  }
+
+  let nextIndex = 0;
+  let found = null;
+  const candidates = page.cards.filter((card) => card.cardId !== likelyCard?.cardId);
+  const worker = async () => {
+    while (!found && nextIndex < candidates.length) {
+      const candidate = candidates[nextIndex++];
+      const detail = await loadDetail(candidate.cardId).catch(() => null);
+      if (matches(detail)) found = detail;
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(6, candidates.length) }, worker));
+  return found;
 }
 
 export async function fetchCardDetail(cardId) {
@@ -120,11 +180,13 @@ export async function fetchCardDetail(cardId) {
     card_images: imageUrl ? [{ id: `${cardId}-1`, image_url_small: imageUrl }] : [],
     koreanData: { cardName: name },
     card_sets: imageMatch
-      ? [{
-          set_date: null,
-          set_code: cardNumber ? `${cardNumber[1]}/${cardNumber[2]}` : imageMatch[2],
-          set_name: release?.name || imageMatch[1],
-        }]
+      ? [
+          {
+            set_date: null,
+            set_code: cardNumber ? `${cardNumber[1]}/${cardNumber[2]}` : imageMatch[2],
+            set_name: release?.name || imageMatch[1],
+          },
+        ]
       : [],
     isDetailLoaded: true,
   };

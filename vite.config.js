@@ -20,6 +20,17 @@ export default defineConfig({
           });
         },
       },
+      "/official-onepiece": {
+        target: "https://www.onepiece-cardgame.com",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/official-onepiece/, ""),
+        configure: (proxy) => {
+          proxy.on("proxyReq", (proxyRequest) => {
+            proxyRequest.setHeader("Accept-Language", "ja-JP,ja;q=0.9");
+            proxyRequest.setHeader("Referer", "https://www.onepiece-cardgame.com/cardlist/");
+          });
+        },
+      },
     },
   },
 });

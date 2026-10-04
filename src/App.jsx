@@ -71,7 +71,10 @@ function LanguageSwitcher({ activeLanguage, onSelect }) {
   return (
     <div className="language-switcher" role="group" aria-label="카드 판본">
       <span>판본</span>
-      {[{ id: "ko", label: "한글판" }, { id: "ja", label: "일본판" }].map((language) => (
+      {[
+        { id: "ko", label: "한글판" },
+        { id: "ja", label: "일본판" },
+      ].map((language) => (
         <button
           key={language.id}
           type="button"
@@ -415,7 +418,10 @@ export default function App() {
         const page =
           activeGame === "pokemon" || activeGame === "onepiece"
             ? await fetchGameReleaseCardsPage(activeGame, selectedRelease.path, 0, activeLanguage)
-            : { cards: await fetchGameReleaseCards(activeGame, selectedRelease.path, activeLanguage), nextOffset: null };
+            : {
+                cards: await fetchGameReleaseCards(activeGame, selectedRelease.path, activeLanguage),
+                nextOffset: null,
+              };
         const previews = page.cards;
         setReleaseNextOffset(page.nextOffset);
         if (activeGame !== "yugioh" || !isQuarterCenturyChronicleRelease(selectedRelease.name)) {

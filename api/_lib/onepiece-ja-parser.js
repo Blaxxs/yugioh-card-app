@@ -11,24 +11,20 @@ const baseHeaders = {
 };
 
 const textOf = (element) =>
-  element
-    .clone()
-    .find("h3, .getInfoBtnCol, button")
-    .remove()
-    .end()
-    .text()
-    .replace(/\s+/g, " ")
-    .trim() || null;
+  element.clone().find("h3, .getInfoBtnCol, button").remove().end().text().replace(/\s+/g, " ").trim() || null;
 
 function parseCard($, element) {
   const modal = $(element);
   const cardId = modal.attr("id");
   const name = modal.find(".cardName").first().text().replace(/\s+/g, " ").trim();
   if (!cardId || !name) return null;
-  const info = modal.find(".infoCol span").map((_index, item) => $(item).text().trim()).get();
+  const info = modal
+    .find(".infoCol span")
+    .map((_index, item) => $(item).text().trim())
+    .get();
   const imageElement = modal.find(".frontCol img").first();
   const imagePath = imageElement.attr("data-src") || imageElement.attr("src");
-  const imageUrl = imagePath ? new URL(imagePath, `${ORIGIN}/cardlist/`).href : null;
+  const imageUrl = imagePath ? `/official-onepiece${new URL(imagePath, `${ORIGIN}/cardlist/`).pathname}` : null;
   const getInfo = textOf(modal.find(".getInfo").first());
   const cardNumber = info[0] || cardId;
   const rarity = info[1] || null;
@@ -44,14 +40,25 @@ function parseCard($, element) {
       cardAttr: textOf(modal.find(".color").first()),
       cardLevel: textOf(modal.find(".cost").first()),
       cardOther: [info[2], textOf(modal.find(".feature").first())].filter(Boolean).join(" / ") || null,
-      cardAtk: [textOf(modal.find(".power").first()), modal.find(".attribute img").first().attr("alt")]
-        .filter(Boolean)
-        .join(" · ") || null,
+      cardAtk:
+        [textOf(modal.find(".power").first()), modal.find(".attribute img").first().attr("alt")]
+          .filter(Boolean)
+          .join(" · ") || null,
       cardDef: textOf(modal.find(".counter").first()),
       cardText: textOf(modal.find(".text").first()),
     },
     card_sets: getInfo
-      ? [{ set_date: null, set_code: cardNumber, set_name: getInfo, set_rarity: rarity, rarity_code: rarity, price_query: cardNumber, price_queries: [cardNumber, name] }]
+      ? [
+          {
+            set_date: null,
+            set_code: cardNumber,
+            set_name: getInfo,
+            set_rarity: rarity,
+            rarity_code: rarity,
+            price_query: cardNumber,
+            price_queries: [cardNumber, name],
+          },
+        ]
       : [],
     isDetailLoaded: true,
   };
