@@ -2,6 +2,14 @@ const OFFICIAL_SITE_ORIGIN = "https://www.db.yugioh-card.com";
 const USE_CARD_API = !import.meta.env.DEV || import.meta.env.VITE_USE_CARD_API === "true";
 
 const normalizeCardName = (name) => name.replace(/\s+/g, "");
+const toOfficialImageUrl = (source, language = "ko") => {
+  if (!source) return source;
+  const proxyPrefix = "/official-ygo";
+  const isProxied = source.startsWith(`${proxyPrefix}/`);
+  const url = new URL(isProxied ? source.slice(proxyPrefix.length) : source, OFFICIAL_SITE_ORIGIN);
+  if (language === "ja" && url.pathname.endsWith("/get_image.action")) url.searchParams.set("osplang", "1");
+  return url.origin === OFFICIAL_SITE_ORIGIN ? `${proxyPrefix}${url.pathname}${url.search}` : url.href;
+};
 
 const RARITY_CODES = new Map([
   ["노멀", "N"],
@@ -162,7 +170,9 @@ const findOfficialImageUrl = (document, cardId) => {
   const match = document.documentElement.innerHTML.match(
     new RegExp(`get_image\\.action\\?type=1[^"'\\s<]*?cid=${cardId}[^"'\\s<]*`),
   );
-  return match ? new URL(match[0].replaceAll("&amp;", "&"), `${OFFICIAL_SITE_ORIGIN}/yugiohdb/`).href : null;
+  return match
+    ? toOfficialImageUrl(new URL(match[0].replaceAll("&amp;", "&"), `${OFFICIAL_SITE_ORIGIN}/yugiohdb/`).href)
+    : null;
 };
 
 const findCardEntries = (document, term, language = "ko") => {
@@ -183,7 +193,7 @@ const findCardEntries = (document, term, language = "ko") => {
       ),
       imageUrl:
         image.getAttribute("src") && image.getAttribute("src") !== "null"
-          ? new URL(image.getAttribute("src"), OFFICIAL_SITE_ORIGIN).href
+          ? toOfficialImageUrl(new URL(image.getAttribute("src"), OFFICIAL_SITE_ORIGIN).href)
           : findOfficialImageUrl(document, cardId),
       name: row.querySelector(".card_name")?.textContent.trim() || "",
     }));
@@ -220,7 +230,7 @@ export async function fetchReleaseList(language = "ko") {
     .filter((release) => release.path && release.name && !seen.has(release.path) && seen.add(release.path));
 }
 
-const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
+const parseOfficialCard = (document, fallbackName, imageUrl, cardId, language = "ko") => {
   const root = document.querySelector("#CardSet") || document;
   const read = (selector) => root.querySelector(selector)?.textContent.trim() || null;
   const itemValue = (title) =>
@@ -240,7 +250,10 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
       ?.closest(".item_box")
       ?.querySelector(".item_box_value")
       ?.textContent.trim() || null;
-  const name = root.querySelector("#cardname h1")?.childNodes[0]?.textContent.trim() || fallbackName;
+  const name =
+    [...(root.querySelector("#cardname h1")?.childNodes || [])]
+      .find((node) => node.nodeType === 3 && node.textContent.trim())
+      ?.textContent.trim() || fallbackName;
   const auth = document.documentElement.innerHTML.match(
     /get_image\.action\?type=2&cid=\d+&ciid=\d+&enc=([^&'" )]+)/,
   )?.[1];
@@ -251,8 +264,11 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
       id: `${name}-${index}`,
       image_url_small:
         source && source !== "null"
-          ? new URL(source, OFFICIAL_SITE_ORIGIN).href
-          : `${OFFICIAL_SITE_ORIGIN}/yugiohdb/get_image.action?type=2&cid=${cardId}&ciid=${ciid}&enc=${auth}`,
+            ? toOfficialImageUrl(new URL(source, OFFICIAL_SITE_ORIGIN).href, language)
+          : toOfficialImageUrl(
+              `${OFFICIAL_SITE_ORIGIN}/yugiohdb/get_image.action?type=2&cid=${cardId}&ciid=${ciid}&enc=${auth}`,
+              language,
+            ),
     };
   });
   const cardSets = [...document.querySelectorAll(".t_row")]
@@ -290,7 +306,9 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId) => {
     id: cardId,
     cardId,
     name,
-    card_images: images.length ? images : [{ id: imageUrl, image_url_small: imageUrl }],
+    card_images: images.length
+      ? images
+      : [{ id: imageUrl, image_url_small: toOfficialImageUrl(imageUrl, language) }],
     koreanData: {
       cardName: name,
       cardAttr: attribute,
@@ -312,7 +330,7 @@ export async function fetchOfficialCardById(cardId, fallbackName = "", imageUrl 
     `/yugiohdb/card_search.action?request_locale=${language === "ja" ? "ja" : "ko"}&ope=2&cid=${encodeURIComponent(cardId)}`,
     OFFICIAL_SITE_ORIGIN,
   );
-  return parseOfficialCard(await fetchOfficialHtml(href), fallbackName, imageUrl, String(cardId));
+  return parseOfficialCard(await fetchOfficialHtml(href), fallbackName, imageUrl, String(cardId), language);
 }
 
 export async function fetchOfficialCardBySetCode(setCode, language = "ko") {
@@ -345,6 +363,28 @@ export async function searchOfficialCards(searchTerm, language = "ko") {
   if (USE_CARD_API) return fetchCardApi({ q: searchTerm.trim(), lang: language });
 
   const term = normalizeCardName(searchTerm);
+  if (language === "ja" && /[\uac00-\ud7a3]/i.test(searchTerm)) {
+    const koreanDocument = await fetchOfficialHtml(createSearchUrl(searchTerm, "ko"));
+    const koreanEntries = findCardEntries(koreanDocument, term, "ko");
+    const japaneseCards = new Array(koreanEntries.length);
+    let nextIndex = 0;
+    const worker = async () => {
+      while (nextIndex < koreanEntries.length) {
+        const index = nextIndex++;
+        const entry = koreanEntries[index];
+        entry.href.searchParams.set("request_locale", "ja");
+        try {
+          const document = await fetchOfficialHtml(entry.href);
+          japaneseCards[index] = parseOfficialCard(document, entry.name, entry.imageUrl, entry.cardId, "ja");
+        } catch {
+          japaneseCards[index] = null;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, koreanEntries.length) }, worker));
+    return japaneseCards.filter((card) => card?.card_images?.length);
+  }
+
   let document = await fetchOfficialHtml(createSearchUrl(searchTerm, language));
   let entries = findCardEntries(document, term, language);
   if (!entries.length && term.length > 1) {

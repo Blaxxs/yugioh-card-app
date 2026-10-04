@@ -1,6 +1,13 @@
 import { load } from "cheerio";
 
 const OFFICIAL_SITE_ORIGIN = "https://www.db.yugioh-card.com";
+const toOfficialImageUrl = (source, language = "ko") => {
+  const proxyPrefix = "/official-ygo";
+  const isProxied = source.startsWith(`${proxyPrefix}/`);
+  const url = new URL(isProxied ? source.slice(proxyPrefix.length) : source, `${OFFICIAL_SITE_ORIGIN}/yugiohdb/`);
+  if (language === "ja" && url.pathname.endsWith("/get_image.action")) url.searchParams.set("osplang", "1");
+  return url.origin === OFFICIAL_SITE_ORIGIN ? `${proxyPrefix}${url.pathname}${url.search}` : url.href;
+};
 
 const rarityCodes = new Map([
   ["노멀", "N"],
@@ -55,14 +62,14 @@ export const normalizeSearchTerm = (value) =>
 
 const getRarityCode = (rarity) => rarityCodes.get(rarity?.replace(/\s+/g, " ").trim()) || rarity || "";
 
-const findImageUrls = (html, cardId, imageType = 1) =>
+const findImageUrls = (html, cardId, imageType = 1, language = "ko") =>
   [
     ...new Set(
       [
         ...html.matchAll(new RegExp(`get_image\\.action\\?type=${imageType}[^"'\\s<]*?cid=${cardId}[^"'\\s<]*`, "g")),
       ].map((match) => match[0].replaceAll("&amp;", "&")),
     ),
-  ].map((path) => new URL(path, `${OFFICIAL_SITE_ORIGIN}/yugiohdb/`).href);
+  ].map((path) => toOfficialImageUrl(path, language));
 
 export const createSearchUrl = (keyword, language = "ko") => {
   const url = new URL(`${OFFICIAL_SITE_ORIGIN}/yugiohdb/card_search.action`);
@@ -115,7 +122,7 @@ export const parseSearchResults = (html, searchTerm) => {
   return cards;
 };
 
-export const parseCardDetail = (html, cardId, fallbackName = "", fallbackImageUrl = "") => {
+export const parseCardDetail = (html, cardId, fallbackName = "", fallbackImageUrl = "", language = "ko") => {
   const $ = load(html);
   const root = $("#CardSet").first().length ? $("#CardSet").first() : $.root();
   const read = (selector) => root.find(selector).first().text().trim() || null;
@@ -137,15 +144,15 @@ export const parseCardDetail = (html, cardId, fallbackName = "", fallbackImageUr
       .first()
       .contents()
       .filter((_index, node) => node.type === "text")
-      .first()
-      .text()
-      .trim() || fallbackName;
+      .map((_index, node) => node.data.trim())
+      .get()
+      .find(Boolean) || fallbackName;
   const attribute =
     root.find("img[src*='/attribute/']").first().closest(".item_box").find(".item_box_value").text().trim() || null;
   const level =
     root.find("img[src*='icon_level']").first().closest(".item_box").find(".item_box_value").text().trim() || null;
-  const imageUrls = findImageUrls(html, cardId, 2);
-  if (!imageUrls.length && fallbackImageUrl) imageUrls.push(fallbackImageUrl);
+  const imageUrls = findImageUrls(html, cardId, 2, language);
+  if (!imageUrls.length && fallbackImageUrl) imageUrls.push(toOfficialImageUrl(fallbackImageUrl, language));
   const cardSets = [];
 
   $(".t_row").each((_index, element) => {

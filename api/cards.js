@@ -80,6 +80,22 @@ const setResponseCache = (response) => {
   response.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
 };
 
+const proxyOfficialCardImages = (card) => ({
+  ...card,
+  card_images: (card.card_images || []).map((image) => {
+    const source = image.image_url_small;
+    if (!source || source.startsWith("/official-ygo/")) return image;
+    try {
+      const url = new URL(source, "https://www.db.yugioh-card.com");
+      return url.origin === "https://www.db.yugioh-card.com"
+        ? { ...image, image_url_small: `/official-ygo${url.pathname}${url.search}` }
+        : image;
+    } catch {
+      return image;
+    }
+  }),
+});
+
 async function getExternalCardDetail(game, cardId, database, language) {
   const source = EXTERNAL_GAMES[game][language];
   if (database && language === "ko") {
@@ -217,12 +233,12 @@ async function getCardDetail(cardId, database, language) {
       .eq("card_id", cardId)
       .maybeSingle();
     staleCard = data?.detail_loaded ? data.data : null;
-    if (staleCard && isFresh(data.updated_at)) return { data: staleCard, cache: "HIT" };
+    if (staleCard && isFresh(data.updated_at)) return { data: proxyOfficialCardImages(staleCard), cache: "HIT" };
   }
 
   try {
     const html = await fetchOfficialHtml(createDetailUrl(cardId, language), language);
-    const card = parseCardDetail(html, cardId, staleCard?.name, staleCard?.card_images?.[0]?.image_url_small);
+      const card = parseCardDetail(html, cardId, staleCard?.name, staleCard?.card_images?.[0]?.image_url_small, language);
     if (database && language === "ko") {
       await database
         .from("card_catalog")
@@ -236,16 +252,16 @@ async function getCardDetail(cardId, database, language) {
           updated_at: new Date().toISOString(),
         });
     }
-    return { data: card, cache: database ? "MISS" : "BYPASS" };
+    return { data: proxyOfficialCardImages(card), cache: database ? "MISS" : "BYPASS" };
   } catch (error) {
-    if (staleCard) return { data: staleCard, cache: "STALE" };
+    if (staleCard) return { data: proxyOfficialCardImages(staleCard), cache: "STALE" };
     throw error;
   }
 }
 
 async function searchCards(query, database, language) {
   const normalizedTerm = normalizeSearchTerm(query);
-  const queryKey = `yugioh:${language}:${normalizedTerm}`;
+  const queryKey = `yugioh:v3:${language}:${normalizedTerm}`;
   if (database) {
     if (Date.now() - lastExpiredCacheCleanup > 60 * 60 * 1000) {
       lastExpiredCacheCleanup = Date.now();
@@ -261,6 +277,27 @@ async function searchCards(query, database, language) {
 
   let html = await fetchOfficialHtml(createSearchUrl(query, language), language);
   let cards = parseSearchResults(html, query);
+  if (!cards.length && language === "ja" && /[\uac00-\ud7a3]/i.test(query)) {
+    const koreanHtml = await fetchOfficialHtml(createSearchUrl(query, "ko"), "ko");
+    const koreanResults = parseSearchResults(koreanHtml, query);
+    const japaneseResults = new Array(koreanResults.length);
+    let nextIndex = 0;
+    const worker = async () => {
+      while (nextIndex < koreanResults.length) {
+        const index = nextIndex++;
+        const preview = koreanResults[index];
+        try {
+          const detailHtml = await fetchOfficialHtml(createDetailUrl(preview.cardId, "ja"), "ja");
+          const detail = parseCardDetail(detailHtml, preview.cardId, preview.name, "", "ja");
+          japaneseResults[index] = detail.card_images.length ? detail : null;
+        } catch {
+          japaneseResults[index] = null;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(6, koreanResults.length) }, worker));
+    cards = japaneseResults.filter(Boolean);
+  }
   if (!cards.length && normalizedTerm.length > 1) {
     html = await fetchOfficialHtml(createSearchUrl(normalizedTerm.slice(0, 2), language), language);
     cards = parseSearchResults(html, query);
