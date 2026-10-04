@@ -52,6 +52,15 @@ SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 
 Supabase와 Google은 무료 사용량 구간에서 시작할 수 있지만, 저장공간·요청량·인증 사용량이 무료 한도를 넘으면 과금될 수 있습니다. 실제 운영 전에는 각 서비스의 현재 요금과 한도를 확인해야 합니다.
 
+## 일본어 검색어 AI 번역 (선택)
+
+일본판에서 한글 카드명을 일본어 검색어로 변환할 때는 다음 순서로 AI를 선택적으로 사용합니다.
+
+- NVIDIA Build의 Riva Translate를 먼저 호출하려면 `NVIDIA_API_KEY`를 Vercel 서버 환경변수로 등록합니다. 모델은 기본 `nvidia/riva-translate-4b-instruct-v2`이며 `NVIDIA_NIM_MODEL`로 바꿀 수 있습니다. Build API는 trial 약관과 rate limit을 따릅니다.
+- NVIDIA 키가 없거나 호출이 제한되면 Gemini를 사용합니다. Google AI Studio 키를 `GEMINI_API_KEY`로 등록하고, 필요하면 `GEMINI_MODEL`을 설정합니다. [Gemini API 가격 및 무료 등급](https://ai.google.dev/gemini-api/docs/pricing)을 확인하세요.
+
+두 키 모두 서버 환경변수로만 설정하고 `VITE_` 접두사를 붙이지 마세요. 무료 사용량과 trial 한도는 제공자 정책에 따라 달라질 수 있습니다. 무료 Gemini 등급의 검색어는 Google 제품 개선에 사용될 수 있습니다. 이 기능은 검색어만 외부 AI에 보내고, 카드 데이터는 각 공식 일본 DB에서 조회합니다. 키가 없거나 두 제공자가 모두 실패하면 내장 사전과 기존 공식 데이터 매핑 검색으로 fallback합니다.
+
 ## 포켓몬 · 원피스 카드 지원
 
 앱 상단의 게임 선택 UI에서 유희왕/포켓몬/원피스를 전환할 수 있습니다. 포켓몬과 원피스 카드 데이터는
