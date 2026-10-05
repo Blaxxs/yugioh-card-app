@@ -468,14 +468,9 @@ export default function InventoryConsole({
     setPackLoading(false);
   };
   const openPackModal = () => {
-    setPackWindow(null);
-    setPackQuery("");
-    setPackMatches([]);
-    setPackCards([]);
     setPackModalOpen(true);
   };
   const openAddModal = () => {
-    setAddWindow(null);
     setAddModalOpen(true);
   };
 
@@ -950,7 +945,6 @@ export default function InventoryConsole({
             className="pack-intake-backdrop"
             type="button"
             aria-label="팩 입고 닫기"
-            onClick={() => setPackModalOpen(false)}
           />
           <section
             className={`pack-intake-dialog ${packCards.length || packMatches.length || packLoading ? "pack-cards-dialog" : "pack-search-dialog"}`}
@@ -1209,7 +1203,7 @@ export default function InventoryConsole({
       )}
       {addModalOpen && (
         <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="재고 추가">
-          <button className="pack-intake-backdrop" type="button" aria-label="재고 추가 닫기" onClick={closeAddModal} />
+          <button className="pack-intake-backdrop" type="button" aria-label="재고 추가 배경" />
           <section
             className={`pack-intake-dialog inventory-add-dialog ${addResults.length || addCard ? "pack-cards-dialog" : "pack-search-dialog"}`}
             style={addWindow ? { ...addWindow, position: "fixed" } : undefined}
