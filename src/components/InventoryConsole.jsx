@@ -71,6 +71,7 @@ export default function InventoryConsole({
   const [addCondition, setAddCondition] = useState("S급 (신품급)");
   const [addPrice, setAddPrice] = useState("");
   const [addQuantity, setAddQuantity] = useState(1);
+  const [addMemo, setAddMemo] = useState("");
   const [sellModalOpen, setSellModalOpen] = useState(false);
   const [sellItems, setSellItems] = useState([]);
   const [salesHistoryOpen, setSalesHistoryOpen] = useState(false);
@@ -98,6 +99,7 @@ export default function InventoryConsole({
   const [editQuantity, setEditQuantity] = useState(1);
   const [editCondition, setEditCondition] = useState("S급 (신품급)");
   const [editPrice, setEditPrice] = useState("");
+  const [editMemoById, setEditMemoById] = useState({});
   const visibleItems = inventoryItems
     .filter(
       (item) =>
@@ -266,6 +268,7 @@ export default function InventoryConsole({
             : detailedCard,
           quantity: 0,
           price: "",
+          memo: "",
           rarity: getRarityCode(set?.rarity_code || set?.set_rarity) || "",
         }));
       });
@@ -292,6 +295,8 @@ export default function InventoryConsole({
     );
   const changePackPrice = (key, price) =>
     setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, price } : item)));
+  const changePackMemo = (key, memo) =>
+    setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, memo } : item)));
   const startPackResize = (event, direction, setWindow = setPackWindow) => {
     const rect = event.currentTarget.parentElement.getBoundingClientRect();
     resizeRef.current = { startX: event.clientX, startY: event.clientY, rect, direction, setWindow };
@@ -391,6 +396,7 @@ export default function InventoryConsole({
       rarity: String(pick("레어도", "rarity") || "").trim(),
       quantity: Math.max(0, Number(pick("수량", "quantity")) || 0),
       price: pick("가격", "매입가", "purchase_price", "price") ?? "",
+      memo: String(pick("비고", "메모", "memo") || "").trim(),
     };
   };
   const importSpreadsheet = async (event) => {
@@ -454,7 +460,7 @@ export default function InventoryConsole({
   const saveImportedRows = async () => {
     const items = importRows
       .filter((row) => row.card && !row.error)
-      .map((row) => ({ card: row.card, quantity: row.quantity, price: row.price }));
+      .map((row) => ({ card: row.card, quantity: row.quantity, price: row.price, memo: row.memo }));
     await onBatchIntake(items);
     setImportRows([]);
     setImportOpen(false);
@@ -523,12 +529,24 @@ export default function InventoryConsole({
   };
   const editSelected = async (event) => {
     event.preventDefault();
-    await onUpdateInventory([...selectedIds], {
-      quantity: Number(editQuantity),
-      condition: editCondition,
-      purchase_price: editPrice === "" ? null : Number(editPrice),
-    });
+    const selected = inventoryItems.filter((item) => selectedIds.has(item.id));
+    await onUpdateInventory(
+      selected.map((item) => ({
+        id: item.id,
+        changes: {
+          quantity: Number(editQuantity),
+          condition: editCondition,
+          purchase_price: editPrice === "" ? null : Number(editPrice),
+          memo: editMemoById[item.id] ?? item.memo ?? null,
+        },
+      })),
+    );
     setEditOpen(false);
+  };
+  const openEditModal = () => {
+    const selected = inventoryItems.filter((item) => selectedIds.has(item.id));
+    setEditMemoById(Object.fromEntries(selected.map((item) => [item.id, item.memo || ""])));
+    setEditOpen(true);
   };
   const searchAddCards = async () => {
     const query = addQuery.trim();
@@ -565,6 +583,7 @@ export default function InventoryConsole({
     setAddCode(firstSet?.set_code || "");
     setAddRarity(firstSet?.rarity_code || firstSet?.set_rarity || "");
     setAddRarityEditing(false);
+    setAddMemo("");
   };
   const closeAddModal = () => {
     setAddModalOpen(false);
@@ -572,6 +591,7 @@ export default function InventoryConsole({
     setAddResults([]);
     setAddCard(null);
     setAddRarityEditing(false);
+    setAddMemo("");
   };
 
   const openSellModal = () => {
@@ -680,7 +700,7 @@ export default function InventoryConsole({
               </button>
             </div>
             <div className="inventory-toolbar-group">
-              <button type="button" disabled={!selectedIds.size} onClick={() => setEditOpen(true)}>
+              <button type="button" disabled={!selectedIds.size} onClick={openEditModal}>
                 선택 수정
               </button>
               <button type="button" disabled={!selectedIds.size} onClick={deleteSelected}>
@@ -943,6 +963,12 @@ export default function InventoryConsole({
                     value={editPrice}
                     onChange={(event) => setEditPrice(event.target.value)}
                   />
+                  <input
+                    type="text"
+                    placeholder="비고"
+                    value={editMemoById[item.id] || ""}
+                    onChange={(event) => setEditMemoById((current) => ({ ...current, [item.id]: event.target.value }))}
+                  />
                 </div>
               ))}
             <button type="submit">선택 항목 저장</button>
@@ -1007,7 +1033,7 @@ export default function InventoryConsole({
                   </div>
                 ) : (
                   <div className="pack-card-list pack-card-album">
-                    {packCards.map(({ card, quantity, price, rarity }) => (
+                    {packCards.map(({ card, quantity, price, memo, rarity }) => (
                       <article className="pack-card" key={card.id || card.cardId}>
                         <div className="pack-card-image">
                           <img src={card.card_images[0]?.image_url_small} alt={card.name} />
@@ -1036,6 +1062,13 @@ export default function InventoryConsole({
                             onChange={(event) => changePackPrice(packKey(card), event.target.value)}
                           />
                         </div>
+                        <input
+                          className="pack-card-memo"
+                          type="text"
+                          placeholder="비고"
+                          value={memo || ""}
+                          onChange={(event) => changePackMemo(packKey(card), event.target.value)}
+                        />
                         <strong>{card.koreanData?.cardName || card.localizedName || card.name}</strong>
                         <small>
                           {card.card_sets?.[0]?.set_code || "코드 확인 중"}
@@ -1284,6 +1317,7 @@ export default function InventoryConsole({
                       condition: addCondition,
                       price: addPrice,
                       quantity: addQuantity,
+                      memo: addMemo,
                     });
                     closeAddModal();
                   }}
@@ -1378,6 +1412,10 @@ export default function InventoryConsole({
                       value={addQuantity}
                       onChange={(event) => setAddQuantity(event.target.value)}
                     />
+                  </label>
+                  <label>
+                    비고
+                    <input type="text" value={addMemo} onChange={(event) => setAddMemo(event.target.value)} />
                   </label>
                   <button className="pack-save" type="submit">
                     재고 저장
