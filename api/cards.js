@@ -226,6 +226,56 @@ async function localizeJapaneseReleases(game, releases) {
   });
 }
 
+const normalizePokemonCollectorNumber = (value) => {
+  const match = String(value || "").match(/^\s*0*(\d{1,3})\s*\/\s*0*(\d{1,3})\s*$/);
+  return match ? `${Number(match[1])}/${Number(match[2])}` : "";
+};
+
+async function searchJapanesePokemonByCollectorNumber(query) {
+  const expectedCode = normalizePokemonCollectorNumber(query);
+  if (!expectedCode) return [];
+  const koreanSearch = await pokemonKr.searchCards(query, 0).catch(() => ({ cards: [] }));
+  const koreanCards = await mapWithConcurrency((koreanSearch.cards || []).slice(0, 12), 4, (card) =>
+    pokemonKr.fetchCardDetail(card.cardId, query).catch(() => null),
+  );
+  const exactKoreanCards = [
+    ...new Map(
+      koreanCards
+        .filter((card) =>
+          card?.card_sets?.some((set) => normalizePokemonCollectorNumber(set.set_code) === expectedCode),
+        )
+        .map((card) => [card.cardId, card]),
+    ).values(),
+  ];
+  if (!exactKoreanCards.length) return [];
+
+  const japanesePreviews = await mapWithConcurrency(exactKoreanCards, 3, async (koreanCard) => {
+    const terms = await translateJapaneseSearchTerms("pokemon", koreanCard.name);
+    const pages = await mapWithConcurrency(terms.slice(0, 2), 2, async (term) =>
+      pokemonJa.searchCards(term, 0).catch(() => ({ cards: [] })),
+    );
+    return pages.flatMap((page) => page.cards || []);
+  });
+  const uniquePreviews = [...new Map(japanesePreviews.flat().map((card) => [card.cardId, card])).values()].slice(0, 24);
+  const japaneseCards = await mapWithConcurrency(uniquePreviews, 4, (card) =>
+    pokemonJa.fetchCardDetail(card.cardId).catch(() => null),
+  );
+  return [
+    ...new Map(
+      japaneseCards
+        .filter((card) =>
+          card?.card_sets?.some((set) => normalizePokemonCollectorNumber(set.set_code) === expectedCode),
+        )
+        .map((card) => {
+          const matchingSets = card.card_sets.filter(
+            (set) => normalizePokemonCollectorNumber(set.set_code) === expectedCode,
+          );
+          return [card.cardId, { ...card, card_sets: matchingSets }];
+        }),
+    ).values(),
+  ];
+}
+
 const pageCacheKey = (baseKey, offset) => (offset ? `${baseKey}:offset:${offset}` : baseKey);
 
 const matchesJapaneseCardName = (game, cardName, term) => {
@@ -302,7 +352,7 @@ async function getExternalCardDetail(game, cardId, database, language) {
 }
 
 async function getExternalSearch(game, query, database, offset = 0, language = "ko", filters = {}) {
-  const cacheVersion = game === "onepiece" ? "v16" : game === "pokemon" ? "v12" : "v4";
+  const cacheVersion = game === "onepiece" ? "v16" : game === "pokemon" ? "v13" : "v4";
   const filterKey = JSON.stringify(Object.fromEntries(Object.entries(filters).filter(([, value]) => value)));
   const cacheScope = `${game}:${language}:${cacheVersion}:${normalizeSearchTerm(query)}:${filterKey}`;
   const queryKey = pageCacheKey(cacheScope, offset);
@@ -317,6 +367,17 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
       const cards = language === "ja" ? await localizeJapaneseCards(game, page.cards, database) : page.cards;
       return { data: cards, nextOffset: page.nextOffset, cache: "HIT" };
     }
+  }
+  if (game === "pokemon" && language === "ja" && normalizePokemonCollectorNumber(query)) {
+    const cards = await searchJapanesePokemonByCollectorNumber(query);
+    const localizedCards = await localizeJapaneseCards(game, cards, database);
+    if (database) {
+      const expiresAt = new Date(Date.now() + SEARCH_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+      await database
+        .from("card_search_cache")
+        .upsert({ query_key: queryKey, results: { cards: localizedCards, nextOffset: null }, expires_at: expiresAt });
+    }
+    return { data: localizedCards, nextOffset: null, cache: database ? "MISS" : "BYPASS" };
   }
   const config = EXTERNAL_GAMES[game];
   const koreanJapaneseQuery = language === "ja" && /[\uac00-\ud7a3]/i.test(query);
