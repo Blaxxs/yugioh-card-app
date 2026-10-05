@@ -1071,78 +1071,78 @@ export default function InventoryConsole({
             )}
             {packCards.length > 0 && (
               <>
-            <button
-              className="pack-window-resizer resize-right"
-              type="button"
-              aria-label="오른쪽 크기 조절"
-              onPointerDown={(event) => startPackResize(event, "right")}
-              onPointerMove={resizePack}
-              onPointerUp={stopPackResize}
-              onPointerCancel={stopPackResize}
-            />
-            <button
-              className="pack-window-resizer resize-left"
-              type="button"
-              aria-label="왼쪽 크기 조절"
-              onPointerDown={(event) => startPackResize(event, "left")}
-              onPointerMove={resizePack}
-              onPointerUp={stopPackResize}
-              onPointerCancel={stopPackResize}
-            />
-            <button
-              className="pack-window-resizer resize-bottom"
-              type="button"
-              aria-label="아래쪽 크기 조절"
-              onPointerDown={(event) => startPackResize(event, "bottom")}
-              onPointerMove={resizePack}
-              onPointerUp={stopPackResize}
-              onPointerCancel={stopPackResize}
-            />
-            <button
-              className="pack-window-resizer resize-bottom-left"
-              type="button"
-              aria-label="왼쪽 아래 크기 조절"
-              onPointerDown={(event) => startPackResize(event, "bottom-left")}
-              onPointerMove={resizePack}
-              onPointerUp={stopPackResize}
-              onPointerCancel={stopPackResize}
-            />
-            <button
-              className="pack-window-resizer resize-bottom-right"
-              type="button"
-              aria-label="오른쪽 아래 크기 조절"
-              onPointerDown={(event) => startPackResize(event, "bottom-right")}
-              onPointerMove={resizePack}
-              onPointerUp={stopPackResize}
-              onPointerCancel={stopPackResize}
-            />
-            <button
-              className="pack-window-resizer resize-top"
-              type="button"
-              aria-label="위쪽 크기 조절"
-              onPointerDown={(event) => startPackResize(event, "top")}
-              onPointerMove={resizePack}
-              onPointerUp={stopPackResize}
-              onPointerCancel={stopPackResize}
-            />
-            <button
-              className="pack-window-resizer resize-top-left"
-              type="button"
-              aria-label="왼쪽 위 크기 조절"
-              onPointerDown={(event) => startPackResize(event, "top-left")}
-              onPointerMove={resizePack}
-              onPointerUp={stopPackResize}
-              onPointerCancel={stopPackResize}
-            />
-            <button
-              className="pack-window-resizer resize-top-right"
-              type="button"
-              aria-label="오른쪽 위 크기 조절"
-              onPointerDown={(event) => startPackResize(event, "top-right")}
-              onPointerMove={resizePack}
-              onPointerUp={stopPackResize}
-              onPointerCancel={stopPackResize}
-            />
+                <button
+                  className="pack-window-resizer resize-right"
+                  type="button"
+                  aria-label="오른쪽 크기 조절"
+                  onPointerDown={(event) => startPackResize(event, "right")}
+                  onPointerMove={resizePack}
+                  onPointerUp={stopPackResize}
+                  onPointerCancel={stopPackResize}
+                />
+                <button
+                  className="pack-window-resizer resize-left"
+                  type="button"
+                  aria-label="왼쪽 크기 조절"
+                  onPointerDown={(event) => startPackResize(event, "left")}
+                  onPointerMove={resizePack}
+                  onPointerUp={stopPackResize}
+                  onPointerCancel={stopPackResize}
+                />
+                <button
+                  className="pack-window-resizer resize-bottom"
+                  type="button"
+                  aria-label="아래쪽 크기 조절"
+                  onPointerDown={(event) => startPackResize(event, "bottom")}
+                  onPointerMove={resizePack}
+                  onPointerUp={stopPackResize}
+                  onPointerCancel={stopPackResize}
+                />
+                <button
+                  className="pack-window-resizer resize-bottom-left"
+                  type="button"
+                  aria-label="왼쪽 아래 크기 조절"
+                  onPointerDown={(event) => startPackResize(event, "bottom-left")}
+                  onPointerMove={resizePack}
+                  onPointerUp={stopPackResize}
+                  onPointerCancel={stopPackResize}
+                />
+                <button
+                  className="pack-window-resizer resize-bottom-right"
+                  type="button"
+                  aria-label="오른쪽 아래 크기 조절"
+                  onPointerDown={(event) => startPackResize(event, "bottom-right")}
+                  onPointerMove={resizePack}
+                  onPointerUp={stopPackResize}
+                  onPointerCancel={stopPackResize}
+                />
+                <button
+                  className="pack-window-resizer resize-top"
+                  type="button"
+                  aria-label="위쪽 크기 조절"
+                  onPointerDown={(event) => startPackResize(event, "top")}
+                  onPointerMove={resizePack}
+                  onPointerUp={stopPackResize}
+                  onPointerCancel={stopPackResize}
+                />
+                <button
+                  className="pack-window-resizer resize-top-left"
+                  type="button"
+                  aria-label="왼쪽 위 크기 조절"
+                  onPointerDown={(event) => startPackResize(event, "top-left")}
+                  onPointerMove={resizePack}
+                  onPointerUp={stopPackResize}
+                  onPointerCancel={stopPackResize}
+                />
+                <button
+                  className="pack-window-resizer resize-top-right"
+                  type="button"
+                  aria-label="오른쪽 위 크기 조절"
+                  onPointerDown={(event) => startPackResize(event, "top-right")}
+                  onPointerMove={resizePack}
+                  onPointerUp={stopPackResize}
+                  onPointerCancel={stopPackResize}
+                />
               </>
             )}
           </section>
@@ -1267,134 +1267,137 @@ export default function InventoryConsole({
                 </div>
               ) : (
                 <form
-                className="inventory-add-form"
-                onSubmit={async (event) => {
-                  event.preventDefault();
-                  const set =
-                    addCard.card_sets?.find(
-                      (item) => item.set_code === addCode && (item.rarity_code || item.set_rarity) === addRarity,
-                    ) ||
-                    addCard.card_sets?.find((item) => item.set_code === addCode) ||
-                    {};
-                  const selectedSet = { ...set, set_code: addCode, set_rarity: addRarity, rarity_code: addRarity };
-                  await onAddInventory({
-                    card: addCard,
-                    set: selectedSet,
-                    imageIndex: addImageIndex,
-                    condition: addCondition,
-                    price: addPrice,
-                    quantity: addQuantity,
-                  });
-                  closeAddModal();
-                }}
-              >
-                <div className="add-card-preview">
-                  <img src={addCard.card_images?.[addImageIndex]?.image_url_small} alt={addCard.name} />
-                  <div>
-                    {addCard.card_images?.map((image, index) => (
-                      <button
-                        type="button"
-                        key={image.id}
-                        className={index === addImageIndex ? "selected" : ""}
-                        onClick={() => setAddImageIndex(index)}
-                      >
-                        <img src={image.image_url_small} alt="" />
+                  className="inventory-add-form"
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    const set =
+                      addCard.card_sets?.find(
+                        (item) => item.set_code === addCode && (item.rarity_code || item.set_rarity) === addRarity,
+                      ) ||
+                      addCard.card_sets?.find((item) => item.set_code === addCode) ||
+                      {};
+                    const selectedSet = { ...set, set_code: addCode, set_rarity: addRarity, rarity_code: addRarity };
+                    await onAddInventory({
+                      card: addCard,
+                      set: selectedSet,
+                      imageIndex: addImageIndex,
+                      condition: addCondition,
+                      price: addPrice,
+                      quantity: addQuantity,
+                    });
+                    closeAddModal();
+                  }}
+                >
+                  <div className="add-card-preview">
+                    <img src={addCard.card_images?.[addImageIndex]?.image_url_small} alt={addCard.name} />
+                    <div>
+                      {addCard.card_images?.map((image, index) => (
+                        <button
+                          type="button"
+                          key={image.id}
+                          className={index === addImageIndex ? "selected" : ""}
+                          onClick={() => setAddImageIndex(index)}
+                        >
+                          <img src={image.image_url_small} alt="" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <strong>{addCard.name}</strong>
+                  <label>
+                    코드
+                    <select
+                      value={addCode}
+                      onChange={(event) => {
+                        setAddCode(event.target.value);
+                        const next = addCard.card_sets?.find((item) => item.set_code === event.target.value);
+                        setAddRarity(next?.rarity_code || next?.set_rarity || "");
+                      }}
+                    >
+                      {[...new Set((addCard.card_sets || []).map((set) => set.set_code).filter(Boolean))].map(
+                        (code) => (
+                          <option value={code} key={code}>
+                            {code}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                  <label>
+                    레어도
+                    <div className="rarity-value" ref={rarityFieldRef}>
+                      <span>{addRarity || "-"}</span>
+                      <button type="button" onClick={() => setAddRarityEditing((value) => !value)}>
+                        변경
                       </button>
-                    ))}
-                  </div>
-                </div>
-                <strong>{addCard.name}</strong>
-                <label>
-                  코드
-                  <select
-                    value={addCode}
-                    onChange={(event) => {
-                      setAddCode(event.target.value);
-                      const next = addCard.card_sets?.find((item) => item.set_code === event.target.value);
-                      setAddRarity(next?.rarity_code || next?.set_rarity || "");
-                    }}
-                  >
-                    {[...new Set((addCard.card_sets || []).map((set) => set.set_code).filter(Boolean))].map((code) => (
-                      <option value={code} key={code}>
-                        {code}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  레어도
-                  <div className="rarity-value" ref={rarityFieldRef}>
-                    <span>{addRarity || "-"}</span>
-                    <button type="button" onClick={() => setAddRarityEditing((value) => !value)}>
-                      변경
-                    </button>
-                    {addRarityEditing && (
-                      <ul className="rarity-options">
-                        {ALL_RARITY_CODES.map((rarity) => (
-                          <li key={rarity}>
-                            <button
-                              type="button"
-                              className={rarity === addRarity ? "selected" : ""}
-                              onClick={() => {
-                                setAddRarity(rarity);
-                                setAddRarityEditing(false);
-                              }}
-                            >
-                              {rarity}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </label>
-                <label>
-                  상태
-                  <select value={addCondition} onChange={(event) => setAddCondition(event.target.value)}>
-                    <option>S급 (신품급)</option>
-                    <option>S-급 (미품급)</option>
-                    <option>A급</option>
-                    <option>B급</option>
-                    <option>C급</option>
-                  </select>
-                </label>
-                <label>
-                  가격
-                  <input
-                    className="price-input"
-                    type="number"
-                    min="0"
-                    value={addPrice}
-                    onChange={(event) => setAddPrice(event.target.value)}
-                  />
-                </label>
-                <label>
-                  수량
-                  <input
-                    type="number"
-                    min="1"
-                    value={addQuantity}
-                    onChange={(event) => setAddQuantity(event.target.value)}
-                  />
-                </label>
-                <button className="pack-save" type="submit">
-                  재고 저장
-                </button>
+                      {addRarityEditing && (
+                        <ul className="rarity-options">
+                          {ALL_RARITY_CODES.map((rarity) => (
+                            <li key={rarity}>
+                              <button
+                                type="button"
+                                className={rarity === addRarity ? "selected" : ""}
+                                onClick={() => {
+                                  setAddRarity(rarity);
+                                  setAddRarityEditing(false);
+                                }}
+                              >
+                                {rarity}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </label>
+                  <label>
+                    상태
+                    <select value={addCondition} onChange={(event) => setAddCondition(event.target.value)}>
+                      <option>S급 (신품급)</option>
+                      <option>S-급 (미품급)</option>
+                      <option>A급</option>
+                      <option>B급</option>
+                      <option>C급</option>
+                    </select>
+                  </label>
+                  <label>
+                    가격
+                    <input
+                      className="price-input"
+                      type="number"
+                      min="0"
+                      value={addPrice}
+                      onChange={(event) => setAddPrice(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    수량
+                    <input
+                      type="number"
+                      min="1"
+                      value={addQuantity}
+                      onChange={(event) => setAddQuantity(event.target.value)}
+                    />
+                  </label>
+                  <button className="pack-save" type="submit">
+                    재고 저장
+                  </button>
                 </form>
               )}
             </div>
-            {(addResults.length > 0 || addCard) && resizeHandles.map(([direction, label]) => (
-              <button
-                className={`pack-window-resizer resize-${direction}`}
-                type="button"
-                key={direction}
-                aria-label={label}
-                onPointerDown={(event) => startPackResize(event, direction, setAddWindow)}
-                onPointerMove={resizePack}
-                onPointerUp={stopPackResize}
-                onPointerCancel={stopPackResize}
-              />
-            ))}
+            {(addResults.length > 0 || addCard) &&
+              resizeHandles.map(([direction, label]) => (
+                <button
+                  className={`pack-window-resizer resize-${direction}`}
+                  type="button"
+                  key={direction}
+                  aria-label={label}
+                  onPointerDown={(event) => startPackResize(event, direction, setAddWindow)}
+                  onPointerMove={resizePack}
+                  onPointerUp={stopPackResize}
+                  onPointerCancel={stopPackResize}
+                />
+              ))}
           </section>
         </div>
       )}

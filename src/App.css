@@ -1990,8 +1990,8 @@ button:disabled {
 .inventory-intake-toolbar {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1.2fr);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
   gap: 10px;
   border-bottom: 1px solid #c9ced8;
   padding: 12px 16px;
@@ -2014,12 +2014,17 @@ button:disabled {
   margin: 0;
 }
 .inventory-intake-toolbar .pack-search input {
+  box-sizing: border-box;
   width: 100%;
   min-width: 0;
+  height: 38px;
+  min-height: 38px;
 }
 .inventory-intake-toolbar .pack-search button {
   flex: 0 0 auto;
-  min-height: 36px;
+  width: 88px;
+  height: 38px;
+  min-height: 38px;
 }
 .pack-intake-dialog header span {
   color: var(--app-primary);
@@ -2527,7 +2532,6 @@ button:disabled {
     min-height: 0;
   }
   .inventory-intake-toolbar {
-    grid-template-columns: minmax(0, 1fr);
     gap: 9px;
     padding: 10px 12px;
   }
