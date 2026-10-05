@@ -1,6 +1,23 @@
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const translationCache = new Map();
+const geminiRequests = new Map();
+
+async function fetchGemini(body, timeout) {
+  const key = JSON.stringify(body);
+  if (!geminiRequests.has(key)) {
+    geminiRequests.set(
+      key,
+      fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
+        body: key,
+        signal: AbortSignal.timeout(timeout),
+      }).finally(() => geminiRequests.delete(key)),
+    );
+  }
+  return (await geminiRequests.get(key)).clone();
+}
 
 const SEARCH_DICTIONARY = {
   yugioh: new Map([
@@ -114,10 +131,8 @@ async function translateWithGemini(query, game, gameLabel, target) {
     'Return only JSON in this shape: {"terms":["...", "..."]}. Do not add explanations.',
     `Korean search term: ${query}`,
   ].join("\n");
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
+  const response = await fetchGemini(
+    {
       contents: [{ parts: [{ text: prompt }] }],
       ...(process.env.GEMINI_SEARCH_GROUNDING === "true" ? { tools: [{ googleSearch: {} }] } : {}),
       generationConfig: {
@@ -130,9 +145,9 @@ async function translateWithGemini(query, game, gameLabel, target) {
         temperature: 0.1,
         maxOutputTokens: 128,
       },
-    }),
-    signal: AbortSignal.timeout(2500),
-  });
+    },
+    2500,
+  );
   if (!response.ok) {
     console.warn(`Gemini translation request failed (${response.status}).`);
     return [];
@@ -151,10 +166,8 @@ async function translateDisplayNamesWithGemini(names, game, gameLabel, target) {
     "Return exactly one Korean name for each input, in the same order. Preserve card codes and do not add explanations.",
     `Japanese names: ${JSON.stringify(names)}`,
   ].join("\n");
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
+  const response = await fetchGemini(
+    {
       contents: [{ parts: [{ text: prompt }] }],
       ...(process.env.GEMINI_SEARCH_GROUNDING === "true" ? { tools: [{ googleSearch: {} }] } : {}),
       generationConfig: {
@@ -167,9 +180,9 @@ async function translateDisplayNamesWithGemini(names, game, gameLabel, target) {
         temperature: 0.1,
         maxOutputTokens: Math.min(1024, names.length * 48),
       },
-    }),
-    signal: AbortSignal.timeout(8000),
-  });
+    },
+    8000,
+  );
   if (!response.ok) {
     console.warn(`Gemini display-name translation failed (${response.status}).`);
     return [];
@@ -184,13 +197,17 @@ async function translateDisplayNamesWithGemini(names, game, gameLabel, target) {
 export async function translateJapaneseDisplayNames(game, sourceNames, target = "card") {
   const names = sourceNames.map((name) => String(name || "").trim());
   const results = new Array(names.length).fill("");
-  const missing = [];
+  const missingByKey = new Map();
   names.forEach((name, index) => {
     const cacheKey = `display:${target}:${game}:${normalizeQuery(name)}`;
     const cached = translationCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) results[index] = cached.terms[0];
-    else if (name) missing.push({ index, name, cacheKey });
+    else if (name) {
+      if (!missingByKey.has(cacheKey)) missingByKey.set(cacheKey, { indexes: [], name, cacheKey });
+      missingByKey.get(cacheKey).indexes.push(index);
+    }
   });
+  const missing = [...missingByKey.values()];
   if (!missing.length) return results;
 
   const gameLabel =
@@ -200,10 +217,12 @@ export async function translateJapaneseDisplayNames(game, sourceNames, target = 
   await mapChunksWithConcurrency(chunks, 2, async (chunk) => {
     const chunkNames = chunk.map((item) => item.name);
     const localized = await translateDisplayNamesWithGemini(chunkNames, game, gameLabel, target).catch(() => []);
-    chunk.forEach(({ index, cacheKey }, chunkIndex) => {
+    chunk.forEach(({ indexes, cacheKey }, chunkIndex) => {
       const name = localized[chunkIndex];
       if (!name) return;
-      results[index] = name;
+      indexes.forEach((index) => {
+        results[index] = name;
+      });
       translationCache.set(cacheKey, { terms: [name], expiresAt: Date.now() + CACHE_TTL });
     });
   });

@@ -1,5 +1,5 @@
-import { Download, Minus, PackagePlus, Plus, Search, ShoppingCart, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Download, Minus, PackagePlus, Plus, Save, Search, ShoppingCart, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { hydrateCardPreviews, getRarityCode, getRarityLabel, ALL_RARITY_CODES } from "../lib/officialCardApi";
 import { CARD_GAMES, getGameById } from "../lib/cardGames";
 import {
@@ -59,6 +59,7 @@ export default function InventoryConsole({
   const importFileRef = useRef(null);
   const resizeRef = useRef(null);
   const dragRef = useRef(null);
+  const packLoadVersion = useRef(0);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState([]);
@@ -96,28 +97,38 @@ export default function InventoryConsole({
   const [filterSearch, setFilterSearch] = useState("");
   const [viewItem, setViewItem] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [editQuantity, setEditQuantity] = useState(1);
-  const [editCondition, setEditCondition] = useState("S급 (신품급)");
-  const [editPrice, setEditPrice] = useState("");
-  const [editMemoById, setEditMemoById] = useState({});
-  const visibleItems = inventoryItems
-    .filter(
-      (item) =>
-        `${item.card_name} ${item.set_code || ""} ${item.rarity || ""}`.toLowerCase().includes(query.toLowerCase()) &&
-        Object.entries(columnFilters).every(([key, value]) => {
-          const raw = String(item[key === "name" ? "card_name" : key === "code" ? "set_code" : key] || "");
-          return Array.isArray(value)
-            ? !value.length || value.includes(raw)
-            : !value || raw.toLowerCase().includes(value.toLowerCase());
-        }),
-    )
-    .sort((left, right) =>
-      sort === "name"
-        ? left.card_name.localeCompare(right.card_name, "ko")
-        : sort === "quantity"
-          ? right.quantity - left.quantity
-          : new Date(right.updated_at) - new Date(left.updated_at),
-    );
+  const [editDrafts, setEditDrafts] = useState({});
+  const [editItemId, setEditItemId] = useState(null);
+  const [editError, setEditError] = useState("");
+  const editDialogRef = useRef(null);
+  const editItems = useMemo(
+    () => inventoryItems.filter((item) => selectedIds.has(item.id)),
+    [inventoryItems, selectedIds],
+  );
+  const editItem = editItems.find((item) => item.id === editItemId) || editItems[0];
+  const editDraft = editDrafts[editItem?.id];
+  const visibleItems = useMemo(() => {
+    const normalizedQuery = query.toLowerCase();
+    const filters = Object.entries(columnFilters);
+    return inventoryItems
+      .filter(
+        (item) =>
+          `${item.card_name} ${item.set_code || ""} ${item.rarity || ""}`.toLowerCase().includes(normalizedQuery) &&
+          filters.every(([key, value]) => {
+            const raw = String(item[key === "name" ? "card_name" : key === "code" ? "set_code" : key] || "");
+            return Array.isArray(value)
+              ? !value.length || value.includes(raw)
+              : !value || raw.toLowerCase().includes(value.toLowerCase());
+          }),
+      )
+      .sort((left, right) =>
+        sort === "name"
+          ? left.card_name.localeCompare(right.card_name, "ko")
+          : sort === "quantity"
+            ? right.quantity - left.quantity
+            : new Date(right.updated_at) - new Date(left.updated_at),
+      );
+  }, [inventoryItems, query, columnFilters, sort]);
   const exportCsv = (selectedOnly) => {
     const items = selectedOnly ? visibleItems.filter((item) => selectedIds.has(item.id)) : visibleItems;
     const rows = [
@@ -172,6 +183,7 @@ export default function InventoryConsole({
     );
   };
   const changeIntakeGame = (game) => {
+    packLoadVersion.current += 1;
     setIntakeGame(game);
     setPackWindow(null);
     setAddWindow(null);
@@ -182,6 +194,7 @@ export default function InventoryConsole({
     setImportRows([]);
   };
   const changeIntakeLanguage = (language) => {
+    packLoadVersion.current += 1;
     setIntakeLanguage(language);
     setPackWindow(null);
     setAddWindow(null);
@@ -216,6 +229,18 @@ export default function InventoryConsole({
       </label>
     </div>
   );
+  useEffect(
+    () => () => {
+      packLoadVersion.current += 1;
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!editOpen) return undefined;
+    const previousFocus = document.activeElement;
+    editDialogRef.current?.querySelector("input:not([readonly])")?.focus();
+    return () => previousFocus?.focus();
+  }, [editOpen]);
   useEffect(() => {
     if (!addRarityEditing) return undefined;
     const closeIfOutside = (event) => {
@@ -231,6 +256,8 @@ export default function InventoryConsole({
     }
   };
   const choosePack = async (release) => {
+    const loadVersion = ++packLoadVersion.current;
+    let listReady = false;
     setPackWindow(null);
     setPackLoading(true);
     setPackCards([]);
@@ -256,6 +283,7 @@ export default function InventoryConsole({
         await hydrateCardPreviews(cards, (detailedCard) => detailedCards.push(detailedCard), intakeLanguage);
       }
       if (intakeLanguage === "ja") detailedCards = await localizeJapaneseCards(intakeGame, detailedCards);
+      if (packLoadVersion.current !== loadVersion) return;
       const variants = detailedCards.flatMap((detailedCard) => {
         const sets = detailedCard.card_sets.filter((set) => set.set_name === release.name);
         return (sets.length ? sets : [null]).map((set) => ({
@@ -282,8 +310,60 @@ export default function InventoryConsole({
       setPackCards(variants);
       setPackMatches([]);
       setPackQuery(release.name);
-    } finally {
       setPackLoading(false);
+      listReady = true;
+      if (intakeGame === "pokemon" && intakeLanguage === "ja") {
+        const pending = variants.filter((item) => !item.card.card_sets?.[0]?.set_code);
+        let nextIndex = 0;
+        const resolveCodes = async () => {
+          while (nextIndex < pending.length && packLoadVersion.current === loadVersion) {
+            const card = pending[nextIndex++].card;
+            try {
+              const detail = await fetchGameCardById(
+                intakeGame,
+                card.cardId,
+                card.name,
+                card.card_images?.[0]?.image_url_small,
+                intakeLanguage,
+                { localize: false },
+              );
+              if (packLoadVersion.current !== loadVersion) return;
+              const detailSet =
+                detail?.card_sets?.find((set) => set.set_name === release.name && set.set_code) ||
+                detail?.card_sets?.find((set) => set.set_code);
+              if (!detailSet) continue;
+              setPackCards((items) =>
+                items.map((item) =>
+                  item.card.id === card.id
+                    ? {
+                        ...item,
+                        card: {
+                          ...item.card,
+                          ...detail,
+                          id: item.card.id,
+                          localizedName: item.card.localizedName || detail.localizedName,
+                          koreanData: { ...detail.koreanData, ...item.card.koreanData },
+                          card_sets: [
+                            {
+                              ...detailSet,
+                              ...item.card.card_sets?.[0],
+                              set_code: item.card.card_sets?.[0]?.set_code || detailSet.set_code,
+                            },
+                          ],
+                        },
+                      }
+                    : item,
+                ),
+              );
+            } catch {
+              continue;
+            }
+          }
+        };
+        await Promise.all([resolveCodes(), resolveCodes()]);
+      }
+    } finally {
+      if (!listReady && packLoadVersion.current === loadVersion) setPackLoading(false);
     }
   };
   const packKey = (card) => card.id || card.cardId;
@@ -297,6 +377,17 @@ export default function InventoryConsole({
     setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, price } : item)));
   const changePackMemo = (key, memo) =>
     setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, memo } : item)));
+  const changePackCode = (key, code) =>
+    setPackCards((items) =>
+      items.map((item) =>
+        packKey(item.card) === key
+          ? {
+              ...item,
+              card: { ...item.card, card_sets: [{ ...(item.card.card_sets?.[0] || {}), set_code: code.trim() }] },
+            }
+          : item,
+      ),
+    );
   const startPackResize = (event, direction, setWindow = setPackWindow) => {
     const rect = event.currentTarget.parentElement.getBoundingClientRect();
     resizeRef.current = { startX: event.clientX, startY: event.clientY, rect, direction, setWindow };
@@ -559,25 +650,71 @@ export default function InventoryConsole({
   };
   const editSelected = async (event) => {
     event.preventDefault();
-    const selected = inventoryItems.filter((item) => selectedIds.has(item.id));
-    await onUpdateInventory(
-      selected.map((item) => ({
-        id: item.id,
-        changes: {
-          quantity: Number(editQuantity),
-          condition: editCondition,
-          purchase_price: editPrice === "" ? null : Number(editPrice),
-          memo: editMemoById[item.id] ?? item.memo ?? null,
-        },
-      })),
-    );
-    setEditOpen(false);
+    if (busy) return;
+    setEditError("");
+    const invalidItem = editItems.find((item) => {
+      const draft = editDrafts[item.id];
+      const quantity = Number(draft?.quantity);
+      const price = Number(draft?.price);
+      return (
+        !draft ||
+        draft.quantity === "" ||
+        !Number.isSafeInteger(quantity) ||
+        quantity < 0 ||
+        (draft.price !== "" && (!Number.isFinite(price) || price < 0))
+      );
+    });
+    if (invalidItem) {
+      setEditItemId(invalidItem.id);
+      setEditError("수량은 0 이상의 정수, 가격은 0 이상의 숫자로 입력해 주세요.");
+      return;
+    }
+    try {
+      const saved = await onUpdateInventory(
+        editItems.map((item) => {
+          const draft = editDrafts[item.id];
+          return {
+            id: item.id,
+            changes: {
+              quantity: Number(draft.quantity),
+              condition: draft.condition || null,
+              purchase_price: draft.price === "" ? null : Number(draft.price),
+              memo: draft.memo,
+            },
+          };
+        }),
+      );
+      if (saved === false) {
+        setEditError("저장하지 못했습니다. 같은 카드·코드·레어도·비고의 재고가 이미 있는지 확인해 주세요.");
+        return;
+      }
+      setEditOpen(false);
+    } catch (error) {
+      setEditError(error.message || "재고를 수정하지 못했습니다.");
+    }
   };
   const openEditModal = () => {
     const selected = inventoryItems.filter((item) => selectedIds.has(item.id));
-    setEditMemoById(Object.fromEntries(selected.map((item) => [item.id, item.memo || ""])));
+    if (!selected.length) return;
+    setEditDrafts(
+      Object.fromEntries(
+        selected.map((item) => [
+          item.id,
+          {
+            quantity: String(item.quantity),
+            condition: item.condition || "",
+            price: item.purchase_price == null ? "" : String(item.purchase_price),
+            memo: item.memo || "",
+          },
+        ]),
+      ),
+    );
+    setEditItemId(selected[0].id);
+    setEditError("");
     setEditOpen(true);
   };
+  const changeEditField = (field, value) =>
+    setEditDrafts((drafts) => ({ ...drafts, [editItem.id]: { ...drafts[editItem.id], [field]: value } }));
   const searchAddCards = async () => {
     const query = addQuery.trim();
     setAddWindow(null);
@@ -957,51 +1094,163 @@ export default function InventoryConsole({
         </div>
       )}
       {editOpen && (
-        <div className="inventory-edit-modal" role="dialog" aria-modal="true">
-          <button className="pack-intake-backdrop" onClick={() => setEditOpen(false)} />
-          <form onSubmit={editSelected}>
-            <header>
-              <h3>선택 재고 수정</h3>
-              <button type="button" onClick={() => setEditOpen(false)}>
-                <X size={18} />
+        <div
+          className="pack-intake-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="inventory-edit-title"
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !busy) setEditOpen(false);
+            if (event.key !== "Tab") return;
+            const controls = editDialogRef.current?.querySelectorAll(
+              "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)",
+            );
+            if (!controls?.length) return;
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first.focus();
+            }
+          }}
+        >
+          <button className="pack-intake-backdrop" type="button" aria-label="재고 수정 배경" tabIndex={-1} />
+          <form
+            className="pack-intake-dialog inventory-edit-dialog"
+            onSubmit={editSelected}
+            ref={editDialogRef}
+            aria-busy={busy}
+          >
+            <header className="pack-intake-header">
+              <div className="pack-intake-title">
+                <span>INVENTORY EDIT</span>
+                <h3 id="inventory-edit-title">재고 수정</h3>
+              </div>
+              <button type="button" aria-label="재고 수정 닫기" disabled={busy} onClick={() => setEditOpen(false)}>
+                <X size={19} />
               </button>
             </header>
-            {visibleItems
-              .filter((item) => selectedIds.has(item.id))
-              .map((item) => (
-                <div className="inventory-edit-row" key={item.id}>
-                  <img src={item.card_snapshot?.card_images?.[0]?.image_url_small} alt="" />
-                  <strong>{item.card_name}</strong>
-                  <input
-                    type="number"
-                    min="0"
-                    defaultValue={item.quantity}
-                    onChange={(event) => setEditQuantity(event.target.value)}
-                  />
-                  <select value={editCondition} onChange={(event) => setEditCondition(event.target.value)}>
-                    <option>S급 (신품급)</option>
-                    <option>S-급 (미품급)</option>
-                    <option>A급</option>
-                    <option>B급</option>
-                    <option>C급</option>
-                  </select>
-                  <input
-                    className="price-input"
-                    type="number"
-                    min="0"
-                    placeholder="가격"
-                    value={editPrice}
-                    onChange={(event) => setEditPrice(event.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder="비고"
-                    value={editMemoById[item.id] || ""}
-                    onChange={(event) => setEditMemoById((current) => ({ ...current, [item.id]: event.target.value }))}
-                  />
+            <div className={`inventory-edit-layout ${editItems.length > 1 ? "has-item-list" : ""}`}>
+              {editItems.length > 1 && (
+                <nav className="inventory-edit-list" aria-label="수정할 재고">
+                  {editItems.map((item) => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      className={editItem?.id === item.id ? "selected" : ""}
+                      aria-current={editItem?.id === item.id ? "true" : undefined}
+                      onClick={() => setEditItemId(item.id)}
+                    >
+                      <img
+                        src={item.card_snapshot?.card_images?.[0]?.image_url_small}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <span>
+                        <strong>{item.card_name}</strong>
+                        <small>
+                          {item.set_code || "-"} · {item.rarity_code || item.rarity || "-"}
+                        </small>
+                        <small>
+                          {editDrafts[item.id]?.memo.trim() || "비고 없음"} ·{" "}
+                          {editDrafts[item.id]?.quantity ?? item.quantity}개
+                        </small>
+                      </span>
+                    </button>
+                  ))}
+                </nav>
+              )}
+              {editItem && editDraft && (
+                <div className="inventory-edit-details" key={editItem.id}>
+                  <div className="inventory-edit-preview">
+                    {editItem.card_snapshot?.card_images?.[0]?.image_url_small ? (
+                      <img
+                        src={editItem.card_snapshot.card_images[0].image_url_small}
+                        alt={editItem.card_name}
+                        decoding="async"
+                      />
+                    ) : (
+                      <PackagePlus size={48} aria-hidden="true" />
+                    )}
+                    <strong>{editItem.card_name}</strong>
+                  </div>
+                  <fieldset className="inventory-edit-fields" disabled={busy}>
+                    <label>
+                      카드 코드
+                      <input readOnly value={editItem.set_code || "-"} />
+                    </label>
+                    <label>
+                      레어도
+                      <input readOnly value={editItem.rarity_code || editItem.rarity || "-"} />
+                    </label>
+                    <label className="inventory-edit-wide">
+                      상태
+                      <select
+                        value={editDraft.condition}
+                        onChange={(event) => changeEditField("condition", event.target.value)}
+                      >
+                        <option value="">미지정</option>
+                        {["S급 (신품급)", "S-급 (미품급)", "A급", "B급", "C급"].map((condition) => (
+                          <option key={condition}>{condition}</option>
+                        ))}
+                        {editDraft.condition &&
+                          !["S급 (신품급)", "S-급 (미품급)", "A급", "B급", "C급"].includes(editDraft.condition) && (
+                            <option>{editDraft.condition}</option>
+                          )}
+                      </select>
+                    </label>
+                    <label>
+                      가격
+                      <input
+                        className="price-input"
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={editDraft.price}
+                        onChange={(event) => changeEditField("price", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      수량
+                      <input
+                        required
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={editDraft.quantity}
+                        onChange={(event) => changeEditField("quantity", event.target.value)}
+                      />
+                    </label>
+                    <label className="inventory-edit-wide">
+                      비고
+                      <textarea
+                        rows={3}
+                        value={editDraft.memo}
+                        onChange={(event) => changeEditField("memo", event.target.value)}
+                      />
+                    </label>
+                  </fieldset>
                 </div>
-              ))}
-            <button type="submit">선택 항목 저장</button>
+              )}
+            </div>
+            {editError && (
+              <p className="inventory-edit-error" role="alert">
+                {editError}
+              </p>
+            )}
+            <footer className="inventory-edit-footer">
+              <span>{editItems.length}개 항목</span>
+              <button type="button" disabled={busy} onClick={() => setEditOpen(false)}>
+                취소
+              </button>
+              <button className="pack-save" type="submit" disabled={busy || !editItems.length}>
+                <Save size={16} /> {busy ? "저장 중" : "저장"}
+              </button>
+            </footer>
           </form>
         </div>
       )}
@@ -1066,7 +1315,12 @@ export default function InventoryConsole({
                     {packCards.map(({ card, quantity, price, memo, rarity }) => (
                       <article className="pack-card" key={card.id || card.cardId}>
                         <div className="pack-card-image">
-                          <img src={card.card_images[0]?.image_url_small} alt={card.name} />
+                          <img
+                            src={card.card_images[0]?.image_url_small}
+                            alt={card.name}
+                            loading="lazy"
+                            decoding="async"
+                          />
                           <div>
                             <button type="button" onClick={() => changePackQuantity(packKey(card), quantity - 1)}>
                               <Minus size={14} />
@@ -1101,7 +1355,7 @@ export default function InventoryConsole({
                         />
                         <strong>{card.koreanData?.cardName || card.localizedName || card.name}</strong>
                         <small>
-                          {card.card_sets?.[0]?.set_code || "코드 확인 중"}
+                          {card.card_sets?.[0]?.set_code || "코드 없음"}
                           {rarity && (
                             <span
                               className={`rarity-chip rarity-${getRarityCode(rarity)
@@ -1113,6 +1367,16 @@ export default function InventoryConsole({
                             </span>
                           )}
                         </small>
+                        {intakeGame === "pokemon" && intakeLanguage === "ja" && (
+                          <input
+                            className="pack-card-memo"
+                            type="text"
+                            aria-label={`${card.name} 카드 코드`}
+                            placeholder="카드 코드 (예: 001/193)"
+                            value={card.card_sets?.[0]?.set_code || ""}
+                            onChange={(event) => changePackCode(packKey(card), event.target.value)}
+                          />
+                        )}
                       </article>
                     ))}
                   </div>

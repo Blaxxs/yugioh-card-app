@@ -11,6 +11,12 @@
 5. Google OAuth Redirect URI에 `https://<project-id>.supabase.co/auth/v1/callback`을 등록합니다.
 6. 로컬 개발 주소 `http://localhost:5173`을 Supabase Auth URL 설정의 허용 주소에 추가합니다.
 
+## 재고 비고별 분리
+
+비고가 없는 카드와 비고가 있는 카드는 별도 재고로 저장하며, 비고 내용이 다르면 각각 별도 항목입니다. 같은 카드·코드·레어도·비고로 다시 입고하면 해당 항목의 수량만 증가합니다. 비고 앞뒤 공백은 제거하고 빈 비고는 같은 값으로 취급합니다.
+
+기존 `supabase-migration-inventory-variants.sql`과 `supabase-migration-inventory-variant-constraint.sql` 적용 후, Supabase SQL Editor에서 [supabase-migration-inventory-memo-variants.sql](supabase-migration-inventory-memo-variants.sql)을 실행한 다음 앱을 배포하세요. 이 마이그레이션은 기존 재고 ID와 거래 이력을 유지하고 비고 식별용 `memo_key` 컬럼과 고유 제약조건을 추가합니다. 적용 전에는 새 앱의 재고 저장이 정상 동작하지 않습니다. 수정한 비고가 기존 항목과 같아지면 자동 병합하지 않고 중복 오류를 표시합니다.
+
 ## 공개 배포
 
 이 프로젝트는 Vercel 배포를 기준으로 운영 프록시를 포함합니다.
@@ -49,6 +55,8 @@ SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 5. 배포 주소에서 같은 카드명을 두 번 검색하고 `/api/cards` 응답의 `X-Card-Cache` 헤더를 확인합니다. 첫 요청은 `MISS`, 이후 요청은 `HIT`이어야 합니다.
 
 캐시 없이 API 동작만 로컬에서 확인하려면 `.env`에 `VITE_USE_CARD_API=true`를 추가하고 `vercel dev`로 실행합니다. 일반 `npm run dev`에서는 Vercel 서버리스 함수가 실행되지 않습니다.
+
+브라우저는 동일한 카드 API 요청을 공유하고, 성공한 전체 응답을 최대 100건까지 60초 동안 재사용합니다. 이 캐시는 카드 검색·상세·팩·번역 데이터에만 적용되며 개인 재고나 판매 데이터에는 적용되지 않습니다. 새로고침하면 브라우저 요청 캐시는 초기화됩니다. 일본판 포켓몬 일괄입고는 카드 목록을 먼저 표시한 뒤 코드를 보완하며, 화면 밖 이미지는 스크롤 시 불러옵니다. 카드 수나 표시 필드를 줄이지 않습니다.
 
 Supabase와 Google은 무료 사용량 구간에서 시작할 수 있지만, 저장공간·요청량·인증 사용량이 무료 한도를 넘으면 과금될 수 있습니다. 실제 운영 전에는 각 서비스의 현재 요금과 한도를 확인해야 합니다.
 

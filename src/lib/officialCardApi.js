@@ -1,3 +1,5 @@
+import { fetchCardApi } from "./cardApiClient";
+
 const OFFICIAL_SITE_ORIGIN = "https://www.db.yugioh-card.com";
 const USE_CARD_API = !import.meta.env.DEV || import.meta.env.VITE_USE_CARD_API === "true";
 
@@ -132,13 +134,6 @@ const fetchOfficialHtml = async (url) => {
   const response = await fetch(`/official-ygo${url.pathname}${url.search}`);
   if (!response.ok) throw new Error("공식 카드 데이터베이스에 연결할 수 없습니다.");
   return new DOMParser().parseFromString(await response.text(), "text/html");
-};
-
-const fetchCardApi = async (params) => {
-  const response = await fetch(`/api/cards?${new URLSearchParams(params)}`);
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error || "카드 데이터 API에 연결할 수 없습니다.");
-  return body;
 };
 
 const createSearchUrl = (keyword, language = "ko", filters = {}) => {
@@ -340,6 +335,7 @@ export async function fetchOfficialCardBySetCode(setCode, language = "ko") {
 }
 
 export async function hydrateCardPreviews(cards, onHydrated, language = "ko") {
+  cards.filter((card) => card.isDetailLoaded).forEach(onHydrated);
   const pendingCards = cards.filter((card) => !card.isDetailLoaded);
   let nextIndex = 0;
   const worker = async () => {

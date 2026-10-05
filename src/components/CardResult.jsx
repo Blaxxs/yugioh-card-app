@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function CardResult({
   card,
@@ -17,7 +17,16 @@ export default function CardResult({
   const pointerStart = useRef(null);
   const touchStartY = useRef(null);
   const touchGesture = useRef("idle");
+  const pointerFrame = useRef(null);
+  const pointerPosition = useRef(null);
   const images = card.card_images || [];
+
+  useEffect(
+    () => () => {
+      if (pointerFrame.current !== null) cancelAnimationFrame(pointerFrame.current);
+    },
+    [],
+  );
 
   const changeImage = (direction) => {
     if (images.length < 2) return;
@@ -46,13 +55,19 @@ export default function CardResult({
         return;
       }
     }
-    const rect = event.currentTarget.getBoundingClientRect();
-    const pointerX = (event.clientX - rect.left) / rect.width;
-    const pointerY = (event.clientY - rect.top) / rect.height;
-    event.currentTarget.style.setProperty("--pointer-x", `${pointerX * 100}%`);
-    event.currentTarget.style.setProperty("--pointer-y", `${pointerY * 100}%`);
-    event.currentTarget.style.setProperty("--tilt-x", `${(0.5 - pointerY) * 24}deg`);
-    event.currentTarget.style.setProperty("--tilt-y", `${(pointerX - 0.5) * 32}deg`);
+    pointerPosition.current = { element: event.currentTarget, x: event.clientX, y: event.clientY };
+    if (pointerFrame.current !== null) return;
+    pointerFrame.current = requestAnimationFrame(() => {
+      pointerFrame.current = null;
+      const { element, x, y } = pointerPosition.current;
+      const rect = element.getBoundingClientRect();
+      const pointerX = (x - rect.left) / rect.width;
+      const pointerY = (y - rect.top) / rect.height;
+      element.style.setProperty("--pointer-x", `${pointerX * 100}%`);
+      element.style.setProperty("--pointer-y", `${pointerY * 100}%`);
+      element.style.setProperty("--tilt-x", `${(0.5 - pointerY) * 24}deg`);
+      element.style.setProperty("--tilt-y", `${(pointerX - 0.5) * 32}deg`);
+    });
   };
 
   const handlePointerUp = (event) => {
@@ -82,6 +97,8 @@ export default function CardResult({
   };
 
   const resetPointer = (event) => {
+    if (pointerFrame.current !== null) cancelAnimationFrame(pointerFrame.current);
+    pointerFrame.current = null;
     event.currentTarget.style.setProperty("--tilt-x", "0deg");
     event.currentTarget.style.setProperty("--tilt-y", "0deg");
   };

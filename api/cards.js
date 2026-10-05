@@ -142,33 +142,39 @@ async function localizeJapaneseCards(game, cards, database) {
   if (!cards.length) return cards;
   const displayLimit = Math.min(cards.length, 24);
   const displayCards = cards.slice(0, displayLimit);
-  const officialNames = await mapWithConcurrency(displayCards, 4, async (card) => {
-    if (cards.length > 24) return null;
-    if (hasKoreanName(card.koreanData?.cardName)) return card.koreanData.cardName;
-    return getOfficialKoreanCardName(game, card, database).catch(() => null);
-  });
-  const missingIndexes = officialNames.flatMap((name, index) => (name ? [] : [index]));
-  const translatedNames = await translateJapaneseDisplayNames(
-    game,
-    missingIndexes.map((index) => displayCards[index].name),
-    "card",
-  );
-  if (game === "pokemon" && cards.length === 1) {
-    const officialPokemonNames = await mapWithConcurrency(translatedNames, 1, (name) =>
-      name ? findOfficialKoreanPokemonName(name).catch(() => null) : null,
-    );
-    translatedNames.forEach((name, index) => {
-      translatedNames[index] = officialPokemonNames[index] || name;
+  const cardNamesPromise = (async () => {
+    const officialNames = await mapWithConcurrency(displayCards, 4, async (card) => {
+      if (hasKoreanName(card.koreanData?.cardName)) return card.koreanData.cardName;
+      if (cards.length > 24) return null;
+      return getOfficialKoreanCardName(game, card, database).catch(() => null);
     });
-  }
-  const displayNames = [...officialNames];
-  missingIndexes.forEach((index, translatedIndex) => {
-    displayNames[index] = translatedNames[translatedIndex] || cards[index].name;
-  });
+    const missingIndexes = officialNames.flatMap((name, index) => (name ? [] : [index]));
+    const translatedNames = await translateJapaneseDisplayNames(
+      game,
+      missingIndexes.map((index) => displayCards[index].name),
+      "card",
+    );
+    if (game === "pokemon" && cards.length === 1) {
+      const officialPokemonNames = await mapWithConcurrency(translatedNames, 1, (name) =>
+        name ? findOfficialKoreanPokemonName(name).catch(() => null) : null,
+      );
+      translatedNames.forEach((name, index) => {
+        translatedNames[index] = officialPokemonNames[index] || name;
+      });
+    }
+    const displayNames = [...officialNames];
+    missingIndexes.forEach((index, translatedIndex) => {
+      displayNames[index] = translatedNames[translatedIndex] || cards[index].name;
+    });
+    return displayNames;
+  })();
   const setNames = [
     ...new Set(cards.flatMap((card) => (card.card_sets || []).map((set) => set.set_name).filter(Boolean))),
   ].slice(0, 24);
-  const localizedSetNames = await translateJapaneseDisplayNames(game, setNames, "release");
+  const [displayNames, localizedSetNames] = await Promise.all([
+    cardNamesPromise,
+    translateJapaneseDisplayNames(game, setNames, "release"),
+  ]);
   const localizedSetMap = new Map(setNames.map((name, index) => [name, localizedSetNames[index] || name]));
   return cards.map((card, index) => ({
     ...card,
@@ -322,7 +328,7 @@ const proxyOfficialCardImages = (card) => ({
   }),
 });
 
-async function getExternalCardDetail(game, cardId, database, language) {
+async function getExternalCardDetail(game, cardId, database, language, localize = true) {
   const source = EXTERNAL_GAMES[game][language];
   if (database && language === "ko") {
     const { data } = await database
@@ -349,7 +355,7 @@ async function getExternalCardDetail(game, cardId, database, language) {
       break;
     }
   }
-  if (language === "ja") [card] = await localizeJapaneseCards(game, [card], database);
+  if (language === "ja" && localize) [card] = await localizeJapaneseCards(game, [card], database);
   if (database && language === "ko") {
     await database
       .from("card_catalog")
@@ -751,7 +757,13 @@ export default async function handler(request, response) {
                 language,
               )
             : cardId
-              ? await getExternalCardDetail(game, cardId, database, language)
+              ? await getExternalCardDetail(
+                  game,
+                  cardId,
+                  database,
+                  language,
+                  requestUrl.searchParams.get("localize") !== "0",
+                )
               : await getExternalSearch(
                   game,
                   query,

@@ -14,6 +14,7 @@ import {
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { getReleaseSetVariants, hydrateCardPreviews, isQuarterCenturyChronicleRelease } from "./lib/officialCardApi";
 import { CARD_GAMES, DEFAULT_GAME_ID, getGameById } from "./lib/cardGames";
+import { getInventoryVariantKey, INVENTORY_VARIANT_CONFLICT, normalizeInventoryMemo } from "./lib/inventoryVariants";
 import {
   fetchGameCardById,
   fetchGameReleaseCards,
@@ -600,6 +601,9 @@ export default function App() {
       .select("*")
       .eq("user_id", session.user.id)
       .eq("card_id", selectedCard.cardId)
+      .eq("set_code", selectedCard.card_sets?.[0]?.set_code || "")
+      .eq("rarity_code", selectedCard.card_sets?.[0]?.rarity_code || "")
+      .eq("memo_key", "")
       .maybeSingle()
       .then(({ data, error }) => {
         if (error) setActionError(`재고 조회 오류: ${error.message}`);
@@ -886,11 +890,11 @@ export default function App() {
       set_code: set?.set_code || "",
       rarity_code: set?.rarity_code || "",
       quantity,
-      memo: null,
+      memo: "",
     };
     const { data, error } = await supabase
       .from("inventory_items")
-      .upsert(payload, { onConflict: "user_id,card_id,set_code,rarity_code" })
+      .upsert(payload, { onConflict: INVENTORY_VARIANT_CONFLICT })
       .select()
       .single();
     if (error) setActionError(`재고 저장 오류: ${error.message}`);
@@ -920,20 +924,21 @@ export default function App() {
     setInventoryBusy(false);
   };
 
-  const addInventoryCards = async (cardsToAdd, quantity) => {
+  const addInventoryCards = async (cardsToAdd, quantity, variantMap) => {
     if (!supabase || !session || inventoryBusy) throw new Error("재고 기능은 로그인 후 사용할 수 있습니다.");
-    const uniqueCards = [...new Map(cardsToAdd.filter(Boolean).map((card) => [card.cardId, card])).values()];
+    const uniqueCards = [
+      ...new Map(cardsToAdd.filter(Boolean).map((card) => [getInventoryVariantKey(card), card])).values(),
+    ];
     setInventoryBusy(true);
     try {
-      const currentByVariant = new Map(
-        inventoryItems.map((item) => [`${item.card_id}:${item.set_code}:${item.rarity_code}`, item]),
-      );
+      const currentByVariant =
+        variantMap || new Map(inventoryItems.map((item) => [getInventoryVariantKey(item), item]));
       const savedItems = [];
       for (const card of uniqueCards) {
         const set = card.card_sets?.[0];
         const setCode = set?.set_code || "";
         const rarityCode = set?.rarity_code || "";
-        const current = currentByVariant.get(`${card.cardId}:${setCode}:${rarityCode}`);
+        const current = currentByVariant.get(getInventoryVariantKey(card));
         const { data, error } = await supabase
           .from("inventory_items")
           .upsert(
@@ -947,15 +952,16 @@ export default function App() {
               rarity_code: rarityCode,
               condition: card.condition || null,
               purchase_price: card.purchase_price ? Number(card.purchase_price) : null,
-              memo: card.memo || null,
+              memo: normalizeInventoryMemo(card.memo),
               quantity: (current?.quantity || 0) + quantity,
             },
-            { onConflict: "user_id,card_id,set_code,rarity_code" },
+            { onConflict: INVENTORY_VARIANT_CONFLICT },
           )
           .select()
           .single();
         if (error) throw error;
         savedItems.push(data);
+        currentByVariant.set(getInventoryVariantKey(data), data);
       }
       if (savedItems.length) {
         const { error } = await supabase
@@ -981,8 +987,9 @@ export default function App() {
   };
 
   const batchIntake = async (items) => {
+    const variants = new Map(inventoryItems.map((item) => [getInventoryVariantKey(item), item]));
     for (const { card, quantity, price, memo } of items) {
-      await addInventoryCards([{ ...card, purchase_price: price, memo: memo ?? card.memo }], quantity);
+      await addInventoryCards([{ ...card, purchase_price: price, memo: memo ?? card.memo }], quantity, variants);
     }
   };
 
@@ -1002,7 +1009,11 @@ export default function App() {
       for (const update of updates) {
         const { data, error } = await supabase
           .from("inventory_items")
-          .update({ ...update.changes, updated_at: new Date().toISOString() })
+          .update({
+            ...update.changes,
+            ...(Object.hasOwn(update.changes, "memo") ? { memo: normalizeInventoryMemo(update.changes.memo) } : {}),
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", update.id)
           .eq("user_id", session.user.id)
           .select()
@@ -1015,7 +1026,7 @@ export default function App() {
     } catch (error) {
       setActionError(
         error.code === "23505"
-          ? "같은 카드·코드·레어도 재고가 이미 존재합니다. 기존 항목과 합친 뒤 다시 시도해 주세요."
+          ? "같은 카드·코드·레어도·비고의 재고가 이미 존재합니다. 비고를 다르게 지정하거나 기존 항목을 수정해 주세요."
           : `재고 수정 오류: ${error.message}`,
       );
       return false;
