@@ -60,9 +60,11 @@ export default function InventoryConsole({
   const resizeRef = useRef(null);
   const dragRef = useRef(null);
   const packLoadVersion = useRef(0);
+  const addSearchVersion = useRef(0);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState([]);
+  const [pendingAddCodes, setPendingAddCodes] = useState(new Set());
   const [addCard, setAddCard] = useState(null);
   const [addCode, setAddCode] = useState("");
   const [addRarity, setAddRarity] = useState("");
@@ -183,6 +185,7 @@ export default function InventoryConsole({
     );
   };
   const changeIntakeGame = (game) => {
+    addSearchVersion.current += 1;
     packLoadVersion.current += 1;
     setIntakeGame(game);
     setPackWindow(null);
@@ -194,6 +197,7 @@ export default function InventoryConsole({
     setImportRows([]);
   };
   const changeIntakeLanguage = (language) => {
+    addSearchVersion.current += 1;
     packLoadVersion.current += 1;
     setIntakeLanguage(language);
     setPackWindow(null);
@@ -232,6 +236,7 @@ export default function InventoryConsole({
   useEffect(
     () => () => {
       packLoadVersion.current += 1;
+      addSearchVersion.current += 1;
     },
     [],
   );
@@ -705,7 +710,9 @@ export default function InventoryConsole({
   const changeEditField = (field, value) =>
     setEditDrafts((drafts) => ({ ...drafts, [editItem.id]: { ...drafts[editItem.id], [field]: value } }));
   const searchAddCards = async () => {
+    const searchVersion = ++addSearchVersion.current;
     const query = addQuery.trim();
+    setPendingAddCodes(new Set());
     setAddWindow(null);
     setAddCard(null);
     if (!query) {
@@ -713,6 +720,7 @@ export default function InventoryConsole({
       return;
     }
     const cards = await searchGameCards(intakeGame, query, intakeLanguage);
+    if (addSearchVersion.current !== searchVersion) return;
     const normalizeCode = (value) =>
       String(value || "")
         .replace(/[^a-z0-9]/gi, "")
@@ -722,7 +730,51 @@ export default function InventoryConsole({
         (code) => normalizeCode(code) === normalizeCode(query),
       ),
     );
-    setAddResults(exactCodeMatches.length ? exactCodeMatches : cards);
+    const results = exactCodeMatches.length ? exactCodeMatches : cards;
+    setAddResults(results);
+    if (intakeGame !== "pokemon") return;
+    const pending = results.filter((card) => !card.card_sets?.some((set) => set.set_code));
+    setPendingAddCodes(new Set(pending.map((card) => card.cardId)));
+    let nextIndex = 0;
+    const resolveCodes = async () => {
+      while (nextIndex < pending.length && addSearchVersion.current === searchVersion) {
+        const card = pending[nextIndex++];
+        try {
+          const detail = await fetchGameCardById(
+            intakeGame,
+            card.cardId,
+            card.name,
+            card.card_images?.[0]?.image_url_small,
+            intakeLanguage,
+            { localize: false },
+          );
+          if (addSearchVersion.current !== searchVersion) return;
+          if (detail) {
+            setAddResults((items) => items.map((item) => item.cardId === card.cardId ? {
+              ...item,
+              ...detail,
+              localizedName: item.localizedName || detail.localizedName,
+              koreanData: {
+                ...item.koreanData,
+                ...detail.koreanData,
+                cardName: item.koreanData?.cardName || detail.koreanData?.cardName || detail.name,
+              },
+            } : item));
+          }
+        } catch {
+          continue;
+        } finally {
+          if (addSearchVersion.current === searchVersion) {
+            setPendingAddCodes((ids) => {
+              const next = new Set(ids);
+              next.delete(card.cardId);
+              return next;
+            });
+          }
+        }
+      }
+    };
+    await Promise.all([resolveCodes(), resolveCodes()]);
   };
   const chooseAddCard = async (card) => {
     setAddWindow(null);
@@ -743,6 +795,8 @@ export default function InventoryConsole({
     setAddMemo("");
   };
   const closeAddModal = () => {
+    addSearchVersion.current += 1;
+    setPendingAddCodes(new Set());
     setAddModalOpen(false);
     setAddWindow(null);
     setAddResults([]);
@@ -1569,6 +1623,12 @@ export default function InventoryConsole({
                         </span>
                       )}
                       <span>{card.koreanData?.cardName || card.localizedName || card.name}</span>
+                      {intakeGame === "pokemon" && (
+                        <small className="add-search-card-code">
+                          {[...new Set((card.card_sets || []).map((set) => set.set_code).filter(Boolean))].join(" · ") ||
+                            (pendingAddCodes.has(card.cardId) ? "코드 조회 중" : "코드 없음")}
+                        </small>
+                      )}
                     </button>
                   ))}
                 </div>

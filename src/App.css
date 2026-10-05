@@ -1123,6 +1123,16 @@ button:disabled {
 .add-search-results.add-search-album button > span:last-child {
   overflow-wrap: anywhere;
 }
+.add-search-results.add-search-album button > span,
+.add-search-card-code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.add-search-card-code {
+  color: var(--app-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
 .inventory-add-drag-handle {
   cursor: move;
   touch-action: none;
