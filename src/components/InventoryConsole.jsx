@@ -933,7 +933,7 @@ export default function InventoryConsole({
             onClick={() => setPackModalOpen(false)}
           />
           <section
-            className={`pack-intake-dialog ${packCards.length ? "pack-cards-dialog" : "pack-search-dialog"}`}
+            className={`pack-intake-dialog ${packCards.length || packMatches.length || packLoading ? "pack-cards-dialog" : "pack-search-dialog"}`}
             style={packWindow ? { ...packWindow, position: "fixed" } : undefined}
           >
             <header
@@ -948,35 +948,25 @@ export default function InventoryConsole({
                 <h3>팩 개봉 일괄 입고</h3>
                 <p>카드 이미지 위 수량을 조정한 뒤 저장하세요.</p>
               </div>
-              <div className="pack-intake-header-controls">
-                {renderIntakeSelectors(packLoading)}
-                <div className="pack-search-controls">
-                  <div className="pack-search pack-modal-search">
-                    <input
-                      value={packQuery}
-                      disabled={packLoading}
-                      onChange={(event) => setPackQuery(event.target.value)}
-                      onKeyDown={handlePackSearchKeyDown}
-                      placeholder="수록 팩 이름"
-                    />
-                    <button type="button" disabled={packLoading} onClick={findPacks}>
-                      <Search size={16} aria-hidden="true" /> 찾기
-                    </button>
-                  </div>
-                  <button
-                    className="pack-save pack-search-save"
-                    type="button"
-                    disabled={busy || packLoading || !packCards.some((item) => item.quantity)}
-                    onClick={savePack}
-                  >
-                    <PackagePlus size={17} /> 선택 수량 저장
-                  </button>
-                </div>
-              </div>
               <button type="button" aria-label="팩 입고 닫기" onClick={() => setPackModalOpen(false)}>
                 <X size={19} />
               </button>
             </header>
+            <div className="inventory-intake-toolbar">
+              {renderIntakeSelectors(packLoading)}
+              <div className="pack-search pack-modal-search">
+                <input
+                  value={packQuery}
+                  disabled={packLoading}
+                  onChange={(event) => setPackQuery(event.target.value)}
+                  onKeyDown={handlePackSearchKeyDown}
+                  placeholder="수록 팩 이름"
+                />
+                <button type="button" disabled={packLoading} onClick={findPacks}>
+                  <Search size={16} aria-hidden="true" /> 찾기
+                </button>
+              </div>
+            </div>
             <div className="pack-intake-content">
               {!packLoading && packMatches.length > 0 && (
                 <div className="pack-match-list">
@@ -1046,6 +1036,19 @@ export default function InventoryConsole({
                 )}
               </div>
             </div>
+            {packCards.length > 0 && (
+              <footer className="pack-intake-footer">
+                <span>선택 {packCards.filter((item) => item.quantity > 0).length}종</span>
+                <button
+                  className="pack-save"
+                  type="button"
+                  disabled={busy || packLoading || !packCards.some((item) => item.quantity)}
+                  onClick={savePack}
+                >
+                  <PackagePlus size={17} /> 선택 수량 저장
+                </button>
+              </footer>
+            )}
             <button
               className="pack-window-resizer resize-right"
               type="button"
@@ -1199,34 +1202,31 @@ export default function InventoryConsole({
                 <h3>재고 추가</h3>
                 <p>카드와 판매 정보를 선택해 저장하세요.</p>
               </div>
-              <div className="pack-intake-header-controls">
-                {renderIntakeSelectors()}
-                <div className="pack-search-controls">
-                  <div className="pack-search pack-modal-search">
-                    <input
-                      value={addQuery}
-                      onChange={(event) => setAddQuery(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          searchAddCards();
-                        }
-                      }}
-                      placeholder="카드명 검색"
-                    />
-                    <button type="button" disabled={!addQuery.trim()} onClick={searchAddCards}>
-                      <Search size={16} /> 검색
-                    </button>
-                  </div>
-                </div>
-              </div>
               <button type="button" aria-label="재고 추가 닫기" onClick={closeAddModal}>
                 <X size={19} />
               </button>
             </header>
+            <div className="inventory-intake-toolbar">
+              {renderIntakeSelectors()}
+              <div className="pack-search pack-modal-search">
+                <input
+                  value={addQuery}
+                  onChange={(event) => setAddQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      searchAddCards();
+                    }
+                  }}
+                  placeholder="카드명 검색"
+                />
+                <button type="button" disabled={!addQuery.trim()} onClick={searchAddCards}>
+                  <Search size={16} /> 검색
+                </button>
+              </div>
+            </div>
             <div className="inventory-add-content">
               {!addCard ? (
-              <>
                 <div className="add-search-results add-search-album">
                   {addResults.map((card) => (
                     <button type="button" key={card.cardId} onClick={() => chooseAddCard(card)}>
@@ -1241,9 +1241,8 @@ export default function InventoryConsole({
                     </button>
                   ))}
                 </div>
-              </>
-            ) : (
-              <form
+              ) : (
+                <form
                 className="inventory-add-form"
                 onSubmit={async (event) => {
                   event.preventDefault();
@@ -1357,8 +1356,8 @@ export default function InventoryConsole({
                 <button className="pack-save" type="submit">
                   재고 저장
                 </button>
-              </form>
-            )}
+                </form>
+              )}
             </div>
             {resizeHandles.map(([direction, label]) => (
               <button
