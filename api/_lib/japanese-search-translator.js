@@ -1,8 +1,6 @@
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
-const NVIDIA_MODEL = process.env.NVIDIA_NIM_MODEL || "google/gemma-3-12b-it";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const translationCache = new Map();
-let warnedInvalidNvidiaKey = false;
 
 const SEARCH_DICTIONARY = {
   yugioh: new Map([
@@ -38,7 +36,10 @@ const SEARCH_DICTIONARY = {
 
 const RELEASE_SEARCH_DICTIONARY = {
   yugioh: new Map([["스톰", ["ストーム"]]]),
-  pokemon: new Map([["스톰", ["ストーム"]]]),
+  pokemon: new Map([
+    ["스톰", ["ストーム"]],
+    ["메가드림", ["MEGAドリームex", "メガドリーム"]],
+  ]),
   onepiece: new Map([["스톰", ["ストーム"]]]),
 };
 
@@ -98,52 +99,6 @@ const normalizeKoreanNames = (value, count) => {
   });
 };
 
-async function translateWithNvidia(query, game, gameLabel, target) {
-  const apiKey = process.env.NVIDIA_API_KEY;
-  if (!apiKey) return [];
-  if (!apiKey.startsWith("nvapi-")) {
-    if (!warnedInvalidNvidiaKey) {
-      console.warn("NVIDIA_API_KEY is not an NVIDIA NIM API key; skipping NVIDIA translation.");
-      warnedInvalidNvidiaKey = true;
-    }
-    return [];
-  }
-  const gameContext =
-    game === "pokemon"
-      ? 'For Pokemon, Korean "빛나" refers to the character Dawn; her official Japanese name is "ヒカリ", not the literal word for shining.'
-      : game === "onepiece"
-        ? "Resolve names as One Piece characters or cards, not literal dictionary translations."
-        : "Resolve names as Yu-Gi-Oh! characters, monsters, archetypes, or official card names, not literal dictionary translations.";
-  const targetContext =
-    target === "release"
-      ? `Identify the official Japanese names of ${gameLabel} products, booster packs, expansions, and releases.`
-      : `Identify official Japanese card names or character names for ${gameLabel}.`;
-  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: NVIDIA_MODEL,
-      messages: [
-        {
-          role: "system",
-          content: `You are a Japanese official ${gameLabel} database search assistant. ${targetContext} Resolve the intended entity from Korean game context; do not translate ambiguous names literally. ${gameContext} Return up to 3 Japanese search terms as JSON only: {"terms":["..."]}.`,
-        },
-        { role: "user", content: query },
-      ],
-      temperature: 0.1,
-      max_tokens: 128,
-      stream: false,
-    }),
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!response.ok) {
-    console.warn(`NVIDIA NIM translation request failed (${response.status}).`);
-    return [];
-  }
-  const body = await response.json();
-  return normalizeJapaneseTerms(body.choices?.[0]?.message?.content);
-}
-
 async function translateWithGemini(query, game, gameLabel, target) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return [];
@@ -164,6 +119,7 @@ async function translateWithGemini(query, game, gameLabel, target) {
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
+      ...(process.env.GEMINI_SEARCH_GROUNDING === "true" ? { tools: [{ googleSearch: {} }] } : {}),
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -185,36 +141,6 @@ async function translateWithGemini(query, game, gameLabel, target) {
   return normalizeJapaneseTerms(body.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join(""));
 }
 
-async function translateDisplayNamesWithNvidia(names, game, gameLabel, target) {
-  const apiKey = process.env.NVIDIA_API_KEY;
-  if (!apiKey?.startsWith("nvapi-")) return [];
-  const itemType = target === "release" ? "products, booster packs, and releases" : "cards and characters";
-  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: NVIDIA_MODEL,
-      messages: [
-        {
-          role: "system",
-          content: `Translate Japanese official ${gameLabel} ${itemType} into Korean. For each item, use its established official Korean release name if one exists; otherwise provide a concise natural Korean name. Preserve item order and return one Korean name for every input. Return JSON only as {"names":["..."]}.`,
-        },
-        { role: "user", content: JSON.stringify(names) },
-      ],
-      temperature: 0.1,
-      max_tokens: Math.min(1024, names.length * 48),
-      stream: false,
-    }),
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!response.ok) {
-    console.warn(`NVIDIA NIM display-name translation failed (${response.status}).`);
-    return [];
-  }
-  const body = await response.json();
-  return normalizeKoreanNames(body.choices?.[0]?.message?.content, names.length);
-}
-
 async function translateDisplayNamesWithGemini(names, game, gameLabel, target) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return [];
@@ -230,6 +156,7 @@ async function translateDisplayNamesWithGemini(names, game, gameLabel, target) {
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
+      ...(process.env.GEMINI_SEARCH_GROUNDING === "true" ? { tools: [{ googleSearch: {} }] } : {}),
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -272,20 +199,7 @@ export async function translateJapaneseDisplayNames(game, sourceNames, target = 
   for (let index = 0; index < missing.length; index += 24) chunks.push(missing.slice(index, index + 24));
   await mapChunksWithConcurrency(chunks, 2, async (chunk) => {
     const chunkNames = chunk.map((item) => item.name);
-    const nvidiaNames = await translateDisplayNamesWithNvidia(chunkNames, game, gameLabel, target).catch(() => []);
-    const localized = Array.from({ length: chunk.length }, (_unused, index) => nvidiaNames[index] || "");
-    const missingIndexes = localized.flatMap((name, index) => (name ? [] : [index]));
-    if (missingIndexes.length) {
-      const fallback = await translateDisplayNamesWithGemini(
-        missingIndexes.map((index) => chunkNames[index]),
-        game,
-        gameLabel,
-        target,
-      ).catch(() => []);
-      missingIndexes.forEach((index, fallbackIndex) => {
-        localized[index] = fallback[fallbackIndex] || "";
-      });
-    }
+    const localized = await translateDisplayNamesWithGemini(chunkNames, game, gameLabel, target).catch(() => []);
     chunk.forEach(({ index, cacheKey }, chunkIndex) => {
       const name = localized[chunkIndex];
       if (!name) return;
@@ -326,19 +240,10 @@ async function translateJapaneseTerms(game, query, target) {
   const gameLabel =
     game === "pokemon" ? "포켓몬 카드 게임" : game === "onepiece" ? "원피스 카드 게임" : "유희왕 오피셜 카드 게임";
   try {
-    const nvidiaTerms = await translateWithNvidia(String(query).trim().slice(0, 80), game, gameLabel, target).catch(
-      () => {
-        console.warn("NVIDIA NIM translation request could not be completed.");
-        return [];
-      },
-    );
-    const geminiTerms = nvidiaTerms.length
-      ? []
-      : await translateWithGemini(String(query).trim().slice(0, 80), game, gameLabel, target).catch(() => {
-          console.warn("Gemini translation request could not be completed.");
-          return [];
-        });
-    const terms = nvidiaTerms.length ? nvidiaTerms : geminiTerms;
+    const terms = await translateWithGemini(String(query).trim().slice(0, 80), game, gameLabel, target).catch(() => {
+      console.warn("Gemini translation request could not be completed.");
+      return [];
+    });
     if (terms.length) translationCache.set(cacheKey, { terms, expiresAt: Date.now() + CACHE_TTL });
     return terms;
   } catch {
