@@ -145,6 +145,7 @@ export default function InventoryConsole({
     link.click();
   };
   const findPacks = async () => {
+    setPackWindow(null);
     const releases = await fetchGameReleaseList(intakeGame, intakeLanguage);
     const query = packQuery.trim();
     const terms = [query];
@@ -170,6 +171,8 @@ export default function InventoryConsole({
   };
   const changeIntakeGame = (game) => {
     setIntakeGame(game);
+    setPackWindow(null);
+    setAddWindow(null);
     setPackMatches([]);
     setPackCards([]);
     setAddResults([]);
@@ -178,6 +181,8 @@ export default function InventoryConsole({
   };
   const changeIntakeLanguage = (language) => {
     setIntakeLanguage(language);
+    setPackWindow(null);
+    setAddWindow(null);
     setPackMatches([]);
     setPackCards([]);
     setAddResults([]);
@@ -224,6 +229,7 @@ export default function InventoryConsole({
     }
   };
   const choosePack = async (release) => {
+    setPackWindow(null);
     setPackLoading(true);
     setPackCards([]);
     setPackModalOpen(true);
@@ -453,8 +459,19 @@ export default function InventoryConsole({
     setImportRows([]);
     setImportOpen(false);
   };
+  const closePackModal = () => {
+    setPackModalOpen(false);
+    setPackWindow(null);
+    setPackQuery("");
+    setPackMatches([]);
+    setPackCards([]);
+    setPackLoading(false);
+  };
   const openPackModal = () => {
     setPackWindow(null);
+    setPackQuery("");
+    setPackMatches([]);
+    setPackCards([]);
     setPackModalOpen(true);
   };
   const openAddModal = () => {
@@ -520,6 +537,7 @@ export default function InventoryConsole({
   };
   const searchAddCards = async () => {
     const query = addQuery.trim();
+    setAddWindow(null);
     setAddCard(null);
     if (!query) {
       setAddResults([]);
@@ -545,6 +563,8 @@ export default function InventoryConsole({
   };
   const closeAddModal = () => {
     setAddModalOpen(false);
+    setAddWindow(null);
+    setAddResults([]);
     setAddCard(null);
     setAddRarityEditing(false);
   };
@@ -948,7 +968,7 @@ export default function InventoryConsole({
                 <h3>팩 개봉 일괄 입고</h3>
                 <p>카드 이미지 위 수량을 조정한 뒤 저장하세요.</p>
               </div>
-              <button type="button" aria-label="팩 입고 닫기" onClick={() => setPackModalOpen(false)}>
+              <button type="button" aria-label="팩 입고 닫기" onClick={closePackModal}>
                 <X size={19} />
               </button>
             </header>
@@ -1049,6 +1069,8 @@ export default function InventoryConsole({
                 </button>
               </footer>
             )}
+            {packCards.length > 0 && (
+              <>
             <button
               className="pack-window-resizer resize-right"
               type="button"
@@ -1121,6 +1143,8 @@ export default function InventoryConsole({
               onPointerUp={stopPackResize}
               onPointerCancel={stopPackResize}
             />
+              </>
+            )}
           </section>
         </div>
       )}
@@ -1359,7 +1383,7 @@ export default function InventoryConsole({
                 </form>
               )}
             </div>
-            {resizeHandles.map(([direction, label]) => (
+            {(addResults.length > 0 || addCard) && resizeHandles.map(([direction, label]) => (
               <button
                 className={`pack-window-resizer resize-${direction}`}
                 type="button"

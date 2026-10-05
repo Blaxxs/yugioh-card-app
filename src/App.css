@@ -2061,7 +2061,7 @@ button:disabled {
 .pack-intake-dialog.pack-cards-dialog {
   width: min(1440px, calc(100vw - 48px));
   height: min(82dvh, 860px);
-  min-height: 520px;
+  min-height: 420px;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 .pack-intake-dialog.pack-search-dialog {
@@ -2173,7 +2173,7 @@ button:disabled {
   }
   .pack-intake-dialog.pack-cards-dialog {
     width: min(1440px, calc(100vw - 48px));
-    min-width: 900px;
+    min-width: 420px;
   }
   .pack-intake-dialog.inventory-add-dialog {
     width: min(760px, calc(100vw - 48px));
@@ -2181,7 +2181,7 @@ button:disabled {
   }
   .pack-intake-dialog.inventory-add-dialog.pack-cards-dialog {
     width: min(1440px, calc(100vw - 48px));
-    min-width: 900px;
+    min-width: 420px;
   }
   .pack-intake-dialog.inventory-add-dialog.pack-search-dialog {
     width: min(760px, calc(100vw - 48px));
