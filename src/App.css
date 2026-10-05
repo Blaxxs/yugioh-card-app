@@ -1033,6 +1033,29 @@ button:disabled {
 .inventory-add-dialog {
   width: min(420px, calc(100vw - 48px));
 }
+.inventory-intake-selectors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 12px;
+}
+.inventory-intake-selectors label {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+.inventory-intake-selectors select {
+  width: 100%;
+  min-width: 0;
+}
+.inventory-import-intake {
+  flex: 1 1 260px;
+}
+.inventory-import-intake .inventory-intake-selectors {
+  margin: 0;
+}
 .inventory-add-form input[type="number"],
 .pack-card-album input[type="number"] {
   appearance: textfield;
