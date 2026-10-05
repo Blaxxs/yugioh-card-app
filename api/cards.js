@@ -481,7 +481,7 @@ async function getCardDetail(cardId, database, language) {
 async function searchCards(query, database, language, filters = {}) {
   const normalizedTerm = normalizeSearchTerm(query);
   const filterKey = JSON.stringify(Object.fromEntries(Object.entries(filters).filter(([, value]) => value)));
-  const queryKey = `yugioh:v10:${language}:${normalizedTerm}:${filterKey}`;
+  const queryKey = `yugioh:v11:${language}:${normalizedTerm}:${filterKey}`;
   if (database) {
     if (Date.now() - lastExpiredCacheCleanup > 60 * 60 * 1000) {
       lastExpiredCacheCleanup = Date.now();
@@ -498,10 +498,18 @@ async function searchCards(query, database, language, filters = {}) {
     }
   }
 
+  let cards = [];
+  const looksLikeSetCode = /^[a-z0-9]{2,}(?:-[a-z0-9]+)+$/i.test(query);
+  if (looksLikeSetCode) {
+    const codeUrl = createSearchUrl(query, language, filters);
+    codeUrl.searchParams.set("stype", "4");
+    const codeHtml = await fetchOfficialHtml(codeUrl, language).catch(() => "");
+    if (codeHtml) cards = parseSearchResults(codeHtml, "");
+  }
+
   const koreanJapaneseQuery = language === "ja" && /[\uac00-\ud7a3]/i.test(query);
   const translatedTerms = koreanJapaneseQuery ? await translateJapaneseSearchTerms("yugioh", query) : [];
-  let cards = [];
-  if (translatedTerms.length) {
+  if (!cards.length && translatedTerms.length) {
     const translatedResults = await mapWithConcurrency(translatedTerms, 3, async (term) => {
       const translatedHtml = await fetchOfficialHtml(createSearchUrl(term, language, filters), language).catch(
         () => "",

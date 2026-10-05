@@ -538,7 +538,14 @@ export default function InventoryConsole({
       setAddResults([]);
       return;
     }
-    setAddResults(await searchGameCards(intakeGame, query, intakeLanguage));
+    const cards = await searchGameCards(intakeGame, query, intakeLanguage);
+    const normalizeCode = (value) => String(value || "").replace(/[^a-z0-9]/gi, "").toUpperCase();
+    const exactCodeMatches = cards.filter((card) =>
+      [card.cardId, card.id, ...(card.card_sets || []).map((set) => set.set_code)].some(
+        (code) => normalizeCode(code) === normalizeCode(query),
+      ),
+    );
+    setAddResults(exactCodeMatches.length ? exactCodeMatches : cards);
   };
   const chooseAddCard = async (card) => {
     const detailed = card.isDetailLoaded
@@ -1236,7 +1243,7 @@ export default function InventoryConsole({
                       searchAddCards();
                     }
                   }}
-                  placeholder="카드명 검색"
+                  placeholder="카드명 또는 카드 코드 검색"
                 />
                 <button type="button" disabled={!addQuery.trim()} onClick={searchAddCards}>
                   <Search size={16} /> 검색
