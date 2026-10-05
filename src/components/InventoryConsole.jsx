@@ -377,17 +377,6 @@ export default function InventoryConsole({
     setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, price } : item)));
   const changePackMemo = (key, memo) =>
     setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, memo } : item)));
-  const changePackCode = (key, code) =>
-    setPackCards((items) =>
-      items.map((item) =>
-        packKey(item.card) === key
-          ? {
-              ...item,
-              card: { ...item.card, card_sets: [{ ...(item.card.card_sets?.[0] || {}), set_code: code.trim() }] },
-            }
-          : item,
-      ),
-    );
   const startPackResize = (event, direction, setWindow = setPackWindow) => {
     const rect = event.currentTarget.parentElement.getBoundingClientRect();
     resizeRef.current = { startX: event.clientX, startY: event.clientY, rect, direction, setWindow };
@@ -736,6 +725,7 @@ export default function InventoryConsole({
     setAddResults(exactCodeMatches.length ? exactCodeMatches : cards);
   };
   const chooseAddCard = async (card) => {
+    setAddWindow(null);
     const detailed = card.isDetailLoaded
       ? card
       : await fetchGameCardById(
@@ -1367,16 +1357,6 @@ export default function InventoryConsole({
                             </span>
                           )}
                         </small>
-                        {intakeGame === "pokemon" && intakeLanguage === "ja" && (
-                          <input
-                            className="pack-card-memo"
-                            type="text"
-                            aria-label={`${card.name} 카드 코드`}
-                            placeholder="카드 코드 (예: 001/193)"
-                            value={card.card_sets?.[0]?.set_code || ""}
-                            onChange={(event) => changePackCode(packKey(card), event.target.value)}
-                          />
-                        )}
                       </article>
                     ))}
                   </div>
@@ -1538,7 +1518,7 @@ export default function InventoryConsole({
         <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="재고 추가">
           <button className="pack-intake-backdrop" type="button" aria-label="재고 추가 배경" />
           <section
-            className={`pack-intake-dialog inventory-add-dialog ${addResults.length || addCard ? "pack-cards-dialog" : "pack-search-dialog"}`}
+            className={`pack-intake-dialog inventory-add-dialog ${addCard ? "inventory-add-detail-dialog" : addResults.length ? "inventory-add-results-dialog" : "pack-search-dialog"}`}
             style={addWindow ? { ...addWindow, position: "fixed" } : undefined}
           >
             <header
@@ -1594,6 +1574,7 @@ export default function InventoryConsole({
                 </div>
               ) : (
                 <form
+                  id="inventory-add-form"
                   className="inventory-add-form"
                   onSubmit={async (event) => {
                     event.preventDefault();
@@ -1704,7 +1685,7 @@ export default function InventoryConsole({
                       <option>C급</option>
                     </select>
                   </label>
-                  <label>
+                  <label className="inventory-add-price-field">
                     가격
                     <input
                       className="price-input"
@@ -1714,7 +1695,7 @@ export default function InventoryConsole({
                       onChange={(event) => setAddPrice(event.target.value)}
                     />
                   </label>
-                  <label>
+                  <label className="inventory-add-quantity-field">
                     수량
                     <input
                       type="number"
@@ -1727,12 +1708,19 @@ export default function InventoryConsole({
                     비고
                     <input type="text" value={addMemo} onChange={(event) => setAddMemo(event.target.value)} />
                   </label>
-                  <button className="pack-save" type="submit">
-                    재고 저장
-                  </button>
                 </form>
               )}
             </div>
+            {addCard && (
+              <footer className="inventory-add-footer">
+                <button type="button" disabled={busy} onClick={closeAddModal}>
+                  취소
+                </button>
+                <button className="pack-save" type="submit" form="inventory-add-form" disabled={busy}>
+                  <Save size={16} /> {busy ? "저장 중" : "재고 저장"}
+                </button>
+              </footer>
+            )}
             {(addResults.length > 0 || addCard) &&
               resizeHandles.map(([direction, label]) => (
                 <button

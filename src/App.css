@@ -1131,8 +1131,6 @@ button:disabled {
   display: grid;
   min-width: 0;
   gap: 9px;
-  max-height: 600px;
-  overflow: auto;
   padding: 12px;
 }
 .add-card-preview {
@@ -2269,8 +2267,124 @@ button:disabled {
 .inventory-add-dialog.pack-search-dialog .inventory-add-content:has(.add-search-results:empty) {
   display: none;
 }
-.inventory-add-dialog.pack-cards-dialog .inventory-add-content {
-  max-height: calc(96dvh - 180px);
+.pack-intake-dialog.inventory-add-dialog.inventory-add-detail-dialog,
+.pack-intake-dialog.inventory-add-dialog.inventory-add-results-dialog {
+  width: min(680px, calc(100vw - 48px));
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  max-height: calc(100dvh - 48px);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+.pack-intake-dialog.inventory-add-dialog.inventory-add-results-dialog {
+  height: min(600px, calc(100dvh - 48px));
+}
+.pack-intake-dialog.inventory-add-dialog.inventory-add-detail-dialog {
+  max-height: min(680px, calc(100dvh - 48px));
+}
+.inventory-add-detail-dialog > .pack-intake-header,
+.inventory-add-results-dialog > .pack-intake-header {
+  padding: 12px 16px;
+}
+.inventory-add-detail-dialog .inventory-intake-toolbar,
+.inventory-add-results-dialog .inventory-intake-toolbar {
+  padding: 10px 16px;
+  gap: 8px;
+}
+.inventory-add-detail-dialog .inventory-intake-selectors select,
+.inventory-add-results-dialog .inventory-intake-selectors select {
+  height: 34px;
+}
+.inventory-add-detail-dialog .inventory-add-form {
+  grid-template-columns: 140px repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  align-content: start;
+  padding: 20px;
+}
+.inventory-add-detail-dialog .add-card-preview {
+  grid-column: 1;
+  grid-row: 1 / span 6;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 10px;
+}
+.inventory-add-detail-dialog .add-card-preview > img {
+  width: 100%;
+}
+.inventory-add-detail-dialog .inventory-add-form > strong,
+.inventory-add-detail-dialog .inventory-add-form > label {
+  grid-column: 2 / -1;
+  min-width: 0;
+}
+.inventory-add-detail-dialog .inventory-add-form input,
+.inventory-add-detail-dialog .inventory-add-form select,
+.inventory-add-detail-dialog .rarity-value {
+  width: 100%;
+  min-width: 0;
+}
+.inventory-add-detail-dialog .inventory-add-form > strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.inventory-add-detail-dialog .inventory-add-form > .inventory-add-price-field {
+  grid-column: 2;
+}
+.inventory-add-detail-dialog .inventory-add-form > .inventory-add-quantity-field {
+  grid-column: 3;
+}
+.inventory-add-detail-dialog .pack-intake-title p,
+.inventory-add-results-dialog .pack-intake-title p {
+  display: none;
+}
+.inventory-add-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid #c9ced8;
+  background: #fff;
+}
+.inventory-add-footer > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid #c4cad5;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+.inventory-add-footer > button.pack-save {
+  background: var(--app-primary);
+  color: #fff;
+}
+@media (max-width: 600px) {
+  .inventory-add-detail-dialog .inventory-add-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 14px;
+    gap: 12px;
+  }
+  .inventory-add-detail-dialog .add-card-preview {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    grid-template-columns: 90px minmax(0, 1fr);
+  }
+  .inventory-add-detail-dialog .inventory-add-form > strong,
+  .inventory-add-detail-dialog .inventory-add-form > label {
+    grid-column: 1 / -1;
+  }
+  .inventory-add-detail-dialog .inventory-add-form > .inventory-add-price-field {
+    grid-column: 1;
+  }
+  .inventory-add-detail-dialog .inventory-add-form > .inventory-add-quantity-field {
+    grid-column: 2;
+  }
+  .inventory-add-footer {
+    padding: 10px 14px;
+  }
 }
 .pack-intake-footer {
   display: flex;
@@ -2357,10 +2471,6 @@ button:disabled {
   .pack-intake-dialog.inventory-add-dialog {
     width: min(480px, calc(100vw - 48px));
     min-width: 0;
-  }
-  .pack-intake-dialog.inventory-add-dialog.pack-cards-dialog {
-    width: min(1440px, calc(100vw - 48px));
-    min-width: 420px;
   }
   .pack-intake-dialog.inventory-add-dialog.pack-search-dialog {
     width: min(480px, calc(100vw - 48px));
