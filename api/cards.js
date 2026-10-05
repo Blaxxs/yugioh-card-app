@@ -149,7 +149,7 @@ async function getExternalCardDetail(game, cardId, database, language) {
 }
 
 async function getExternalSearch(game, query, database, offset = 0, language = "ko", filters = {}) {
-  const cacheVersion = game === "onepiece" ? "v13" : game === "pokemon" ? "v10" : "v4";
+  const cacheVersion = game === "onepiece" ? "v14" : game === "pokemon" ? "v10" : "v4";
   const filterKey = JSON.stringify(Object.fromEntries(Object.entries(filters).filter(([, value]) => value)));
   const cacheScope = `${game}:${language}:${cacheVersion}:${normalizeSearchTerm(query)}:${filterKey}`;
   const queryKey = pageCacheKey(cacheScope, offset);

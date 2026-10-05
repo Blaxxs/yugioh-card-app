@@ -69,9 +69,10 @@ function parseCard($, element) {
 }
 
 async function fetchCardList({ term = "", series = "", filters = {} }) {
+  const selectedSeries = series || filters.series || "";
   const params = new URLSearchParams({
     freewords: term,
-    series: series || filters.series || "",
+    series: selectedSeries === "all" ? "" : selectedSeries,
     "cost[min]": "",
     "cost[max]": "",
     "power[min]": "",
