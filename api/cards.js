@@ -481,7 +481,7 @@ async function getCardDetail(cardId, database, language) {
 async function searchCards(query, database, language, filters = {}) {
   const normalizedTerm = normalizeSearchTerm(query);
   const filterKey = JSON.stringify(Object.fromEntries(Object.entries(filters).filter(([, value]) => value)));
-  const queryKey = `yugioh:v11:${language}:${normalizedTerm}:${filterKey}`;
+  const queryKey = `yugioh:v12:${language}:${normalizedTerm}:${filterKey}`;
   if (database) {
     if (Date.now() - lastExpiredCacheCleanup > 60 * 60 * 1000) {
       lastExpiredCacheCleanup = Date.now();
@@ -499,9 +499,28 @@ async function searchCards(query, database, language, filters = {}) {
   }
 
   let cards = [];
+  if (language === "ja") {
+    const prefixMatch = query.toUpperCase().match(/^([A-Z0-9]{2,8})(?:-?JP)?$/);
+    const prefix = prefixMatch?.[1];
+    const looksLikePrefix = prefix && (/[0-9]/.test(prefix) || query === query.toUpperCase());
+    if (looksLikePrefix) {
+      const prefixCodes = Array.from(
+        { length: 20 },
+        (_unused, index) => `${prefix}-JP${String(index + 1).padStart(3, "0")}`,
+      );
+      const prefixResults = await mapWithConcurrency(prefixCodes, 5, async (code) => {
+        const codeUrl = createSearchUrl(code, language, filters);
+        codeUrl.searchParams.set("stype", "4");
+        const html = await fetchOfficialHtml(codeUrl, language).catch(() => "");
+        return html ? parseSearchResults(html, "") : [];
+      });
+      cards = [...new Map(prefixResults.flat().map((card) => [card.cardId, card])).values()];
+    }
+  }
+
   const looksLikeSetCode = /^[a-z0-9]{2,}(?:-[a-z0-9]+)+$/i.test(query);
-  if (looksLikeSetCode) {
-    const codeUrl = createSearchUrl(query, language, filters);
+  if (!cards.length && looksLikeSetCode) {
+    const codeUrl = createSearchUrl(query.toUpperCase(), language, filters);
     codeUrl.searchParams.set("stype", "4");
     const codeHtml = await fetchOfficialHtml(codeUrl, language).catch(() => "");
     if (codeHtml) cards = parseSearchResults(codeHtml, "");

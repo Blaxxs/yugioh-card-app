@@ -539,7 +539,10 @@ export default function InventoryConsole({
       return;
     }
     const cards = await searchGameCards(intakeGame, query, intakeLanguage);
-    const normalizeCode = (value) => String(value || "").replace(/[^a-z0-9]/gi, "").toUpperCase();
+    const normalizeCode = (value) =>
+      String(value || "")
+        .replace(/[^a-z0-9]/gi, "")
+        .toUpperCase();
     const exactCodeMatches = cards.filter((card) =>
       [card.cardId, card.id, ...(card.card_sets || []).map((set) => set.set_code)].some(
         (code) => normalizeCode(code) === normalizeCode(query),
@@ -948,11 +951,7 @@ export default function InventoryConsole({
       )}
       {packModalOpen && (
         <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="팩 개봉 입고">
-          <button
-            className="pack-intake-backdrop"
-            type="button"
-            aria-label="팩 입고 닫기"
-          />
+          <button className="pack-intake-backdrop" type="button" aria-label="팩 입고 닫기" />
           <section
             className={`pack-intake-dialog ${packCards.length || packMatches.length || packLoading ? "pack-cards-dialog" : "pack-search-dialog"}`}
             style={packWindow ? { ...packWindow, position: "fixed" } : undefined}
