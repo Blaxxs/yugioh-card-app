@@ -334,7 +334,7 @@ export default function InventoryConsole({
     });
   };
   const startPackDrag = (event, setWindow = setPackWindow) => {
-    if (event.target.closest("button")) return;
+    if (event.target.closest("button, input, select, textarea")) return;
     const rect = event.currentTarget.parentElement.getBoundingClientRect();
     dragRef.current = { startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top, setWindow };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -936,21 +936,57 @@ export default function InventoryConsole({
             style={packWindow ? { ...packWindow, position: "fixed" } : undefined}
           >
             <header
+              className="pack-intake-header"
               onPointerDown={startPackDrag}
               onPointerMove={dragPack}
               onPointerUp={stopPackDrag}
               onPointerCancel={stopPackDrag}
             >
-              <div>
+              <div className="pack-intake-title">
                 <span>PACK INTAKE</span>
                 <h3>팩 개봉 일괄 입고</h3>
                 <p>카드 이미지 위 수량을 조정한 뒤 저장하세요.</p>
+              </div>
+              <div className="pack-intake-header-controls">
+                {renderIntakeSelectors(packLoading)}
+                <div className="pack-search-controls">
+                  <div className="pack-search pack-modal-search">
+                    <input
+                      value={packQuery}
+                      disabled={packLoading}
+                      onChange={(event) => setPackQuery(event.target.value)}
+                      onKeyDown={handlePackSearchKeyDown}
+                      placeholder="수록 팩 이름"
+                    />
+                    <button type="button" disabled={packLoading} onClick={findPacks}>
+                      <Search size={16} aria-hidden="true" /> 찾기
+                    </button>
+                  </div>
+                  <button
+                    className="pack-save pack-search-save"
+                    type="button"
+                    disabled={busy || packLoading || !packCards.some((item) => item.quantity)}
+                    onClick={savePack}
+                  >
+                    <PackagePlus size={17} /> 선택 수량 저장
+                  </button>
+                </div>
               </div>
               <button type="button" aria-label="팩 입고 닫기" onClick={() => setPackModalOpen(false)}>
                 <X size={19} />
               </button>
             </header>
-            <div className="pack-intake-layout">
+            <div className="pack-intake-content">
+              {!packLoading && packMatches.length > 0 && (
+                <div className="pack-match-list">
+                  {packMatches.map((release) => (
+                    <button className="pack-match" type="button" key={release.id} onClick={() => choosePack(release)}>
+                      {release.localizedName || release.name}
+                      <small>{release.date}</small>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="pack-intake-main">
                 {packLoading ? (
                   <div className="pack-loading-state">
@@ -1008,40 +1044,6 @@ export default function InventoryConsole({
                   </div>
                 )}
               </div>
-              <aside className="pack-intake-sidebar">
-                {renderIntakeSelectors(packLoading)}
-                <div className="pack-search-controls">
-                  <div className="pack-search pack-modal-search">
-                    <input
-                      value={packQuery}
-                      disabled={packLoading}
-                      onChange={(event) => setPackQuery(event.target.value)}
-                      onKeyDown={handlePackSearchKeyDown}
-                      placeholder="수록 팩 이름"
-                    />
-                    <button type="button" disabled={packLoading} onClick={findPacks}>
-                      <Search size={16} aria-hidden="true" /> 찾기
-                    </button>
-                  </div>
-                  <button
-                    className="pack-save pack-search-save"
-                    type="button"
-                    disabled={busy || packLoading || !packCards.some((item) => item.quantity)}
-                    onClick={savePack}
-                  >
-                    <PackagePlus size={17} /> 선택 수량 저장
-                  </button>
-                </div>
-                <div className="pack-match-list">
-                  {!packLoading &&
-                    packMatches.map((release) => (
-                      <button className="pack-match" type="button" key={release.id} onClick={() => choosePack(release)}>
-                        {release.localizedName || release.name}
-                        <small>{release.date}</small>
-                      </button>
-                    ))}
-                </div>
-              </aside>
             </div>
             <button
               className="pack-window-resizer resize-right"
