@@ -13,6 +13,16 @@ import SalesHistory from "./SalesHistory";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
+const resizeHandles = [
+  ["right", "오른쪽 크기 조절"],
+  ["left", "왼쪽 크기 조절"],
+  ["bottom", "아래쪽 크기 조절"],
+  ["bottom-left", "왼쪽 아래 크기 조절"],
+  ["bottom-right", "오른쪽 아래 크기 조절"],
+  ["top", "위쪽 크기 조절"],
+  ["top-left", "왼쪽 위 크기 조절"],
+  ["top-right", "오른쪽 위 크기 조절"],
+];
 
 export default function InventoryConsole({
   activeGame,
@@ -39,6 +49,7 @@ export default function InventoryConsole({
   const [packModalOpen, setPackModalOpen] = useState(false);
   const [packLoading, setPackLoading] = useState(false);
   const [packWindow, setPackWindow] = useState(null);
+  const [addWindow, setAddWindow] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importRows, setImportRows] = useState([]);
   const [importLoading, setImportLoading] = useState(false);
@@ -252,14 +263,14 @@ export default function InventoryConsole({
     );
   const changePackPrice = (key, price) =>
     setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, price } : item)));
-  const startPackResize = (event, direction) => {
+  const startPackResize = (event, direction, setWindow = setPackWindow) => {
     const rect = event.currentTarget.parentElement.getBoundingClientRect();
-    resizeRef.current = { startX: event.clientX, startY: event.clientY, rect, direction };
+    resizeRef.current = { startX: event.clientX, startY: event.clientY, rect, direction, setWindow };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const resizePack = (event) => {
     if (!resizeRef.current) return;
-    const { rect, startX, startY, direction } = resizeRef.current;
+    const { rect, startX, startY, direction, setWindow } = resizeRef.current;
     const deltaX = event.clientX - startX;
     const deltaY = event.clientY - startY;
     const maxWidth = Math.max(420, window.innerWidth - 48);
@@ -286,7 +297,7 @@ export default function InventoryConsole({
             : rect.height,
       ),
     );
-    setPackWindow({
+    setWindow({
       left: Math.max(
         24,
         Math.min(window.innerWidth - width - 24, direction.includes("left") ? rect.left + deltaX : rect.left),
@@ -299,16 +310,16 @@ export default function InventoryConsole({
       height,
     });
   };
-  const startPackDrag = (event) => {
+  const startPackDrag = (event, setWindow = setPackWindow) => {
     if (event.target.closest("button")) return;
     const rect = event.currentTarget.parentElement.getBoundingClientRect();
-    dragRef.current = { startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top };
+    dragRef.current = { startX: event.clientX, startY: event.clientY, left: rect.left, top: rect.top, setWindow };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const dragPack = (event) => {
     const drag = dragRef.current;
     if (!drag) return;
-    setPackWindow((current) => ({
+    drag.setWindow((current) => ({
       ...(current || {}),
       left: drag.left + event.clientX - drag.startX,
       top: drag.top + event.clientY - drag.startY,
@@ -427,6 +438,10 @@ export default function InventoryConsole({
   const openPackModal = () => {
     setPackWindow(null);
     setPackModalOpen(true);
+  };
+  const openAddModal = () => {
+    setAddWindow(null);
+    setAddModalOpen(true);
   };
 
   const languageOf = (item) =>
@@ -564,7 +579,7 @@ export default function InventoryConsole({
         <button className="pack-intake-open" type="button" onClick={openPackModal}>
           일괄 재고 추가
         </button>
-        <button className="inventory-add-open" type="button" onClick={() => setAddModalOpen(true)}>
+        <button className="inventory-add-open" type="button" onClick={openAddModal}>
           재고 추가
         </button>
         <button className="inventory-sell-open" type="button" disabled={!selectedIds.size} onClick={openSellModal}>
@@ -1140,8 +1155,17 @@ export default function InventoryConsole({
       {addModalOpen && (
         <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="재고 추가">
           <button className="pack-intake-backdrop" type="button" aria-label="재고 추가 닫기" onClick={closeAddModal} />
-          <section className="pack-intake-dialog inventory-add-dialog">
-            <header>
+          <section
+            className="pack-intake-dialog inventory-add-dialog"
+            style={addWindow ? { ...addWindow, position: "fixed" } : undefined}
+          >
+            <header
+              className="inventory-add-drag-handle"
+              onPointerDown={(event) => startPackDrag(event, setAddWindow)}
+              onPointerMove={dragPack}
+              onPointerUp={stopPackDrag}
+              onPointerCancel={stopPackDrag}
+            >
               <div>
                 <span>INVENTORY ADD</span>
                 <h3>재고 추가</h3>
@@ -1170,7 +1194,7 @@ export default function InventoryConsole({
                     <Search size={16} /> 검색
                   </button>
                 </div>
-                <div className="add-search-results">
+                <div className="add-search-results add-search-album">
                   {addResults.map((card) => (
                     <button type="button" key={card.cardId} onClick={() => chooseAddCard(card)}>
                       {card.card_images?.[0]?.image_url_small ? (
@@ -1302,6 +1326,18 @@ export default function InventoryConsole({
                 </button>
               </form>
             )}
+            {resizeHandles.map(([direction, label]) => (
+              <button
+                className={`pack-window-resizer resize-${direction}`}
+                type="button"
+                key={direction}
+                aria-label={label}
+                onPointerDown={(event) => startPackResize(event, direction, setAddWindow)}
+                onPointerMove={resizePack}
+                onPointerUp={stopPackResize}
+                onPointerCancel={stopPackResize}
+              />
+            ))}
           </section>
         </div>
       )}

@@ -1031,7 +1031,7 @@ button:disabled {
   text-decoration: line-through;
 }
 .inventory-add-dialog {
-  width: min(420px, calc(100vw - 48px));
+  width: min(900px, calc(100vw - 48px));
 }
 .inventory-intake-selectors {
   display: grid;
@@ -1079,31 +1079,42 @@ button:disabled {
 }
 .add-search-results {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  align-content: start;
   gap: 5px;
-  max-height: 220px;
+  max-height: min(62dvh, 620px);
   overflow: auto;
   margin: 0 12px 10px;
 }
-.add-search-results button {
+.add-search-results.add-search-album button {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  align-items: center;
-  gap: 9px;
-  min-height: 62px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: stretch;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
   border: 1px solid #cdd2dc;
   background: #fff;
   color: var(--app-ink);
-  text-align: left;
+  padding: 6px;
+  text-align: center;
   cursor: pointer;
 }
-.add-search-results img,
-.add-search-image-placeholder {
+.add-search-results.add-search-album img,
+.add-search-album .add-search-image-placeholder {
   display: grid;
-  width: 40px;
-  height: 56px;
+  width: 100%;
+  aspect-ratio: 0.72;
   place-items: center;
   object-fit: contain;
   background: #f1f3f5;
+}
+.add-search-results.add-search-album button > span:last-child {
+  overflow-wrap: anywhere;
+}
+.inventory-add-drag-handle {
+  cursor: move;
+  touch-action: none;
 }
 .inventory-add-form {
   display: grid;
@@ -2024,7 +2035,7 @@ button:disabled {
     min-width: 0;
   }
   .pack-intake-dialog.inventory-add-dialog {
-    width: 420px;
+    width: min(900px, calc(100vw - 48px));
     min-width: 0;
   }
   .pack-intake-dialog.sell-intake-dialog {
