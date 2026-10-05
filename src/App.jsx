@@ -19,6 +19,7 @@ import {
   fetchGameReleaseCards,
   fetchGameReleaseCardsPage,
   fetchGameReleaseList,
+  translateJapaneseReleaseQuery,
   searchGameCards,
   searchGameCardsPage,
 } from "./lib/tcgApi";
@@ -435,6 +436,7 @@ export default function App() {
   const [actionError, setActionError] = useState("");
   const [releases, setReleases] = useState([]);
   const [releaseQuery, setReleaseQuery] = useState("");
+  const [releaseSearchTerms, setReleaseSearchTerms] = useState({ query: "", terms: [] });
   const [selectedRelease, setSelectedRelease] = useState(savedHistory?.selectedRelease || null);
   const [releaseCards, setReleaseCards] = useState([]);
   const [releaseLoading, setReleaseLoading] = useState(false);
@@ -470,6 +472,25 @@ export default function App() {
   const viewRef = useRef({ activeTab, selectedCard, selectedRelease });
   const loadedReleasePath = useRef(null);
   const searchFilterOptionKey = `${activeGame}:${activeLanguage}`;
+
+  useEffect(() => {
+    const query = releaseQuery.trim();
+    if (activeLanguage !== "ja" || !/[\uac00-\ud7a3]/.test(query)) return undefined;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      translateJapaneseReleaseQuery(activeGame, query)
+        .then((terms) => {
+          if (!cancelled) setReleaseSearchTerms({ query, terms });
+        })
+        .catch(() => {
+          if (!cancelled) setReleaseSearchTerms({ query, terms: [] });
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [releaseQuery, activeGame, activeLanguage]);
 
   useEffect(() => {
     if (!searchFiltersOpen || activeGame === "yugioh" || searchFilterReleasesKey === searchFilterOptionKey)
@@ -831,7 +852,12 @@ export default function App() {
       ? await supabase.from("favorites").delete().eq("user_id", session.user.id).eq("card_id", card.cardId)
       : await supabase
           .from("favorites")
-          .upsert({ user_id: session.user.id, card_id: card.cardId, card_name: card.name, card_snapshot: card });
+          .upsert({
+            user_id: session.user.id,
+            card_id: card.cardId,
+            card_name: card.localizedName || card.koreanData?.cardName || card.name,
+            card_snapshot: card,
+          });
     if (result.error) return setActionError(`찜 저장 오류: ${result.error.message}`);
     setFavoriteIds((ids) => {
       const next = new Set(ids);
@@ -854,7 +880,7 @@ export default function App() {
     const payload = {
       user_id: session.user.id,
       card_id: selectedCard.cardId,
-      card_name: selectedCard.name,
+      card_name: selectedCard.localizedName || selectedCard.koreanData?.cardName || selectedCard.name,
       card_snapshot: selectedCard,
       rarity: set?.set_rarity || null,
       set_code: set?.set_code || "",
@@ -914,7 +940,7 @@ export default function App() {
             {
               user_id: session.user.id,
               card_id: card.cardId,
-              card_name: card.name,
+              card_name: card.localizedName || card.koreanData?.cardName || card.name,
               card_snapshot: card,
               rarity: set?.set_rarity || null,
               set_code: setCode,
@@ -1477,7 +1503,7 @@ export default function App() {
               <div className="release-heading">
                 <div>
                   <span>{selectedRelease.category}</span>
-                  <h2>{selectedRelease.name}</h2>
+                  <h2>{selectedRelease.localizedName || selectedRelease.name}</h2>
                   <p>{selectedRelease.date} 발매</p>
                 </div>
                 <button
@@ -1553,7 +1579,20 @@ export default function App() {
               ) : (
                 <div className="release-list">
                   {releases
-                    .filter((release) => release.name.includes(releaseQuery.trim()))
+                    .filter((release) => {
+                      const normalize = (value) =>
+                        String(value || "")
+                          .normalize("NFKC")
+                          .replace(/[\s・._-]/g, "")
+                          .toLowerCase();
+                      const translatedTerms =
+                        releaseSearchTerms.query === releaseQuery.trim() ? releaseSearchTerms.terms : [];
+                      const terms = [releaseQuery, ...translatedTerms].map(normalize).filter(Boolean);
+                      return terms.some(
+                        (term) =>
+                          normalize(release.name).includes(term) || normalize(release.localizedName).includes(term),
+                      );
+                    })
                     .map((release) => (
                       <button
                         className="release-item"
@@ -1562,7 +1601,7 @@ export default function App() {
                         onClick={() => openRelease(release)}
                       >
                         <span>{release.date}</span>
-                        <strong>{release.name}</strong>
+                        <strong>{release.localizedName || release.name}</strong>
                         <small>{release.category}</small>
                       </button>
                     ))}

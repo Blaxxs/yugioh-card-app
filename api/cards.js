@@ -1,3 +1,4 @@
+import { load } from "cheerio";
 import {
   createDetailUrl,
   createSearchUrl,
@@ -9,12 +10,17 @@ import * as pokemonKr from "./_lib/pokemon-kr-parser.js";
 import * as onePieceKr from "./_lib/onepiece-kr-parser.js";
 import * as pokemonJa from "./_lib/pokemon-ja-parser.js";
 import * as onePieceJa from "./_lib/onepiece-ja-parser.js";
-import { translateJapaneseSearchTerms } from "./_lib/japanese-search-translator.js";
+import {
+  translateJapaneseDisplayNames,
+  translateJapaneseReleaseTerms,
+  translateJapaneseSearchTerms,
+} from "./_lib/japanese-search-translator.js";
 import { getSupabaseAdmin } from "./_lib/supabase-admin.js";
 
 const DETAIL_CACHE_DAYS = 30;
 const SEARCH_CACHE_DAYS = 1;
 const RELEASE_CACHE_DAYS = 7;
+const koreanPokemonNameCache = new Map();
 
 // Each external game exposes the same shape so api routing stays game-agnostic.
 const EXTERNAL_GAMES = {
@@ -74,13 +80,159 @@ async function mapWithConcurrency(items, concurrency, mapItem) {
   return results;
 }
 
+const hasKoreanName = (name) => /[\uac00-\ud7a3]/.test(String(name || ""));
+
+const normalizeCode = (value) =>
+  String(value || "")
+    .replace(/[^a-z0-9]/gi, "")
+    .toUpperCase();
+
+const onePieceReleaseCode = (name) =>
+  String(name || "")
+    .match(/\b((?:OP|EB|ST|PRB)K?-\d{1,3})\b/i)?.[1]
+    .replace(/K-/i, "-")
+    .toUpperCase() || "";
+
+async function getOfficialKoreanCardName(game, card, database) {
+  const cardId = String(card.cardId || card.id || "");
+  if (database && cardId) {
+    const { data } = await database
+      .from("card_catalog")
+      .select("data")
+      .eq("game", game)
+      .eq("card_id", cardId)
+      .maybeSingle();
+    const cachedName = data?.data?.koreanData?.cardName || data?.data?.name;
+    if (hasKoreanName(cachedName)) return cachedName;
+  }
+  if (game === "yugioh" && cardId) {
+    const detail = await getCardDetail(cardId, database, "ko").catch(() => null);
+    const name = detail?.data?.koreanData?.cardName || detail?.data?.name;
+    return hasKoreanName(name) ? name : null;
+  }
+  if (game === "onepiece") {
+    const code = card.card_sets?.find((set) => set.set_code)?.set_code || cardId.replace(/_p\d+$/i, "");
+    if (!code) return null;
+    const detail = await onePieceKr.fetchCardById(code).catch(() => null);
+    const matchedCode = detail?.card_sets?.some((set) => normalizeCode(set.set_code) === normalizeCode(code));
+    const name = detail?.koreanData?.cardName || detail?.name;
+    return matchedCode && hasKoreanName(name) ? name : null;
+  }
+  return null;
+}
+
+async function findOfficialKoreanPokemonName(query) {
+  const cacheKey = normalizeSearchTerm(query);
+  const cached = koreanPokemonNameCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.name;
+  const result = await pokemonKr.searchCards(query, 0).catch(() => ({ cards: [] }));
+  const details = await mapWithConcurrency((result.cards || []).slice(0, 3), 3, (card) =>
+    pokemonKr.fetchCardDetail(card.cardId, query).catch(() => null),
+  );
+  const officialName = details.find((card) => normalizeSearchTerm(card?.name) === cacheKey)?.name || null;
+  koreanPokemonNameCache.set(cacheKey, {
+    name: officialName,
+    expiresAt: Date.now() + SEARCH_CACHE_DAYS * 24 * 60 * 60 * 1000,
+  });
+  return officialName;
+}
+
+async function localizeJapaneseCards(game, cards, database) {
+  if (!cards.length) return cards;
+  const displayLimit = Math.min(cards.length, 24);
+  const displayCards = cards.slice(0, displayLimit);
+  const officialNames = await mapWithConcurrency(displayCards, 4, async (card) => {
+    if (cards.length > 24) return null;
+    if (hasKoreanName(card.koreanData?.cardName)) return card.koreanData.cardName;
+    return getOfficialKoreanCardName(game, card, database).catch(() => null);
+  });
+  const missingIndexes = officialNames.flatMap((name, index) => (name ? [] : [index]));
+  const translatedNames = await translateJapaneseDisplayNames(
+    game,
+    missingIndexes.map((index) => displayCards[index].name),
+    "card",
+  );
+  if (game === "pokemon" && cards.length === 1) {
+    const officialPokemonNames = await mapWithConcurrency(translatedNames, 1, (name) =>
+      name ? findOfficialKoreanPokemonName(name).catch(() => null) : null,
+    );
+    translatedNames.forEach((name, index) => {
+      translatedNames[index] = officialPokemonNames[index] || name;
+    });
+  }
+  const displayNames = [...officialNames];
+  missingIndexes.forEach((index, translatedIndex) => {
+    displayNames[index] = translatedNames[translatedIndex] || cards[index].name;
+  });
+  const setNames = [
+    ...new Set(cards.flatMap((card) => (card.card_sets || []).map((set) => set.set_name).filter(Boolean))),
+  ].slice(0, 24);
+  const localizedSetNames = await translateJapaneseDisplayNames(game, setNames, "release");
+  const localizedSetMap = new Map(setNames.map((name, index) => [name, localizedSetNames[index] || name]));
+  return cards.map((card, index) => ({
+    ...card,
+    localizedName: displayNames[index] || card.koreanData?.cardName || card.name,
+    koreanData: { ...card.koreanData, cardName: displayNames[index] || card.koreanData?.cardName || card.name },
+    card_sets: (card.card_sets || []).map((set) => ({
+      ...set,
+      localizedName: localizedSetMap.get(set.set_name) || set.set_name,
+    })),
+  }));
+}
+
+async function getYugiohReleaseNames(language = "ko") {
+  const url = new URL("https://www.db.yugioh-card.com/yugiohdb/card_list.action");
+  url.searchParams.set("request_locale", language);
+  const $ = load(await fetchOfficialHtml(url, language));
+  return $("#CardList .t_row")
+    .map((_index, row) => {
+      const item = $(row);
+      const id = item.find(".link_value").first().val();
+      const name = item.find(".main p").first().text().trim();
+      return id && name ? { id: String(id), path: String(id), name } : null;
+    })
+    .get()
+    .filter(Boolean);
+}
+
+async function localizeJapaneseReleases(game, releases) {
+  if (!releases.length) return releases;
+  const koreanReleases =
+    game === "yugioh"
+      ? await getYugiohReleaseNames("ko").catch(() => [])
+      : await EXTERNAL_GAMES[game].ko.releaseList().catch(() => []);
+  const koreanById = new Map(koreanReleases.map((release) => [String(release.id || release.path), release.name]));
+  const koreanByCode = new Map(
+    koreanReleases.map((release) => [onePieceReleaseCode(release.name), release.name]).filter(([code]) => code),
+  );
+  const matchedNames = releases.map((release) => {
+    const sameId = koreanById.get(String(release.id || release.path));
+    const sameCode = game === "onepiece" ? koreanByCode.get(onePieceReleaseCode(release.name)) : null;
+    return sameId || sameCode || null;
+  });
+  const missingIndexes = matchedNames.flatMap((name, index) => (name ? [] : [index]));
+  const translatedNames = await translateJapaneseDisplayNames(
+    game,
+    missingIndexes.map((index) => releases[index].name),
+    "release",
+  );
+  return releases.map((release, index) => {
+    const translated = translatedNames[missingIndexes.indexOf(index)];
+    const exactKoreanName =
+      !matchedNames[index] && translated
+        ? koreanReleases.find((item) => normalizeSearchTerm(item.name) === normalizeSearchTerm(translated))?.name
+        : null;
+    return { ...release, localizedName: matchedNames[index] || exactKoreanName || translated || release.name };
+  });
+}
+
 const pageCacheKey = (baseKey, offset) => (offset ? `${baseKey}:offset:${offset}` : baseKey);
 
 const matchesJapaneseCardName = (game, cardName, term) => {
   const name = normalizeSearchTerm(cardName);
   const candidate = normalizeSearchTerm(term);
   if (!name || !candidate) return false;
-  if (game === "onepiece") return true;
+  if (game === "onepiece") return name.includes(candidate);
   if (game === "pokemon") return name === candidate || name.startsWith(candidate);
   return name.includes(candidate);
 };
@@ -130,8 +282,9 @@ async function getExternalCardDetail(game, cardId, database, language) {
       .maybeSingle();
     if (data && isFresh(data.updated_at)) return { data: data.data, cache: "HIT" };
   }
-  const card = await source.detail(cardId);
+  let card = await source.detail(cardId);
   if (!card) throw new Error("카드를 찾을 수 없습니다.");
+  if (language === "ja") [card] = await localizeJapaneseCards(game, [card], database);
   if (database && language === "ko") {
     await database
       .from("card_catalog")
@@ -149,7 +302,7 @@ async function getExternalCardDetail(game, cardId, database, language) {
 }
 
 async function getExternalSearch(game, query, database, offset = 0, language = "ko", filters = {}) {
-  const cacheVersion = game === "onepiece" ? "v14" : game === "pokemon" ? "v10" : "v4";
+  const cacheVersion = game === "onepiece" ? "v16" : game === "pokemon" ? "v12" : "v4";
   const filterKey = JSON.stringify(Object.fromEntries(Object.entries(filters).filter(([, value]) => value)));
   const cacheScope = `${game}:${language}:${cacheVersion}:${normalizeSearchTerm(query)}:${filterKey}`;
   const queryKey = pageCacheKey(cacheScope, offset);
@@ -161,7 +314,8 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
       .maybeSingle();
     if (data && new Date(data.expires_at).getTime() > Date.now()) {
       const page = normalizeExternalPage(data.results, game, offset);
-      return { data: page.cards, nextOffset: page.nextOffset, cache: "HIT" };
+      const cards = language === "ja" ? await localizeJapaneseCards(game, page.cards, database) : page.cards;
+      return { data: cards, nextOffset: page.nextOffset, cache: "HIT" };
     }
   }
   const config = EXTERNAL_GAMES[game];
@@ -210,6 +364,7 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
     );
     cards = detailed;
   }
+  if (language === "ja") cards = await localizeJapaneseCards(game, cards, database);
   if (database) {
     if (cards.length && language === "ko") {
       await database.from("card_catalog").upsert(
@@ -233,7 +388,7 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
 }
 
 async function getExternalReleaseList(game, database, language) {
-  const queryKey = `${game}:${language}:releases`;
+  const queryKey = `${game}:${language}:releases${language === "ja" ? ":localized-v2" : ""}`;
   if (database) {
     const { data } = await database
       .from("card_search_cache")
@@ -242,7 +397,8 @@ async function getExternalReleaseList(game, database, language) {
       .maybeSingle();
     if (data && new Date(data.expires_at).getTime() > Date.now()) return { data: data.results, cache: "HIT" };
   }
-  const releases = await EXTERNAL_GAMES[game][language].releaseList();
+  let releases = await EXTERNAL_GAMES[game][language].releaseList();
+  if (language === "ja") releases = await localizeJapaneseReleases(game, releases);
   if (database) {
     const expiresAt = new Date(Date.now() + RELEASE_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
     await database.from("card_search_cache").upsert({ query_key: queryKey, results: releases, expires_at: expiresAt });
@@ -253,9 +409,9 @@ async function getExternalReleaseList(game, database, language) {
 async function getExternalReleaseCards(game, setId, database, offset = 0, language) {
   const cacheScope =
     game === "onepiece"
-      ? `${game}:${language}:v3:set:${setId}`
+      ? `${game}:${language}:v4:set:${setId}`
       : game === "pokemon"
-        ? `${game}:${language}:v6:set:${setId}`
+        ? `${game}:${language}:v7:set:${setId}`
         : `${game}:${language}:set:${setId}`;
   const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {
@@ -266,10 +422,12 @@ async function getExternalReleaseCards(game, setId, database, offset = 0, langua
       .maybeSingle();
     if (data && new Date(data.expires_at).getTime() > Date.now()) {
       const page = normalizeExternalPage(data.results, game, offset);
-      return { data: page.cards, nextOffset: page.nextOffset, cache: "HIT" };
+      const cards = language === "ja" ? await localizeJapaneseCards(game, page.cards, database) : page.cards;
+      return { data: cards, nextOffset: page.nextOffset, cache: "HIT" };
     }
   }
-  const page = normalizeExternalPage(await EXTERNAL_GAMES[game][language].releaseCards(setId, offset), game, offset);
+  let page = normalizeExternalPage(await EXTERNAL_GAMES[game][language].releaseCards(setId, offset), game, offset);
+  if (language === "ja") page = { ...page, cards: await localizeJapaneseCards(game, page.cards, database) };
   if (database) {
     const expiresAt = new Date(Date.now() + RELEASE_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
     await database
@@ -298,7 +456,8 @@ async function getCardDetail(cardId, database, language) {
 
   try {
     const html = await fetchOfficialHtml(createDetailUrl(cardId, language), language);
-    const card = parseCardDetail(html, cardId, staleCard?.name, staleCard?.card_images?.[0]?.image_url_small, language);
+    let card = parseCardDetail(html, cardId, staleCard?.name, staleCard?.card_images?.[0]?.image_url_small, language);
+    if (language === "ja") [card] = await localizeJapaneseCards("yugioh", [card], database);
     if (database && language === "ko") {
       await database
         .from("card_catalog")
@@ -322,7 +481,7 @@ async function getCardDetail(cardId, database, language) {
 async function searchCards(query, database, language, filters = {}) {
   const normalizedTerm = normalizeSearchTerm(query);
   const filterKey = JSON.stringify(Object.fromEntries(Object.entries(filters).filter(([, value]) => value)));
-  const queryKey = `yugioh:v8:${language}:${normalizedTerm}:${filterKey}`;
+  const queryKey = `yugioh:v10:${language}:${normalizedTerm}:${filterKey}`;
   if (database) {
     if (Date.now() - lastExpiredCacheCleanup > 60 * 60 * 1000) {
       lastExpiredCacheCleanup = Date.now();
@@ -333,7 +492,10 @@ async function searchCards(query, database, language, filters = {}) {
       .select("results, expires_at")
       .eq("query_key", queryKey)
       .maybeSingle();
-    if (data && new Date(data.expires_at).getTime() > Date.now()) return { data: data.results, cache: "HIT" };
+    if (data && new Date(data.expires_at).getTime() > Date.now()) {
+      const cards = language === "ja" ? await localizeJapaneseCards("yugioh", data.results, database) : data.results;
+      return { data: cards, cache: "HIT" };
+    }
   }
 
   const koreanJapaneseQuery = language === "ja" && /[\uac00-\ud7a3]/i.test(query);
@@ -359,6 +521,7 @@ async function searchCards(query, database, language, filters = {}) {
     );
     cards = parseSearchResults(fallbackHtml, query);
   }
+  if (language === "ja") cards = await localizeJapaneseCards("yugioh", cards, database);
 
   if (database) {
     if (cards.length && language === "ko") {
@@ -389,6 +552,11 @@ export default async function handler(request, response) {
   const setId = requestUrl.searchParams.get("setId")?.trim();
   const cardId = requestUrl.searchParams.get("id")?.trim();
   const query = requestUrl.searchParams.get("q")?.trim();
+  const translationTarget = requestUrl.searchParams.get("translate");
+  const displayKind = requestUrl.searchParams.get("kind");
+  const displayNames = requestUrl.searchParams.getAll("name").map((name) => name.trim());
+  const displayIds = requestUrl.searchParams.getAll("itemId");
+  const displayCodes = requestUrl.searchParams.getAll("code");
   const requestedOffset = requestUrl.searchParams.get("offset");
   const offset = requestedOffset === null ? 0 : Number(requestedOffset);
   const searchFilters = Object.fromEntries(
@@ -413,7 +581,25 @@ export default async function handler(request, response) {
   if (language !== "ko" && language !== "ja") {
     return response.status(400).json({ error: "지원하지 않는 카드 언어입니다." });
   }
-  if (!cardId && !query && !releases && !setId) {
+  if (translationTarget && !["release", "display"].includes(translationTarget)) {
+    return response.status(400).json({ error: "지원하지 않는 번역 요청입니다." });
+  }
+  if (translationTarget === "release" && (language !== "ja" || !query)) {
+    return response.status(400).json({ error: "일본판 수록명 번역에는 검색어가 필요합니다." });
+  }
+  if (
+    translationTarget === "display" &&
+    (language !== "ja" ||
+      !["cards", "releases"].includes(displayKind) ||
+      !displayNames.length ||
+      displayNames.length > 100)
+  ) {
+    return response.status(400).json({ error: "일본어 카드·수록명 번역 요청이 올바르지 않습니다." });
+  }
+  if (displayNames.some((name) => !name || name.length > 160)) {
+    return response.status(400).json({ error: "번역할 이름이 비어 있거나 너무 깁니다." });
+  }
+  if (!cardId && !query && !releases && !setId && translationTarget !== "display") {
     return response.status(400).json({ error: "id, q, releases, setId 중 하나가 필요합니다." });
   }
   if (game === "yugioh" && cardId && !/^\d+$/.test(cardId)) {
@@ -425,7 +611,30 @@ export default async function handler(request, response) {
   }
 
   try {
+    if (translationTarget === "release") {
+      return response.status(200).json(await translateJapaneseReleaseTerms(game, query));
+    }
     const database = getSupabaseAdmin();
+    if (translationTarget === "display") {
+      if (displayKind === "cards") {
+        const cards = displayNames.map((name, index) => ({
+          id: displayIds[index] || name,
+          cardId: displayIds[index] || "",
+          name,
+          koreanData: { cardName: name },
+          card_sets: displayCodes[index] ? [{ set_code: displayCodes[index] }] : [],
+        }));
+        const localized = await localizeJapaneseCards(game, cards, database);
+        return response.status(200).json(localized.map((card) => card.localizedName));
+      }
+      const releaseItems = displayNames.map((name, index) => ({
+        id: displayIds[index] || "",
+        path: displayIds[index] || "",
+        name,
+      }));
+      const localized = await localizeJapaneseReleases(game, releaseItems);
+      return response.status(200).json(localized.map((release) => release.localizedName));
+    }
     const result =
       game !== "yugioh"
         ? releases

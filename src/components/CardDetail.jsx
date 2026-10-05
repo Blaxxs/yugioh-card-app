@@ -385,7 +385,7 @@ export default function CardDetail({
                     </td>
                     <td>
                       <button className="set-pack-button" type="button" onClick={() => onOpenRelease(set.set_name)}>
-                        {set.set_name}
+                        {set.localizedName || set.set_name}
                       </button>
                     </td>
                     <td>

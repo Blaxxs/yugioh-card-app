@@ -54,12 +54,14 @@ Supabase와 Google은 무료 사용량 구간에서 시작할 수 있지만, 저
 
 ## 일본어 검색어 AI 번역 (선택)
 
-일본판에서 한글 카드명을 일본어 검색어로 변환할 때는 다음 순서로 AI를 선택적으로 사용합니다.
+일본판의 카드·수록 팩은 원본 일본어 ID와 이름을 보존하면서 화면에 한국어 표시명을 제공합니다. 유희왕은 공통 공식 카드 ID, 원피스는 공통 카드 코드·상품 코드를 기준으로 한국 정발명을 우선 연결합니다. 공식 한국판 대응을 찾지 못한 이름은 AI가 한국어로 번역하며, 일본판에서 한글 카드명이나 팩 이름을 검색할 때도 일본어 후보를 생성합니다.
 
-- NVIDIA Build의 Riva Translate를 먼저 호출하려면 `NVIDIA_API_KEY`를 Vercel 서버 환경변수로 등록합니다. 모델은 기본 `nvidia/riva-translate-4b-instruct-v2`이며 `NVIDIA_NIM_MODEL`로 바꿀 수 있습니다. Build API는 trial 약관과 rate limit을 따릅니다.
+일본어↔한국어 이름 변환에는 다음 제공자를 선택적으로 사용합니다.
+
+- NVIDIA Build의 NIM API key를 먼저 호출하려면 `NVIDIA_API_KEY`를 Vercel 서버 환경변수로 등록합니다. 이 키는 보통 `nvapi-`로 시작하며, NGC 컨테이너 레지스트리 키와 다릅니다. 기본 모델은 한국어와 일본어를 포함한 다국어 Gemma 3 `google/gemma-3-12b-it`이며 `NVIDIA_NIM_MODEL`로 바꿀 수 있습니다. Riva Translate는 영어가 원본 또는 대상에 포함되어야 하므로 이 한국어→일본어 검색에는 사용하지 않습니다. Build API는 trial 약관과 rate limit을 따릅니다.
 - NVIDIA 키가 없거나 호출이 제한되면 Gemini를 사용합니다. Google AI Studio 키를 `GEMINI_API_KEY`로 등록하고, 필요하면 `GEMINI_MODEL`을 설정합니다. [Gemini API 가격 및 무료 등급](https://ai.google.dev/gemini-api/docs/pricing)을 확인하세요.
 
-두 키 모두 서버 환경변수로만 설정하고 `VITE_` 접두사를 붙이지 마세요. 무료 사용량과 trial 한도는 제공자 정책에 따라 달라질 수 있습니다. 무료 Gemini 등급의 검색어는 Google 제품 개선에 사용될 수 있습니다. 이 기능은 검색어만 외부 AI에 보내고, 카드 데이터는 각 공식 일본 DB에서 조회합니다. 키가 없거나 두 제공자가 모두 실패하면 내장 사전과 기존 공식 데이터 매핑 검색으로 fallback합니다.
+두 키 모두 서버 환경변수로만 설정하고 `VITE_` 접두사를 붙이지 마세요. 무료 사용량과 trial 한도는 제공자 정책에 따라 달라질 수 있습니다. 무료 Gemini 등급의 검색어는 Google 제품 개선에 사용될 수 있습니다. AI에는 카드/팩 이름만 보내며, 카드 데이터는 각 공식 DB에서 조회합니다. 키가 없거나 제공자가 실패하면 공식 ID·코드 매핑을 우선 사용하고, 그것도 없으면 일본어 원본 이름을 유지합니다.
 
 ## 포켓몬 · 원피스 카드 지원
 

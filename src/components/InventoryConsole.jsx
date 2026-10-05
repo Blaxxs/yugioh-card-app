@@ -7,7 +7,9 @@ import {
   fetchGameReleaseCards,
   fetchGameReleaseCardsPage,
   fetchGameReleaseList,
+  localizeJapaneseCards,
   searchGameCards,
+  translateJapaneseReleaseQuery,
 } from "../lib/tcgApi";
 import SalesHistory from "./SalesHistory";
 
@@ -144,7 +146,27 @@ export default function InventoryConsole({
   };
   const findPacks = async () => {
     const releases = await fetchGameReleaseList(intakeGame, intakeLanguage);
-    setPackMatches(releases.filter((release) => release.name.includes(packQuery)).slice(0, 12));
+    const query = packQuery.trim();
+    const terms = [query];
+    if (intakeLanguage === "ja" && /[\uac00-\ud7a3]/.test(query)) {
+      const translatedTerms = await translateJapaneseReleaseQuery(intakeGame, query).catch(() => []);
+      terms.push(...translatedTerms);
+    }
+    const normalize = (value) =>
+      String(value || "")
+        .normalize("NFKC")
+        .replace(/[\s・._-]/g, "")
+        .toLowerCase();
+    const normalizedTerms = terms.map(normalize).filter(Boolean);
+    setPackMatches(
+      releases
+        .filter((release) =>
+          normalizedTerms.some(
+            (term) => normalize(release.name).includes(term) || normalize(release.localizedName).includes(term),
+          ),
+        )
+        .slice(0, 12),
+    );
   };
   const changeIntakeGame = (game) => {
     setIntakeGame(game);
@@ -225,6 +247,7 @@ export default function InventoryConsole({
         detailedCards = [];
         await hydrateCardPreviews(cards, (detailedCard) => detailedCards.push(detailedCard), intakeLanguage);
       }
+      if (intakeLanguage === "ja") detailedCards = await localizeJapaneseCards(intakeGame, detailedCards);
       const variants = detailedCards.flatMap((detailedCard) => {
         const sets = detailedCard.card_sets.filter((set) => set.set_name === release.name);
         return (sets.length ? sets : [null]).map((set) => ({
@@ -407,12 +430,7 @@ export default function InventoryConsole({
             detail.card_sets?.find((item) => row.setCode && item.set_code === row.setCode) || detail.card_sets?.[0];
           resolved.push({
             ...row,
-            card: {
-              ...detail,
-              game: intakeGame,
-              language: intakeLanguage,
-              card_sets: set ? [set] : detail.card_sets,
-            },
+            card: { ...detail, game: intakeGame, language: intakeLanguage, card_sets: set ? [set] : detail.card_sets },
             error: row.setCode && !set ? "수록 코드가 일치하지 않습니다." : "",
           });
         } catch {
@@ -516,9 +534,9 @@ export default function InventoryConsole({
           card.cardId,
           card.name,
           card.card_images?.[0]?.image_url_small,
-              intakeLanguage,
+          intakeLanguage,
         );
-            setAddCard({ ...detailed, game: intakeGame, language: intakeLanguage });
+    setAddCard({ ...detailed, game: intakeGame, language: intakeLanguage });
     const firstSet = detailed.card_sets?.[0];
     setAddCode(firstSet?.set_code || "");
     setAddRarity(firstSet?.rarity_code || firstSet?.set_rarity || "");
@@ -606,9 +624,7 @@ export default function InventoryConsole({
             </select>
           </div>
           <div className="inventory-table-toolbar-actions">
-            <div className="inventory-import-intake">
-              {renderIntakeSelectors()}
-            </div>
+            <div className="inventory-import-intake">{renderIntakeSelectors()}</div>
             <div className="inventory-toolbar-group">
               <button type="button" onClick={() => importFileRef.current?.click()}>
                 엑셀 업로드
@@ -961,7 +977,7 @@ export default function InventoryConsole({
             {!packLoading &&
               packMatches.map((release) => (
                 <button className="pack-match" type="button" key={release.id} onClick={() => choosePack(release)}>
-                  {release.name}
+                  {release.localizedName || release.name}
                   <small>{release.date}</small>
                 </button>
               ))}
@@ -1002,7 +1018,7 @@ export default function InventoryConsole({
                         onChange={(event) => changePackPrice(packKey(card), event.target.value)}
                       />
                     </div>
-                    <strong>{card.name}</strong>
+                    <strong>{card.koreanData?.cardName || card.localizedName || card.name}</strong>
                     <small>
                       {card.card_sets?.[0]?.set_code || "코드 확인 중"}
                       {rarity && (
@@ -1116,13 +1132,15 @@ export default function InventoryConsole({
             </header>
             {importLoading ? (
               <div className="inventory-import-status">
-                {CARD_GAMES.find((game) => game.id === intakeGame)?.label} · {intakeLanguage === "ja" ? "일본판" : "한글판"}
+                {CARD_GAMES.find((game) => game.id === intakeGame)?.label} ·{" "}
+                {intakeLanguage === "ja" ? "일본판" : "한글판"}
                 기준으로 스프레드시트를 읽고 카드를 매칭하는 중입니다...
               </div>
             ) : (
               <>
                 <div className="inventory-import-status">
-                  입고 기준: {CARD_GAMES.find((game) => game.id === intakeGame)?.label} · {intakeLanguage === "ja" ? "일본판" : "한글판"}
+                  입고 기준: {CARD_GAMES.find((game) => game.id === intakeGame)?.label} ·{" "}
+                  {intakeLanguage === "ja" ? "일본판" : "한글판"}
                 </div>
                 <div className="inventory-import-summary">
                   전체 {importRows.length}행 · 성공 {importRows.filter((row) => row.card && !row.error).length}행 · 확인
@@ -1204,7 +1222,7 @@ export default function InventoryConsole({
                           <PackagePlus size={18} />
                         </span>
                       )}
-                      <span>{card.name}</span>
+                      <span>{card.koreanData?.cardName || card.localizedName || card.name}</span>
                     </button>
                   ))}
                 </div>
