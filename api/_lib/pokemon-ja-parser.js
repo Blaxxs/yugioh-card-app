@@ -150,6 +150,7 @@ export async function fetchCardDetail(cardId) {
     .filter((item) => bodyText.includes(item.name))
     .sort((left, right) => right.name.length - left.name.length)[0];
   if (!name) throw new Error("일본 포켓몬 카드 상세에서 카드명을 찾을 수 없습니다.");
+  const setName = release?.name || imageMatch?.[1] || "";
   return {
     id: String(cardId),
     cardId: String(cardId),
@@ -159,15 +160,10 @@ export async function fetchCardDetail(cardId) {
     collectorNumber,
     card_images: imageUrl ? [{ id: `${cardId}-1`, image_url_small: imageUrl }] : [],
     koreanData: { cardName: name },
-    card_sets: imageMatch
-      ? [
-          {
-            set_date: null,
-            set_code: cardNumber ? `${cardNumber[1]}/${cardNumber[2]}` : imageMatch[2],
-            set_name: release?.name || imageMatch[1],
-          },
-        ]
-      : [],
+    card_sets:
+      cardNumber || imageMatch
+        ? [{ set_date: null, set_code: cardNumber ? `${cardNumber[1]}/${cardNumber[2]}` : "", set_name: setName }]
+        : [],
     isDetailLoaded: true,
   };
 }

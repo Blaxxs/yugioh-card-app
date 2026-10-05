@@ -370,20 +370,50 @@ export default function InventoryConsole({
       event.currentTarget.releasePointerCapture(event.pointerId);
   };
   const savePack = async () => {
-    const selected = packCards
-      .filter((item) => item.quantity > 0)
-      .map((item) => ({
-        ...item,
-        card: {
-          ...item.card,
-          game: intakeGame,
-          language: intakeLanguage,
-          card_sets: [{ ...(item.card.card_sets?.[0] || {}), rarity_code: item.rarity, set_rarity: item.rarity }],
-        },
-      }));
-    await onBatchIntake(selected);
-    setPackCards([]);
-    setPackModalOpen(false);
+    const selected = packCards.filter((item) => item.quantity > 0);
+    if (!selected.length) return;
+    setPackLoading(true);
+    try {
+      const resolved = [];
+      for (const item of selected) {
+        let card = item.card;
+        let set = card.card_sets?.[0] || {};
+        if (!set.set_code) {
+          const detail = await fetchGameCardById(
+            intakeGame,
+            card.cardId,
+            card.name,
+            card.card_images?.[0]?.image_url_small,
+            intakeLanguage,
+          );
+          const detailedSet =
+            detail?.card_sets?.find((candidate) => candidate.set_name === set.set_name && candidate.set_code) ||
+            detail?.card_sets?.find((candidate) => candidate.set_code);
+          if (!detailedSet?.set_code) {
+            window.alert(`${card.name} 카드 코드를 확인하지 못해 입고를 중단했습니다.`);
+            return;
+          }
+          card = detail;
+          set = detailedSet;
+        }
+        resolved.push({
+          ...item,
+          card: {
+            ...card,
+            game: intakeGame,
+            language: intakeLanguage,
+            card_sets: [
+              { ...set, rarity_code: item.rarity || set.rarity_code, set_rarity: item.rarity || set.set_rarity },
+            ],
+          },
+        });
+      }
+      await onBatchIntake(resolved);
+      setPackCards([]);
+      setPackModalOpen(false);
+    } finally {
+      setPackLoading(false);
+    }
   };
   const normalizeImportRow = (row) => {
     const values = Object.fromEntries(
@@ -579,7 +609,7 @@ export default function InventoryConsole({
           intakeLanguage,
         );
     setAddCard({ ...detailed, game: intakeGame, language: intakeLanguage });
-    const firstSet = detailed.card_sets?.[0];
+    const firstSet = detailed.card_sets?.find((set) => set.set_code) || detailed.card_sets?.[0];
     setAddCode(firstSet?.set_code || "");
     setAddRarity(firstSet?.rarity_code || firstSet?.set_rarity || "");
     setAddRarityEditing(false);
@@ -1303,6 +1333,10 @@ export default function InventoryConsole({
                   className="inventory-add-form"
                   onSubmit={async (event) => {
                     event.preventDefault();
+                    if (!addCode.trim()) {
+                      window.alert("카드 코드를 확인하거나 입력해 주세요.");
+                      return;
+                    }
                     const set =
                       addCard.card_sets?.find(
                         (item) => item.set_code === addCode && (item.rarity_code || item.set_rarity) === addRarity,
@@ -1340,22 +1374,34 @@ export default function InventoryConsole({
                   <strong>{addCard.name}</strong>
                   <label>
                     코드
-                    <select
-                      value={addCode}
-                      onChange={(event) => {
-                        setAddCode(event.target.value);
-                        const next = addCard.card_sets?.find((item) => item.set_code === event.target.value);
-                        setAddRarity(next?.rarity_code || next?.set_rarity || "");
-                      }}
-                    >
-                      {[...new Set((addCard.card_sets || []).map((set) => set.set_code).filter(Boolean))].map(
-                        (code) => (
-                          <option value={code} key={code}>
-                            {code}
-                          </option>
-                        ),
-                      )}
-                    </select>
+                    {(() => {
+                      const codes = [...new Set((addCard.card_sets || []).map((set) => set.set_code).filter(Boolean))];
+                      return codes.length ? (
+                        <select
+                          required
+                          value={addCode}
+                          onChange={(event) => {
+                            setAddCode(event.target.value);
+                            const next = addCard.card_sets?.find((item) => item.set_code === event.target.value);
+                            setAddRarity(next?.rarity_code || next?.set_rarity || "");
+                          }}
+                        >
+                          {codes.map((code) => (
+                            <option value={code} key={code}>
+                              {code}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          required
+                          type="text"
+                          value={addCode}
+                          placeholder="카드 코드를 입력하세요"
+                          onChange={(event) => setAddCode(event.target.value)}
+                        />
+                      );
+                    })()}
                   </label>
                   <label>
                     레어도

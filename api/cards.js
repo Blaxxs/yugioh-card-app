@@ -10,6 +10,7 @@ import * as pokemonKr from "./_lib/pokemon-kr-parser.js";
 import * as onePieceKr from "./_lib/onepiece-kr-parser.js";
 import * as pokemonJa from "./_lib/pokemon-ja-parser.js";
 import * as onePieceJa from "./_lib/onepiece-ja-parser.js";
+import { findJapaneseCollectorNumber } from "./_lib/artofpkm-parser.js";
 import {
   translateJapaneseDisplayNames,
   translateJapaneseReleaseTerms,
@@ -334,6 +335,20 @@ async function getExternalCardDetail(game, cardId, database, language) {
   }
   let card = await source.detail(cardId);
   if (!card) throw new Error("카드를 찾을 수 없습니다.");
+  if (game === "pokemon" && language === "ja" && !card.card_sets?.some((set) => set.set_code)) {
+    const imagePath = card.card_images?.[0]?.image_url_small || "";
+    const imageSet = imagePath.match(/\/large\/([^/]+)\//)?.[1] || "";
+    const setNames = [...new Set([card.card_sets?.[0]?.set_name, imageSet].filter(Boolean))];
+    for (const setName of setNames) {
+      const code = await findJapaneseCollectorNumber(setName, card.name);
+      if (!code) continue;
+      card = {
+        ...card,
+        card_sets: [{ ...(card.card_sets?.[0] || {}), set_date: null, set_code: code, set_name: setName }],
+      };
+      break;
+    }
+  }
   if (language === "ja") [card] = await localizeJapaneseCards(game, [card], database);
   if (database && language === "ko") {
     await database

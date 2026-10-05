@@ -72,6 +72,8 @@ Supabase와 Google은 무료 사용량 구간에서 시작할 수 있지만, 저
 - 포켓몬: [pokemoncard.co.kr](https://pokemoncard.co.kr/) (포켓몬코리아 공식 카드 검색)
 - 원피스: [onepiece-cardgame.kr](https://onepiece-cardgame.kr/) (반다이 원피스 카드게임 한국 공식 사이트)
 
+일본 포켓몬 상세에서 수집 번호가 비어 있을 때는 [Art of Pokémon](https://www.artofpkm.com/cards)의 공개 세트/카드 페이지를 보조 조회해 번호만 보완합니다. 결과는 서버 메모리에 24시간 캐시하며, 사이트의 카드 이미지나 카드 텍스트는 가져오거나 재배포하지 않습니다. ArtOfPKM은 Pokémon 권리자와 제휴하지 않은 아카이브이므로 실제 운영 시 해당 사이트와 권리자의 이용 조건을 확인하세요.
+
 1. Supabase Dashboard의 SQL Editor에서 `supabase-migration-multi-game-catalog.sql`을 실행합니다. (기존 `card_catalog` 테이블에 `game` 컬럼을 추가해 유희왕/포켓몬/원피스 카드 ID 충돌을 방지합니다.)
 2. `public/card-backs/` 폴더에 다음 파일명을 정확히 맞춰 카드 뒷면 이미지를 넣습니다. 파일이 없으면 게임 선택 버튼에는 이름만 표시됩니다.
 
