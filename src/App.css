@@ -1079,7 +1079,7 @@ button:disabled {
 }
 .add-search-results {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   align-content: start;
   gap: 5px;
   max-height: min(62dvh, 620px);
@@ -2054,7 +2054,7 @@ button:disabled {
 }
 .pack-card-album {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   grid-auto-rows: max-content;
   align-items: start;
   gap: 8px;
@@ -2064,9 +2064,10 @@ button:disabled {
   border: 0;
 }
 .pack-intake-dialog.pack-cards-dialog {
-  width: min(480px, calc(100vw - 48px));
-  height: min(82dvh, 860px);
+  width: min(1440px, calc(100vw - 48px));
+  height: min(96dvh, 1080px);
   min-height: 420px;
+  max-height: calc(100dvh - 48px);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 .pack-intake-dialog.pack-search-dialog {
@@ -2088,7 +2089,7 @@ button:disabled {
 .pack-intake-main .pack-card-album {
   max-height: none;
   overflow: visible;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
 }
 .pack-match-list {
   display: grid;
@@ -2126,7 +2127,7 @@ button:disabled {
   display: none;
 }
 .inventory-add-dialog.pack-cards-dialog .inventory-add-content {
-  max-height: calc(82dvh - 100px);
+  max-height: calc(96dvh - 180px);
 }
 .pack-intake-footer {
   display: flex;
@@ -2141,6 +2142,36 @@ button:disabled {
 }
 .pack-intake-footer .pack-save {
   margin: 0;
+}
+.pack-cards-dialog > .pack-intake-header {
+  padding: 8px 12px;
+}
+.pack-cards-dialog .pack-intake-title p {
+  display: none;
+}
+.pack-cards-dialog .inventory-intake-toolbar {
+  gap: 8px;
+  padding: 8px 12px;
+}
+.pack-cards-dialog .inventory-intake-selectors label {
+  gap: 2px;
+  font-size: 11px;
+}
+.pack-cards-dialog .inventory-intake-selectors select {
+  height: 30px;
+}
+.pack-cards-dialog .inventory-intake-toolbar .pack-search input,
+.pack-cards-dialog .inventory-intake-toolbar .pack-search button {
+  height: 34px;
+  min-height: 34px;
+}
+.pack-cards-dialog .pack-intake-footer {
+  padding: 6px 12px;
+}
+.pack-intake-main .pack-card-album {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 6px;
+  padding: 8px;
 }
 .pack-loading-state {
   display: grid;
@@ -2177,7 +2208,7 @@ button:disabled {
     min-width: 0;
   }
   .pack-intake-dialog.pack-cards-dialog {
-    width: min(480px, calc(100vw - 48px));
+    width: min(1440px, calc(100vw - 48px));
     min-width: 420px;
   }
   .pack-intake-dialog.inventory-add-dialog {
@@ -2185,7 +2216,7 @@ button:disabled {
     min-width: 0;
   }
   .pack-intake-dialog.inventory-add-dialog.pack-cards-dialog {
-    width: min(480px, calc(100vw - 48px));
+    width: min(1440px, calc(100vw - 48px));
     min-width: 420px;
   }
   .pack-intake-dialog.inventory-add-dialog.pack-search-dialog {
