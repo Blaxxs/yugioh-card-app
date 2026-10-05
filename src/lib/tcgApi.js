@@ -22,24 +22,34 @@ const fetchGameApi = async (params, includePageInfo = false) => {
   return { cards: body, nextOffset: nextOffset == null ? null : Number(nextOffset) };
 };
 
-export async function searchGameCards(game, term, language = "ko") {
+const toFilterParams = (filters = {}) =>
+  Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== "" && value != null));
+
+export async function searchGameCards(game, term, language = "ko", filters = {}) {
   const query = String(term || "").trim();
   if (!query) return [];
-  if (game === "yugioh") return searchOfficialCards(query, language);
-  return fetchGameApi({ game, lang: language, q: query, ...(game === "onepiece" ? { series: "all" } : {}) });
+  if (game === "yugioh") return searchOfficialCards(query, language, filters);
+  return fetchGameApi({
+    game,
+    lang: language,
+    q: query,
+    ...(game === "onepiece" ? { series: "all" } : {}),
+    ...toFilterParams(filters),
+  });
 }
 
-export async function searchGameCardsPage(game, term, offset = 0, language = "ko") {
+export async function searchGameCardsPage(game, term, offset = 0, language = "ko", filters = {}) {
   const query = String(term || "").trim();
   if (!query) return { cards: [], nextOffset: null };
-  if (game === "yugioh") return { cards: await searchOfficialCards(query, language), nextOffset: null };
+  if (game === "yugioh") return { cards: await searchOfficialCards(query, language, filters), nextOffset: null };
   return fetchGameApi(
     {
       game,
       lang: language,
       q: query,
-      ...(game === "pokemon" || game === "onepiece" ? { offset } : {}),
       ...(game === "onepiece" ? { series: "all" } : {}),
+      ...toFilterParams(filters),
+      ...(game === "pokemon" || game === "onepiece" ? { offset } : {}),
     },
     true,
   );

@@ -58,11 +58,11 @@ const previewCard = ({ CardNum, feature_image: featureImage }) => ({
   isDetailLoaded: false,
 });
 
-export async function searchCards(term, offset = 0) {
+export async function searchCards(term, offset = 0, filters = {}) {
   const response = await postAjax({
     action: "search_text_cards",
     search_text: term,
-    search_params: "all",
+    search_params: filters.search_params || "all",
     limit: String(offset),
   });
   const cards = Object.values(response.result || {}).map(previewCard);

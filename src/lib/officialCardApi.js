@@ -141,7 +141,7 @@ const fetchCardApi = async (params) => {
   return body;
 };
 
-const createSearchUrl = (keyword, language = "ko") => {
+const createSearchUrl = (keyword, language = "ko", filters = {}) => {
   const url = new URL(`${OFFICIAL_SITE_ORIGIN}/yugiohdb/card_search.action`);
   url.search = new URLSearchParams({
     request_locale: language === "ja" ? "ja" : "ko",
@@ -157,6 +157,8 @@ const createSearchUrl = (keyword, language = "ko") => {
     releaseMStart: "1",
     releaseYStart: "1999",
   });
+  if (filters.ctype) url.searchParams.set("ctype", filters.ctype);
+  if (filters.attr) url.searchParams.set("attr", filters.attr);
   return url;
 };
 
@@ -354,15 +356,17 @@ export async function hydrateCardPreviews(cards, onHydrated, language = "ko") {
   await Promise.all(Array.from({ length: Math.min(6, pendingCards.length) }, worker));
 }
 
-export async function searchOfficialCards(searchTerm, language = "ko") {
-  const releaseCodeResults = language === "ko" ? await searchCardsByReleaseCode(searchTerm, language) : null;
+export async function searchOfficialCards(searchTerm, language = "ko", filters = {}) {
+  const hasFilters = Object.values(filters).some(Boolean);
+  const releaseCodeResults =
+    language === "ko" && !hasFilters ? await searchCardsByReleaseCode(searchTerm, language) : null;
   if (releaseCodeResults) return releaseCodeResults;
 
-  if (USE_CARD_API) return fetchCardApi({ q: searchTerm.trim(), lang: language });
+  if (USE_CARD_API) return fetchCardApi({ q: searchTerm.trim(), lang: language, ...filters });
 
   const term = normalizeCardName(searchTerm);
   if (language === "ja" && /[\uac00-\ud7a3]/i.test(searchTerm)) {
-    const koreanDocument = await fetchOfficialHtml(createSearchUrl(searchTerm, "ko"));
+    const koreanDocument = await fetchOfficialHtml(createSearchUrl(searchTerm, "ko", filters));
     const koreanEntries = findCardEntries(koreanDocument, term, "ko");
     const japaneseCards = new Array(koreanEntries.length);
     let nextIndex = 0;
@@ -383,10 +387,10 @@ export async function searchOfficialCards(searchTerm, language = "ko") {
     return japaneseCards.filter((card) => card?.card_images?.length);
   }
 
-  let document = await fetchOfficialHtml(createSearchUrl(searchTerm, language));
+  let document = await fetchOfficialHtml(createSearchUrl(searchTerm, language, filters));
   let entries = findCardEntries(document, term, language);
   if (!entries.length && term.length > 1) {
-    document = await fetchOfficialHtml(createSearchUrl(term.slice(0, 2), language));
+    document = await fetchOfficialHtml(createSearchUrl(term.slice(0, 2), language, filters));
     entries = findCardEntries(document, term, language);
   }
   return entries.map(createCardPreview);

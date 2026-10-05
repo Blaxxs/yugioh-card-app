@@ -68,15 +68,18 @@ function parseCard($, element) {
   };
 }
 
-async function fetchCardList({ term = "", series = "" }) {
+async function fetchCardList({ term = "", series = "", filters = {} }) {
   const params = new URLSearchParams({
     freewords: term,
-    series,
+    series: series || filters.series || "",
     "cost[min]": "",
     "cost[max]": "",
     "power[min]": "",
     "power[max]": "",
   });
+  if (filters.colors) params.append("colors[]", filters.colors);
+  if (filters.categories) params.append("categories[]", filters.categories);
+  if (filters.rarity) params.append("rarity[]", filters.rarity);
   const response = await fetch(CARD_LIST_URL, {
     method: "POST",
     headers: { ...baseHeaders, "Content-Type": "application/x-www-form-urlencoded" },
@@ -91,12 +94,12 @@ async function fetchCardList({ term = "", series = "" }) {
   return { cards, nextOffset: null };
 }
 
-export async function searchCards(term) {
+export async function searchCards(term, filters = {}) {
   let searchTerm = String(term || "").trim();
   if (/[\uac00-\ud7a3]/.test(searchTerm)) {
     for (const [pattern, replacement] of KOREAN_SEARCH_ALIASES) searchTerm = searchTerm.replace(pattern, replacement);
   }
-  return fetchCardList({ term: searchTerm });
+  return fetchCardList({ term: searchTerm, filters });
 }
 
 export async function fetchCardById(cardId) {

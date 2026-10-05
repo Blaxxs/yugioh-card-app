@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, ChevronLeft, ChevronRight, LoaderCircle, LogIn, LogOut, Search, X } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  LoaderCircle,
+  LogIn,
+  LogOut,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { getReleaseSetVariants, hydrateCardPreviews, isQuarterCenturyChronicleRelease } from "./lib/officialCardApi";
 import { CARD_GAMES, DEFAULT_GAME_ID, getGameById } from "./lib/cardGames";
@@ -85,6 +96,170 @@ function LanguageSwitcher({ activeLanguage, onSelect }) {
           {language.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+const getSearchFilterFields = (game, language, releases) => {
+  const productOptions = [
+    { value: "", label: "전체 상품" },
+    ...releases.map((release) => ({ value: release.path, label: release.name })),
+  ];
+  const selectAll = (label) => [{ value: "", label }, ...[]];
+
+  if (game === "yugioh") {
+    return [
+      {
+        key: "ctype",
+        label: "카드 종류",
+        options: [
+          ...selectAll("전체"),
+          { value: "1", label: "몬스터" },
+          { value: "2", label: "마법" },
+          { value: "3", label: "함정" },
+        ],
+      },
+      {
+        key: "attr",
+        label: "속성",
+        options: [
+          ...selectAll("전체 속성"),
+          { value: "12", label: "어둠" },
+          { value: "11", label: "빛" },
+          { value: "15", label: "땅" },
+          { value: "13", label: "물" },
+          { value: "14", label: "화염" },
+          { value: "16", label: "바람" },
+          { value: "17", label: "신" },
+        ],
+      },
+    ];
+  }
+
+  if (game === "pokemon" && language === "ko") {
+    return [
+      {
+        key: "search_params",
+        label: "검색 범위",
+        options: [
+          ...selectAll("이름+텍스트"),
+          { value: "cardname", label: "카드 이름" },
+          { value: "cardtext", label: "카드 텍스트" },
+        ],
+      },
+    ];
+  }
+
+  if (game === "pokemon") {
+    return [
+      {
+        key: "se_ta",
+        label: "카드 종류",
+        options: [
+          ...selectAll("전체"),
+          { value: "pokemon", label: "포켓몬" },
+          { value: "trainer", label: "트레이너즈" },
+          { value: "energy", label: "에너지" },
+        ],
+      },
+      {
+        key: "regulation_sidebar_form",
+        label: "레귤레이션",
+        options: [
+          { value: "all", label: "전체" },
+          { value: "XY", label: "스탠다드" },
+          { value: "BW", label: "익스트림" },
+          { value: "DP", label: "전당" },
+        ],
+      },
+      { key: "pg", label: "상품", options: productOptions },
+    ];
+  }
+
+  const colorOptions =
+    language === "ja"
+      ? [
+          ...selectAll("전체 색상"),
+          { value: "赤", label: "빨강" },
+          { value: "緑", label: "초록" },
+          { value: "青", label: "파랑" },
+          { value: "紫", label: "보라" },
+          { value: "黒", label: "검정" },
+          { value: "黄", label: "노랑" },
+        ]
+      : [
+          ...selectAll("전체 색상"),
+          { value: "적색", label: "빨강" },
+          { value: "녹색", label: "초록" },
+          { value: "청색", label: "파랑" },
+          { value: "자색", label: "보라" },
+          { value: "흑색", label: "검정" },
+          { value: "황색", label: "노랑" },
+        ];
+  const categoryOptions =
+    language === "ja"
+      ? [
+          ...selectAll("전체 종류"),
+          { value: "リーダー", label: "리더" },
+          { value: "キャラクター", label: "캐릭터" },
+          { value: "イベント", label: "이벤트" },
+          { value: "ステージ", label: "스테이지" },
+        ]
+      : [
+          ...selectAll("전체 종류"),
+          { value: "리더", label: "리더" },
+          { value: "캐릭터", label: "캐릭터" },
+          { value: "이벤트", label: "이벤트" },
+          { value: "스테이지", label: "스테이지" },
+        ];
+  return [
+    { key: "series", label: "수록 상품", options: productOptions },
+    { key: "colors", label: "색상", options: colorOptions },
+    { key: "categories", label: "카드 종류", options: categoryOptions },
+    ...(language === "ja"
+      ? [
+          {
+            key: "rarity",
+            label: "레어도",
+            options: [
+              ...selectAll("전체 레어도"),
+              ...["L", "C", "UC", "R", "SR", "SEC", "P", "SPカード", "TR"].map((rarity) => ({
+                value: rarity,
+                label: rarity,
+              })),
+            ],
+          },
+        ]
+      : []),
+  ];
+};
+
+function SearchFilterPanel({ game, language, filters, releases, loading, onChange, onReset }) {
+  const fields = getSearchFilterFields(game, language, releases);
+  return (
+    <div className="search-filter-panel">
+      <div className="search-filter-heading">
+        <strong>검색 필터</strong>
+        <button type="button" onClick={onReset} aria-label="필터 초기화" title="필터 초기화">
+          <RotateCcw size={15} aria-hidden="true" />
+          <span>초기화</span>
+        </button>
+      </div>
+      <div className="search-filter-fields">
+        {fields.map((field) => (
+          <label className="search-filter-field" key={field.key}>
+            <span>{field.label}</span>
+            <select value={filters[field.key] || ""} onChange={(event) => onChange(field.key, event.target.value)}>
+              {field.options.map((option) => (
+                <option key={`${field.key}-${option.value}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+      {loading && <span className="search-filter-loading">상품 목록 불러오는 중</span>}
     </div>
   );
 }
@@ -283,12 +458,43 @@ export default function App() {
       return "ko";
     }
   });
+  const [searchFilters, setSearchFilters] = useState({});
+  const [searchFiltersOpen, setSearchFiltersOpen] = useState(false);
+  const [searchFilterReleases, setSearchFilterReleases] = useState([]);
+  const [searchFilterReleasesKey, setSearchFilterReleasesKey] = useState("");
+  const [searchFilterReleasesLoading, setSearchFilterReleasesLoading] = useState(false);
   const [gameSelectionComplete, setGameSelectionComplete] = useState(false);
   const [gameSelectionFlight, setGameSelectionFlight] = useState(null);
   const gameSelectionTimer = useRef(null);
   const historyIndex = useRef(savedHistory?.index || 0);
   const viewRef = useRef({ activeTab, selectedCard, selectedRelease });
   const loadedReleasePath = useRef(null);
+  const searchFilterOptionKey = `${activeGame}:${activeLanguage}`;
+
+  useEffect(() => {
+    if (!searchFiltersOpen || activeGame === "yugioh" || searchFilterReleasesKey === searchFilterOptionKey)
+      return undefined;
+    let cancelled = false;
+    const loadOptions = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setSearchFilterReleasesLoading(true);
+      try {
+        setSearchFilterReleases(await fetchGameReleaseList(activeGame, activeLanguage));
+      } catch (error) {
+        setActionError(error.message);
+      } finally {
+        if (!cancelled) {
+          setSearchFilterReleasesKey(searchFilterOptionKey);
+          setSearchFilterReleasesLoading(false);
+        }
+      }
+    };
+    loadOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchFiltersOpen, activeGame, activeLanguage, searchFilterOptionKey, searchFilterReleasesKey]);
 
   useEffect(() => {
     sessionStorage.setItem(
@@ -551,6 +757,8 @@ export default function App() {
     setActiveGame(gameId);
     setActionError("");
     setSearchTerm("");
+    setSearchFilters({});
+    setSearchFiltersOpen(false);
     setCards([]);
     setSearchNextOffset(null);
     setSelectedCard(null);
@@ -954,11 +1162,11 @@ export default function App() {
     setActionError("");
     try {
       if (activeGame === "pokemon" || activeGame === "onepiece") {
-        const page = await searchGameCardsPage(activeGame, searchTerm, 0, language);
+        const page = await searchGameCardsPage(activeGame, searchTerm, 0, language, searchFilters);
         setCards(page.cards);
         setSearchNextOffset(page.nextOffset);
       } else {
-        setCards(await searchGameCards(activeGame, searchTerm, language));
+        setCards(await searchGameCards(activeGame, searchTerm, language, searchFilters));
       }
     } catch (error) {
       setActionError(error.message);
@@ -977,6 +1185,8 @@ export default function App() {
       // ignore storage failures
     }
     setActionError("");
+    setSearchFilters({});
+    setSearchFiltersOpen(false);
     setCards([]);
     setSearchNextOffset(null);
     setSelectedCard(null);
@@ -989,11 +1199,11 @@ export default function App() {
       setLoading(true);
       try {
         if (activeGame === "pokemon" || activeGame === "onepiece") {
-          const page = await searchGameCardsPage(activeGame, searchTerm, 0, language);
+          const page = await searchGameCardsPage(activeGame, searchTerm, 0, language, {});
           setCards(page.cards);
           setSearchNextOffset(page.nextOffset);
         } else {
-          setCards(await searchGameCards(activeGame, searchTerm, language));
+          setCards(await searchGameCards(activeGame, searchTerm, language, {}));
         }
       } catch (error) {
         setActionError(error.message);
@@ -1015,7 +1225,7 @@ export default function App() {
     setSearchMoreLoading(true);
     setActionError("");
     try {
-      const page = await searchGameCardsPage(activeGame, searchTerm, searchNextOffset, activeLanguage);
+      const page = await searchGameCardsPage(activeGame, searchTerm, searchNextOffset, activeLanguage, searchFilters);
       setCards((current) => {
         const seen = new Set(current.map((card) => card.cardId));
         return [...current, ...page.cards.filter((card) => !seen.has(card.cardId))];
@@ -1170,10 +1380,33 @@ export default function App() {
                 aria-label="카드 이름 검색"
               />
             </label>
+            <button
+              className={`search-filter-toggle ${searchFiltersOpen ? "active" : ""}`}
+              type="button"
+              aria-expanded={searchFiltersOpen}
+              onClick={() => setSearchFiltersOpen((open) => !open)}
+            >
+              <SlidersHorizontal size={17} aria-hidden="true" />
+              <span>필터</span>
+              {Object.values(searchFilters).filter(Boolean).length > 0 && (
+                <b>{Object.values(searchFilters).filter(Boolean).length}</b>
+              )}
+            </button>
             <button className="search-submit" type="submit">
               검색
             </button>
           </form>
+        )}
+        {activeTab === "search" && searchFiltersOpen && (
+          <SearchFilterPanel
+            game={activeGame}
+            language={activeLanguage}
+            filters={searchFilters}
+            releases={searchFilterReleasesKey === searchFilterOptionKey ? searchFilterReleases : []}
+            loading={searchFilterReleasesLoading}
+            onChange={(key, value) => setSearchFilters((current) => ({ ...current, [key]: value }))}
+            onReset={() => setSearchFilters({})}
+          />
         )}
       </div>
       {loading && <p>카드를 검색하고 있습니다...</p>}

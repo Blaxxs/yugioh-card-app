@@ -20,13 +20,13 @@ const RELEASE_CACHE_DAYS = 7;
 const EXTERNAL_GAMES = {
   pokemon: {
     ko: {
-      search: (term, offset) => pokemonKr.searchCards(term, offset),
+      search: (term, offset, filters) => pokemonKr.searchCards(term, offset, filters),
       detail: (id, fallbackName) => pokemonKr.fetchCardDetail(id, fallbackName),
       releaseList: () => pokemonKr.fetchSets(),
       releaseCards: (packId, offset) => pokemonKr.searchCards(packId, offset),
     },
     ja: {
-      search: (term, offset) => pokemonJa.searchCards(term, offset),
+      search: (term, offset, filters) => pokemonJa.searchCards(term, offset, filters),
       detail: (id) => pokemonJa.fetchCardDetail(id),
       releaseList: () => pokemonJa.fetchSets(),
       releaseCards: (packId, offset) => pokemonJa.fetchSetCards(packId, offset),
@@ -36,13 +36,13 @@ const EXTERNAL_GAMES = {
   },
   onepiece: {
     ko: {
-      search: (term, page) => onePieceKr.searchCards(term, page),
+      search: (term, page, filters) => onePieceKr.searchCards(term, page, filters),
       detail: (id) => onePieceKr.fetchCardById(id),
       releaseList: () => onePieceKr.fetchSets(),
       releaseCards: (packId, page) => onePieceKr.fetchSetCards(packId, page),
     },
     ja: {
-      search: (term) => onePieceJa.searchCards(term),
+      search: (term, _page, filters) => onePieceJa.searchCards(term, filters),
       detail: (id) => onePieceJa.fetchCardById(id),
       releaseList: () => onePieceJa.fetchSets(),
       releaseCards: (packId) => onePieceJa.fetchSetCards(packId),
@@ -148,9 +148,10 @@ async function getExternalCardDetail(game, cardId, database, language) {
   return { data: card, cache: database ? "MISS" : "BYPASS" };
 }
 
-async function getExternalSearch(game, query, database, offset = 0, language = "ko") {
+async function getExternalSearch(game, query, database, offset = 0, language = "ko", filters = {}) {
   const cacheVersion = game === "onepiece" ? "v13" : game === "pokemon" ? "v10" : "v4";
-  const cacheScope = `${game}:${language}:${cacheVersion}:${normalizeSearchTerm(query)}`;
+  const filterKey = JSON.stringify(Object.fromEntries(Object.entries(filters).filter(([, value]) => value)));
+  const cacheScope = `${game}:${language}:${cacheVersion}:${normalizeSearchTerm(query)}:${filterKey}`;
   const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {
     const { data } = await database
@@ -170,7 +171,7 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
   if (translatedTerms.length) {
     searchPages = await mapWithConcurrency(translatedTerms.slice(0, 2), 2, async (term) => {
       try {
-        return normalizeExternalPage(await config[language].search(term, offset), game, offset);
+        return normalizeExternalPage(await config[language].search(term, offset, filters), game, offset);
       } catch {
         return { cards: [], nextOffset: null };
       }
@@ -178,7 +179,7 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
   } else if (koreanJapaneseQuery) {
     searchPages = [{ cards: [], nextOffset: null }];
   } else {
-    searchPages = [normalizeExternalPage(await config[language].search(query, offset), game, offset)];
+    searchPages = [normalizeExternalPage(await config[language].search(query, offset, filters), game, offset)];
   }
   const keyForCard = (card) => (game === "onepiece" ? card.cardId.toUpperCase() : card.cardId);
   let cards = [...new Map(searchPages.flatMap((page) => page.cards).map((card) => [keyForCard(card), card])).values()];
@@ -318,9 +319,10 @@ async function getCardDetail(cardId, database, language) {
   }
 }
 
-async function searchCards(query, database, language) {
+async function searchCards(query, database, language, filters = {}) {
   const normalizedTerm = normalizeSearchTerm(query);
-  const queryKey = `yugioh:v7:${language}:${normalizedTerm}`;
+  const filterKey = JSON.stringify(Object.fromEntries(Object.entries(filters).filter(([, value]) => value)));
+  const queryKey = `yugioh:v8:${language}:${normalizedTerm}:${filterKey}`;
   if (database) {
     if (Date.now() - lastExpiredCacheCleanup > 60 * 60 * 1000) {
       lastExpiredCacheCleanup = Date.now();
@@ -339,17 +341,22 @@ async function searchCards(query, database, language) {
   let cards = [];
   if (translatedTerms.length) {
     const translatedResults = await mapWithConcurrency(translatedTerms, 3, async (term) => {
-      const translatedHtml = await fetchOfficialHtml(createSearchUrl(term, language), language).catch(() => "");
+      const translatedHtml = await fetchOfficialHtml(createSearchUrl(term, language, filters), language).catch(
+        () => "",
+      );
       return translatedHtml ? parseSearchResults(translatedHtml, term) : [];
     });
     cards = [...new Map(translatedResults.flat().map((card) => [card.cardId, card])).values()];
   }
   if (!cards.length && !koreanJapaneseQuery) {
-    const html = await fetchOfficialHtml(createSearchUrl(query, language), language);
+    const html = await fetchOfficialHtml(createSearchUrl(query, language, filters), language);
     cards = parseSearchResults(html, query);
   }
   if (!cards.length && !koreanJapaneseQuery && normalizedTerm.length > 1) {
-    const fallbackHtml = await fetchOfficialHtml(createSearchUrl(normalizedTerm.slice(0, 2), language), language);
+    const fallbackHtml = await fetchOfficialHtml(
+      createSearchUrl(normalizedTerm.slice(0, 2), language, filters),
+      language,
+    );
     cards = parseSearchResults(fallbackHtml, query);
   }
 
@@ -384,6 +391,22 @@ export default async function handler(request, response) {
   const query = requestUrl.searchParams.get("q")?.trim();
   const requestedOffset = requestUrl.searchParams.get("offset");
   const offset = requestedOffset === null ? 0 : Number(requestedOffset);
+  const searchFilters = Object.fromEntries(
+    [
+      "ctype",
+      "attr",
+      "search_params",
+      "se_ta",
+      "regulation_sidebar_form",
+      "pg",
+      "series",
+      "colors",
+      "categories",
+      "rarity",
+    ]
+      .map((name) => [name, requestUrl.searchParams.get(name)?.trim() || ""])
+      .filter(([, value]) => value),
+  );
   if (game !== "yugioh" && !EXTERNAL_GAMES[game]) {
     return response.status(400).json({ error: "지원하지 않는 카드게임입니다." });
   }
@@ -423,10 +446,11 @@ export default async function handler(request, response) {
                   database,
                   game === "pokemon" || game === "onepiece" ? offset : 0,
                   language,
+                  searchFilters,
                 )
         : cardId
           ? await getCardDetail(cardId, database, language)
-          : await searchCards(query, database, language);
+          : await searchCards(query, database, language, searchFilters);
     setResponseCache(response);
     response.setHeader("X-Card-Cache", result.cache);
     if ((game === "pokemon" || game === "onepiece") && Number.isSafeInteger(result.nextOffset)) {

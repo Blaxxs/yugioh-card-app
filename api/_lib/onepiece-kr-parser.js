@@ -86,8 +86,18 @@ async function fetchCardList(params, page = 0) {
   return { cards, nextOffset: pageIndexes.some((pageIndex) => pageIndex > page) ? page + 1 : null };
 }
 
-export async function searchCards(term, page = 0) {
-  return fetchCardList({ freewords: term, series: "all" }, page);
+export async function searchCards(term, page = 0, filters = {}) {
+  return fetchCardList(
+    {
+      freewords: term,
+      series: filters.series || "all",
+      colors: filters.colors || "",
+      categories: filters.categories || "",
+      illustrations: filters.illustrations || "",
+      blockIcons: filters.blockIcons || "",
+    },
+    page,
+  );
 }
 
 export async function fetchCardById(cardNumber) {

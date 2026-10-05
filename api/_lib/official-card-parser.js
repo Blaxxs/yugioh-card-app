@@ -71,7 +71,7 @@ const findImageUrls = (html, cardId, imageType = 1, language = "ko") =>
     ),
   ].map((path) => toOfficialImageUrl(path, language));
 
-export const createSearchUrl = (keyword, language = "ko") => {
+export const createSearchUrl = (keyword, language = "ko", filters = {}) => {
   const url = new URL(`${OFFICIAL_SITE_ORIGIN}/yugiohdb/card_search.action`);
   url.search = new URLSearchParams({
     request_locale: language === "ja" ? "ja" : "ko",
@@ -87,6 +87,8 @@ export const createSearchUrl = (keyword, language = "ko") => {
     releaseMStart: "1",
     releaseYStart: "1999",
   });
+  if (filters.ctype) url.searchParams.set("ctype", filters.ctype);
+  if (filters.attr) url.searchParams.set("attr", filters.attr);
   return url;
 };
 

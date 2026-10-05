@@ -639,6 +639,92 @@ button:disabled {
 .search-slot .search-bar {
   margin-bottom: 0;
 }
+.search-filter-toggle {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--app-line);
+  padding: 0 11px;
+  background: var(--app-surface);
+  color: var(--app-ink);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.search-filter-toggle.active {
+  border-color: var(--app-primary);
+  color: var(--app-primary-strong);
+}
+.search-filter-toggle b {
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--app-primary);
+  color: #fff;
+  font-size: 11px;
+}
+.search-filter-panel {
+  margin: 8px 0 18px;
+  border: 1px solid var(--app-line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
+}
+.search-filter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: var(--app-ink);
+  font-size: 13px;
+}
+.search-filter-heading button {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--app-line);
+  padding: 0 8px;
+  background: transparent;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+.search-filter-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.search-filter-field {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.search-filter-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--app-line);
+  border-radius: 6px;
+  padding: 0 8px;
+  background: var(--app-surface);
+  color: var(--app-ink);
+  font: inherit;
+  font-weight: 500;
+}
+.search-filter-loading {
+  display: block;
+  margin-top: 9px;
+  color: var(--app-muted);
+  font-size: 11px;
+}
 
 .search-input-wrap {
   display: flex;
@@ -2987,6 +3073,15 @@ button:disabled {
   .search-bar {
     gap: 7px;
     margin-bottom: 16px;
+  }
+  .search-filter-toggle {
+    min-height: 42px;
+    gap: 4px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .search-filter-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .search-submit {
     min-width: 62px;

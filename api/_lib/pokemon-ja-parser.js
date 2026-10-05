@@ -2,7 +2,6 @@ import { load } from "cheerio";
 
 const ORIGIN = "https://www.pokemon-card.com";
 const SEARCH_URL = `${ORIGIN}/card-search/resultAPI.php`;
-const CARD_TYPES = ["pokemon", "trainer", "energy"];
 let setListPromise;
 const setPagePromises = new Map();
 const requestWaiters = [];
@@ -44,40 +43,30 @@ const createPreview = (entry, pack) => {
   };
 };
 
-async function requestCards({ term = "", packId = "", page = 0 }) {
+async function requestCards({ term = "", packId = "", page = 0, filters = {} }) {
   const pack = packId ? (await fetchSets()).find((item) => item.id.toLowerCase() === packId.toLowerCase()) : null;
-  const results = await Promise.all(
-    CARD_TYPES.map(async (type) => {
-      const params = new URLSearchParams({
-        keyword: term,
-        se_ta: type,
-        regulation_sidebar_form: "all",
-        pg: packId,
-        illust: "",
-        sm_and_keyword: "true",
-        page: String(page + 1),
-      });
-      const response = await fetchOfficial(`${SEARCH_URL}?${params}`, { headers: headers() });
-      if (!response.ok) throw new Error(`일본 포켓몬 카드 검색 실패 (${response.status})`);
-      const body = await response.json();
-      if (body.result !== 1) throw new Error(body.errMsg || "일본 포켓몬 카드 검색에 실패했습니다.");
-      return body;
-    }),
-  );
-  const cards = [
-    ...new Map(
-      results
-        .flatMap((result) => Object.values(result.cardList || {}))
-        .filter((entry) => entry.cardID)
-        .map((entry) => [String(entry.cardID), createPreview(entry, pack)]),
-    ).values(),
-  ];
-  const maxPage = Math.max(...results.map((result) => Number(result.maxPage) || 0));
+  const params = new URLSearchParams({
+    keyword: term,
+    se_ta: filters.se_ta || "",
+    regulation_sidebar_form: filters.regulation_sidebar_form || "all",
+    pg: packId || filters.pg || "",
+    illust: "",
+    sm_and_keyword: "true",
+    page: String(page + 1),
+  });
+  const response = await fetchOfficial(`${SEARCH_URL}?${params}`, { headers: headers() });
+  if (!response.ok) throw new Error(`일본 포켓몬 카드 검색 실패 (${response.status})`);
+  const body = await response.json();
+  if (body.result !== 1) throw new Error(body.errMsg || "일본 포켓몬 카드 검색에 실패했습니다.");
+  const cards = Object.values(body.cardList || {})
+    .filter((entry) => entry.cardID)
+    .map((entry) => createPreview(entry, pack));
+  const maxPage = Number(body.maxPage) || 0;
   return { cards, nextOffset: cards.length && page + 1 < maxPage ? page + 1 : null };
 }
 
-export async function searchCards(term, page = 0) {
-  return requestCards({ term: String(term || "").trim(), page });
+export async function searchCards(term, page = 0, filters = {}) {
+  return requestCards({ term: String(term || "").trim(), page, filters });
 }
 
 export async function fetchSets() {
