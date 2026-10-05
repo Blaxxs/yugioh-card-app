@@ -950,92 +950,99 @@ export default function InventoryConsole({
                 <X size={19} />
               </button>
             </header>
-            {renderIntakeSelectors(packLoading)}
-            {!packLoading && (
-              <div className="pack-search-controls">
-                <div className="pack-search pack-modal-search">
-                  <input
-                    value={packQuery}
-                    onChange={(event) => setPackQuery(event.target.value)}
-                    onKeyDown={handlePackSearchKeyDown}
-                    placeholder="수록 팩 이름"
-                  />
-                  <button type="button" onClick={findPacks}>
-                    <Search size={16} aria-hidden="true" /> 찾기
+            <div className="pack-intake-layout">
+              <div className="pack-intake-main">
+                {packLoading ? (
+                  <div className="pack-loading-state">
+                    <span className="pack-loading-spinner" />
+                    <strong>카드 이미지를 준비하는 중입니다</strong>
+                    <small>잠시만 기다려 주세요.</small>
+                  </div>
+                ) : (
+                  <div className="pack-card-list pack-card-album">
+                    {packCards.map(({ card, quantity, price, rarity }) => (
+                      <article className="pack-card" key={card.id || card.cardId}>
+                        <div className="pack-card-image">
+                          <img src={card.card_images[0]?.image_url_small} alt={card.name} />
+                          <div>
+                            <button type="button" onClick={() => changePackQuantity(packKey(card), quantity - 1)}>
+                              <Minus size={14} />
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              value={quantity}
+                              onChange={(event) => changePackQuantity(packKey(card), event.target.value)}
+                            />
+                            <button type="button" onClick={() => changePackQuantity(packKey(card), quantity + 1)}>
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="pack-card-row">
+                          <input
+                            className="pack-card-price price-input"
+                            type="number"
+                            min="0"
+                            placeholder="가격"
+                            value={price}
+                            onChange={(event) => changePackPrice(packKey(card), event.target.value)}
+                          />
+                        </div>
+                        <strong>{card.koreanData?.cardName || card.localizedName || card.name}</strong>
+                        <small>
+                          {card.card_sets?.[0]?.set_code || "코드 확인 중"}
+                          {rarity && (
+                            <span
+                              className={`rarity-chip rarity-${getRarityCode(rarity)
+                                .replace(/[^a-z0-9+]/gi, "")
+                                .toLowerCase()}`}
+                              title={getRarityLabel(rarity)}
+                            >
+                              {rarity}
+                            </span>
+                          )}
+                        </small>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <aside className="pack-intake-sidebar">
+                {renderIntakeSelectors(packLoading)}
+                <div className="pack-search-controls">
+                  <div className="pack-search pack-modal-search">
+                    <input
+                      value={packQuery}
+                      disabled={packLoading}
+                      onChange={(event) => setPackQuery(event.target.value)}
+                      onKeyDown={handlePackSearchKeyDown}
+                      placeholder="수록 팩 이름"
+                    />
+                    <button type="button" disabled={packLoading} onClick={findPacks}>
+                      <Search size={16} aria-hidden="true" /> 찾기
+                    </button>
+                  </div>
+                  <button
+                    className="pack-save pack-search-save"
+                    type="button"
+                    disabled={busy || packLoading || !packCards.some((item) => item.quantity)}
+                    onClick={savePack}
+                  >
+                    <PackagePlus size={17} /> 선택 수량 저장
                   </button>
                 </div>
-                <button
-                  className="pack-save pack-search-save"
-                  type="button"
-                  disabled={busy || !packCards.some((item) => item.quantity)}
-                  onClick={savePack}
-                >
-                  <PackagePlus size={17} /> 선택 수량 저장
-                </button>
-              </div>
-            )}
-            {!packLoading &&
-              packMatches.map((release) => (
-                <button className="pack-match" type="button" key={release.id} onClick={() => choosePack(release)}>
-                  {release.localizedName || release.name}
-                  <small>{release.date}</small>
-                </button>
-              ))}
-            {packLoading ? (
-              <div className="pack-loading-state">
-                <span className="pack-loading-spinner" />
-                <strong>카드 이미지를 준비하는 중입니다</strong>
-                <small>잠시만 기다려 주세요.</small>
-              </div>
-            ) : (
-              <div className="pack-card-list pack-card-album">
-                {packCards.map(({ card, quantity, price, rarity }) => (
-                  <article className="pack-card" key={card.id || card.cardId}>
-                    <div className="pack-card-image">
-                      <img src={card.card_images[0]?.image_url_small} alt={card.name} />
-                      <div>
-                        <button type="button" onClick={() => changePackQuantity(packKey(card), quantity - 1)}>
-                          <Minus size={14} />
-                        </button>
-                        <input
-                          type="number"
-                          min="0"
-                          value={quantity}
-                          onChange={(event) => changePackQuantity(packKey(card), event.target.value)}
-                        />
-                        <button type="button" onClick={() => changePackQuantity(packKey(card), quantity + 1)}>
-                          <Plus size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="pack-card-row">
-                      <input
-                        className="pack-card-price price-input"
-                        type="number"
-                        min="0"
-                        placeholder="가격"
-                        value={price}
-                        onChange={(event) => changePackPrice(packKey(card), event.target.value)}
-                      />
-                    </div>
-                    <strong>{card.koreanData?.cardName || card.localizedName || card.name}</strong>
-                    <small>
-                      {card.card_sets?.[0]?.set_code || "코드 확인 중"}
-                      {rarity && (
-                        <span
-                          className={`rarity-chip rarity-${getRarityCode(rarity)
-                            .replace(/[^a-z0-9+]/gi, "")
-                            .toLowerCase()}`}
-                          title={getRarityLabel(rarity)}
-                        >
-                          {rarity}
-                        </span>
-                      )}
-                    </small>
-                  </article>
-                ))}
-              </div>
-            )}
+                <div className="pack-match-list">
+                  {!packLoading &&
+                    packMatches.map((release) => (
+                      <button className="pack-match" type="button" key={release.id} onClick={() => choosePack(release)}>
+                        {release.localizedName || release.name}
+                        <small>{release.date}</small>
+                      </button>
+                    ))}
+                </div>
+              </aside>
+            </div>
             <button
               className="pack-window-resizer resize-right"
               type="button"
