@@ -2061,7 +2061,7 @@ button:disabled {
   grid-template-rows: auto minmax(0, 1fr);
 }
 .pack-intake-dialog.pack-search-dialog {
-  width: min(1280px, calc(100vw - 48px));
+  width: min(760px, calc(100vw - 48px));
   min-width: 0;
 }
 .pack-intake-content {
@@ -2097,6 +2097,21 @@ button:disabled {
 }
 .pack-intake-dialog.pack-search-dialog .pack-intake-content:empty {
   display: none;
+}
+.pack-intake-dialog.inventory-add-dialog.pack-search-dialog {
+  width: min(760px, calc(100vw - 48px));
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  grid-template-rows: auto auto;
+}
+.inventory-add-content {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.inventory-add-dialog.pack-cards-dialog .inventory-add-content {
+  max-height: calc(82dvh - 100px);
 }
 .pack-loading-state {
   display: grid;
@@ -2148,7 +2163,7 @@ button:disabled {
     min-width: 900px;
   }
   .pack-intake-dialog.pack-search-dialog {
-    width: min(1280px, calc(100vw - 48px));
+    width: min(760px, calc(100vw - 48px));
     min-width: 0;
   }
   .pack-intake-dialog.pack-cards-dialog {
@@ -2156,7 +2171,15 @@ button:disabled {
     min-width: 900px;
   }
   .pack-intake-dialog.inventory-add-dialog {
-    width: min(900px, calc(100vw - 48px));
+    width: min(760px, calc(100vw - 48px));
+    min-width: 0;
+  }
+  .pack-intake-dialog.inventory-add-dialog.pack-cards-dialog {
+    width: min(1440px, calc(100vw - 48px));
+    min-width: 900px;
+  }
+  .pack-intake-dialog.inventory-add-dialog.pack-search-dialog {
+    width: min(760px, calc(100vw - 48px));
     min-width: 0;
   }
   .pack-intake-dialog.sell-intake-dialog {

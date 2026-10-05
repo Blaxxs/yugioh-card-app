@@ -520,6 +520,7 @@ export default function InventoryConsole({
   };
   const searchAddCards = async () => {
     const query = addQuery.trim();
+    setAddCard(null);
     if (!query) {
       setAddResults([]);
       return;
@@ -1183,44 +1184,49 @@ export default function InventoryConsole({
         <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-label="재고 추가">
           <button className="pack-intake-backdrop" type="button" aria-label="재고 추가 닫기" onClick={closeAddModal} />
           <section
-            className="pack-intake-dialog inventory-add-dialog"
+            className={`pack-intake-dialog inventory-add-dialog ${addResults.length || addCard ? "pack-cards-dialog" : "pack-search-dialog"}`}
             style={addWindow ? { ...addWindow, position: "fixed" } : undefined}
           >
             <header
-              className="inventory-add-drag-handle"
+              className="pack-intake-header inventory-add-drag-handle"
               onPointerDown={(event) => startPackDrag(event, setAddWindow)}
               onPointerMove={dragPack}
               onPointerUp={stopPackDrag}
               onPointerCancel={stopPackDrag}
             >
-              <div>
+              <div className="pack-intake-title">
                 <span>INVENTORY ADD</span>
                 <h3>재고 추가</h3>
                 <p>카드와 판매 정보를 선택해 저장하세요.</p>
               </div>
-              <button type="button" onClick={closeAddModal}>
+              <div className="pack-intake-header-controls">
+                {renderIntakeSelectors()}
+                <div className="pack-search-controls">
+                  <div className="pack-search pack-modal-search">
+                    <input
+                      value={addQuery}
+                      onChange={(event) => setAddQuery(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          searchAddCards();
+                        }
+                      }}
+                      placeholder="카드명 검색"
+                    />
+                    <button type="button" disabled={!addQuery.trim()} onClick={searchAddCards}>
+                      <Search size={16} /> 검색
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <button type="button" aria-label="재고 추가 닫기" onClick={closeAddModal}>
                 <X size={19} />
               </button>
             </header>
-            {renderIntakeSelectors()}
-            {!addCard ? (
+            <div className="inventory-add-content">
+              {!addCard ? (
               <>
-                <div className="pack-search pack-modal-search">
-                  <input
-                    value={addQuery}
-                    onChange={(event) => setAddQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        searchAddCards();
-                      }
-                    }}
-                    placeholder="카드명 검색"
-                  />
-                  <button type="button" disabled={!addQuery.trim()} onClick={searchAddCards}>
-                    <Search size={16} /> 검색
-                  </button>
-                </div>
                 <div className="add-search-results add-search-album">
                   {addResults.map((card) => (
                     <button type="button" key={card.cardId} onClick={() => chooseAddCard(card)}>
@@ -1353,6 +1359,7 @@ export default function InventoryConsole({
                 </button>
               </form>
             )}
+            </div>
             {resizeHandles.map(([direction, label]) => (
               <button
                 className={`pack-window-resizer resize-${direction}`}
