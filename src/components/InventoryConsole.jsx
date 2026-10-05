@@ -1173,7 +1173,14 @@ export default function InventoryConsole({
                 <div className="add-search-results">
                   {addResults.map((card) => (
                     <button type="button" key={card.cardId} onClick={() => chooseAddCard(card)}>
-                      {card.name}
+                      {card.card_images?.[0]?.image_url_small ? (
+                        <img src={card.card_images[0].image_url_small} alt="" loading="lazy" />
+                      ) : (
+                        <span className="add-search-image-placeholder" aria-hidden="true">
+                          <PackagePlus size={18} />
+                        </span>
+                      )}
+                      <span>{card.name}</span>
                     </button>
                   ))}
                 </div>

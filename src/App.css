@@ -1085,12 +1085,25 @@ button:disabled {
   margin: 0 12px 10px;
 }
 .add-search-results button {
-  min-height: 34px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 62px;
   border: 1px solid #cdd2dc;
   background: #fff;
   color: var(--app-ink);
   text-align: left;
   cursor: pointer;
+}
+.add-search-results img,
+.add-search-image-placeholder {
+  display: grid;
+  width: 40px;
+  height: 56px;
+  place-items: center;
+  object-fit: contain;
+  background: #f1f3f5;
 }
 .inventory-add-form {
   display: grid;
