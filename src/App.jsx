@@ -1796,9 +1796,12 @@ export default function App() {
                           ? releaseSearchTerms.terms
                           : [];
                       const terms = [releaseQuery, ...translatedTerms].map(normalize).filter(Boolean);
-                      return terms.some(
-                        (term) =>
-                          normalize(release.name).includes(term) || normalize(release.localizedName).includes(term),
+                      return (
+                        !terms.length ||
+                        terms.some(
+                          (term) =>
+                            normalize(release.name).includes(term) || normalize(release.localizedName).includes(term),
+                        )
                       );
                     })
                     .map((release) => (
