@@ -16,6 +16,7 @@ import {
   translateJapaneseReleaseTerms,
   translateJapaneseSearchTerms,
 } from "./_lib/japanese-search-translator.js";
+import { findCatalogJapaneseCardName } from "./_lib/pokemon-ja-catalog-rarity.js";
 import { getSupabaseAdmin } from "./_lib/supabase-admin.js";
 import { getYugiohReleaseDisplayName } from "../src/lib/yugiohReleaseNames.js";
 
@@ -239,48 +240,97 @@ async function localizeJapaneseReleases(game, releases) {
 }
 
 const normalizePokemonCollectorNumber = (value) => {
-  const match = String(value || "").match(/^\s*0*(\d{1,3})\s*\/\s*0*(\d{1,3})\s*$/);
-  return match ? `${Number(match[1])}/${Number(match[2])}` : "";
+  const match = String(value || "")
+    .normalize("NFKC")
+    .match(/^\s*(.*?)\s*0*(\d{1,3})\s*\/\s*(?:0*(\d{1,3})|([a-z][a-z0-9-]*))\s*$/i);
+  if (!match) return null;
+  const setId = match[1].replace(/[\s:_-]+$/, "").trim();
+  const denominator = match[3] ? String(Number(match[3])) : match[4].toUpperCase();
+  return { setId, code: `${Number(match[2])}/${denominator}` };
 };
 
 async function searchJapanesePokemonByCollectorNumber(query) {
-  const expectedCode = normalizePokemonCollectorNumber(query);
-  if (!expectedCode) return [];
-  const koreanSearch = await pokemonKr.searchCards(query, 0).catch(() => ({ cards: [] }));
-  const koreanCards = await mapWithConcurrency((koreanSearch.cards || []).slice(0, 12), 4, (card) =>
-    pokemonKr.fetchCardDetail(card.cardId, query).catch(() => null),
+  const parsed = normalizePokemonCollectorNumber(query);
+  if (!parsed) return [];
+  let japaneseNames = [];
+  if (parsed.setId) {
+    const name = await findCatalogJapaneseCardName(parsed.setId, parsed.code);
+    if (name) japaneseNames = [{ name, setId: parsed.setId, japanese: true }];
+  } else {
+    const koreanSearch = await pokemonKr.searchCards(query, 0).catch(() => ({ cards: [] }));
+    const koreanCards = await mapWithConcurrency((koreanSearch.cards || []).slice(0, 12), 4, (card) =>
+      pokemonKr.fetchCardDetail(card.cardId, query).catch(() => null),
+    );
+    const exactKoreanCards = [
+      ...new Map(
+        koreanCards
+          .filter((card) =>
+            card?.card_sets?.some((set) => normalizePokemonCollectorNumber(set.set_code)?.code === parsed.code),
+          )
+          .map((card) => [card.cardId, card]),
+      ).values(),
+    ];
+    japaneseNames = exactKoreanCards.flatMap((card) => (card.name ? [{ name: card.name, japanese: false }] : []));
+  }
+  const sets = await fetch("https://api.tcgdex.net/v2/ja/sets", { signal: AbortSignal.timeout(8000) })
+    .then((response) => (response.ok ? response.json() : []))
+    .catch(() => []);
+  const candidateSets = (Array.isArray(sets) ? sets : []).filter(
+    (set) => Number(set.cardCount?.official) === Number(parsed.code.split("/")[1]),
   );
-  const exactKoreanCards = [
+  const matches = await mapWithConcurrency(candidateSets, 4, async (set) => {
+    const name = await findCatalogJapaneseCardName(set.id, parsed.code);
+    return name ? { setId: set.id, name, japanese: true } : null;
+  });
+  japaneseNames.push(...matches.filter(Boolean));
+  japaneseNames = [
     ...new Map(
-      koreanCards
-        .filter((card) =>
-          card?.card_sets?.some((set) => normalizePokemonCollectorNumber(set.set_code) === expectedCode),
-        )
-        .map((card) => [card.cardId, card]),
+      [...matches.filter(Boolean).map((item) => ({ ...item, japanese: true })), ...japaneseNames].map((item) => [
+        `${item.setId || ""}:${item.name}`,
+        item,
+      ]),
     ).values(),
   ];
-  if (!exactKoreanCards.length) return [];
+  if (!japaneseNames.length) return [];
 
-  const japanesePreviews = await mapWithConcurrency(exactKoreanCards, 3, async (koreanCard) => {
-    const terms = await translateJapaneseSearchTerms("pokemon", koreanCard.name);
+  const japanesePreviews = await mapWithConcurrency(japaneseNames, 3, async ({ name, setId, japanese }) => {
+    const translatedTerms = japanese ? [name] : await translateJapaneseSearchTerms("pokemon", name);
+    const terms = [...new Set(translatedTerms.flatMap((term) => [term, term.replace(/ex$/i, "")].filter(Boolean)))];
     const pages = await mapWithConcurrency(terms.slice(0, 2), 2, async (term) =>
       pokemonJa.searchCards(term, 0).catch(() => ({ cards: [] })),
     );
-    return pages.flatMap((page) => page.cards || []);
+    return pages
+      .flatMap((page) => page.cards || [])
+      .filter((card) => {
+        const expectedSetId = parsed.setId || setId;
+        if (!expectedSetId) return true;
+        const imageSetId = card.card_images?.[0]?.image_url_small?.match(/\/card_images\/large\/([^/]+)\//)?.[1];
+        return imageSetId?.toLowerCase() === expectedSetId.toLowerCase();
+      })
+      .map((card) => ({ ...card, requestedSetId: parsed.setId || null }));
   });
   const uniquePreviews = [...new Map(japanesePreviews.flat().map((card) => [card.cardId, card])).values()].slice(0, 24);
   const japaneseCards = await mapWithConcurrency(uniquePreviews, 4, (card) =>
-    pokemonJa.fetchCardDetail(card.cardId).catch(() => null),
+    pokemonJa
+      .fetchCardDetail(card.cardId)
+      .then((detail) => detail && { ...detail, requestedSetId: card.requestedSetId })
+      .catch(() => null),
   );
   return [
     ...new Map(
       japaneseCards
-        .filter((card) =>
-          card?.card_sets?.some((set) => normalizePokemonCollectorNumber(set.set_code) === expectedCode),
+        .filter(
+          (card) =>
+            card?.card_sets?.some((set) => normalizePokemonCollectorNumber(set.set_code)?.code === parsed.code) &&
+            (!card.requestedSetId ||
+              card.card_images?.some((image) => {
+                const imageSetId = image.image_url_small?.match(/\/card_images\/large\/([^/]+)\//)?.[1];
+                return imageSetId?.toLowerCase() === card.requestedSetId.toLowerCase();
+              })),
         )
         .map((card) => {
           const matchingSets = card.card_sets.filter(
-            (set) => normalizePokemonCollectorNumber(set.set_code) === expectedCode,
+            (set) => normalizePokemonCollectorNumber(set.set_code)?.code === parsed.code,
           );
           return [card.cardId, { ...card, card_sets: matchingSets }];
         }),
@@ -386,7 +436,7 @@ async function getExternalCardDetail(game, cardId, database, language, localize 
 }
 
 async function getExternalSearch(game, query, database, offset = 0, language = "ko", filters = {}) {
-  const cacheVersion = game === "onepiece" ? "v16" : game === "pokemon" ? "v13" : "v4";
+  const cacheVersion = game === "onepiece" ? "v16" : game === "pokemon" ? "v15" : "v4";
   const filterKey = JSON.stringify(Object.fromEntries(Object.entries(filters).filter(([, value]) => value)));
   const cacheScope = `${game}:${language}:${cacheVersion}:${normalizeSearchTerm(query)}:${filterKey}`;
   const queryKey = pageCacheKey(cacheScope, offset);

@@ -46,6 +46,50 @@ const resizeHandles = [
   ["top-right", "오른쪽 위 크기 조절"],
 ];
 
+const resolveMatchingPokemonPrinting = (detail, preferredSet, preferredRelease) => {
+  const sets = detail?.card_sets || [];
+  const normalizeSetName = (value) =>
+    String(value || "")
+      .normalize("NFKC")
+      .replace(/\s+/g, "")
+      .toLowerCase();
+  const hasReleaseIdentity = Boolean(
+    preferredSet?.set_id || preferredSet?.set_name || preferredRelease?.id || preferredRelease?.name,
+  );
+  const criteria = [
+    preferredSet?.set_id &&
+      preferredSet?.set_code &&
+      ((set) => String(set.set_id) === String(preferredSet.set_id) && set.set_code === preferredSet.set_code),
+    preferredRelease?.id &&
+      preferredSet?.set_code &&
+      ((set) => String(set.set_id) === String(preferredRelease.id) && set.set_code === preferredSet.set_code),
+    preferredSet?.set_name &&
+      preferredSet?.set_code &&
+      ((set) =>
+        normalizeSetName(set.set_name) === normalizeSetName(preferredSet.set_name) &&
+        set.set_code === preferredSet.set_code),
+    preferredRelease?.name &&
+      preferredSet?.set_code &&
+      ((set) =>
+        normalizeSetName(set.set_name) === normalizeSetName(preferredRelease.name) &&
+        set.set_code === preferredSet.set_code),
+    preferredSet?.set_id && ((set) => String(set.set_id) === String(preferredSet.set_id)),
+    preferredRelease?.id && ((set) => String(set.set_id) === String(preferredRelease.id)),
+    preferredSet?.set_name && ((set) => normalizeSetName(set.set_name) === normalizeSetName(preferredSet.set_name)),
+    preferredRelease?.name && ((set) => normalizeSetName(set.set_name) === normalizeSetName(preferredRelease.name)),
+    !hasReleaseIdentity && preferredSet?.set_code && ((set) => set.set_code === preferredSet.set_code),
+  ].filter(Boolean);
+  for (const matches of criteria) {
+    const candidates = sets.filter(matches);
+    if (!candidates.length) continue;
+    const variants = new Map(
+      candidates.map((set) => [`${set.set_code || ""}:${set.rarity_code || set.set_rarity || ""}`, set]),
+    );
+    return variants.size === 1 ? variants.values().next().value : null;
+  }
+  return !hasReleaseIdentity && sets.length === 1 ? sets[0] : null;
+};
+
 export default function InventoryConsole({
   activeGame,
   activeLanguage,
@@ -69,6 +113,7 @@ export default function InventoryConsole({
   const [packQuery, setPackQuery] = useState("");
   const [packMatches, setPackMatches] = useState([]);
   const [packCards, setPackCards] = useState([]);
+  const [packPendingRarities, setPackPendingRarities] = useState(new Set());
   const [packModalOpen, setPackModalOpen] = useState(false);
   const [packLoading, setPackLoading] = useState(false);
   const [packWindow, setPackWindow] = useState(null);
@@ -90,6 +135,9 @@ export default function InventoryConsole({
   const [addCode, setAddCode] = useState("");
   const [addRarity, setAddRarity] = useState("");
   const [addRarityEditing, setAddRarityEditing] = useState(false);
+  const [addSaveSuccess, setAddSaveSuccess] = useState("");
+  const [addSaveError, setAddSaveError] = useState("");
+  const addSaveNoticeTimer = useRef(null);
   const rarityFieldRef = useRef(null);
   const [addImageIndex, setAddImageIndex] = useState(0);
   const [addCondition, setAddCondition] = useState("S급 (신품급)");
@@ -220,6 +268,7 @@ export default function InventoryConsole({
     setAddWindow(null);
     setPackMatches([]);
     setPackCards([]);
+    setPackPendingRarities(new Set());
     setAddResults([]);
     setAddCard(null);
     setImportRows([]);
@@ -232,6 +281,7 @@ export default function InventoryConsole({
     setAddWindow(null);
     setPackMatches([]);
     setPackCards([]);
+    setPackPendingRarities(new Set());
     setAddResults([]);
     setAddCard(null);
     setImportRows([]);
@@ -240,7 +290,14 @@ export default function InventoryConsole({
     <div className="inventory-intake-selectors intake-button-selectors">
       <div role="group" aria-label="추가할 카드 종류">
         {CARD_GAMES.map((game) => (
-          <button key={game.id} type="button" disabled={disabled} aria-pressed={intakeGame === game.id} title={game.label} onClick={() => changeIntakeGame(game.id)}>
+          <button
+            key={game.id}
+            type="button"
+            disabled={disabled}
+            aria-pressed={intakeGame === game.id}
+            title={game.label}
+            onClick={() => changeIntakeGame(game.id)}
+          >
             <img src={game.cardBack} alt="" aria-hidden="true" />
             <span>{game.label}</span>
           </button>
@@ -251,8 +308,19 @@ export default function InventoryConsole({
           { id: "ko", label: "한국어", country: "kr" },
           { id: "ja", label: "일본어", country: "jp" },
         ].map((language) => (
-          <button key={language.id} type="button" disabled={disabled} aria-pressed={intakeLanguage === language.id} onClick={() => changeIntakeLanguage(language.id)}>
-            <img className="intake-language-flag" src={`https://flagcdn.com/w40/${language.country}.png`} alt="" aria-hidden="true" />
+          <button
+            key={language.id}
+            type="button"
+            disabled={disabled}
+            aria-pressed={intakeLanguage === language.id}
+            onClick={() => changeIntakeLanguage(language.id)}
+          >
+            <img
+              className="intake-language-flag"
+              src={`https://flagcdn.com/w40/${language.country}.png`}
+              alt=""
+              aria-hidden="true"
+            />
             <span>{language.label}</span>
           </button>
         ))}
@@ -263,6 +331,7 @@ export default function InventoryConsole({
     () => () => {
       packLoadVersion.current += 1;
       addSearchVersion.current += 1;
+      if (addSaveNoticeTimer.current) window.clearTimeout(addSaveNoticeTimer.current);
     },
     [],
   );
@@ -292,6 +361,7 @@ export default function InventoryConsole({
     setPackWindow(null);
     setPackLoading(true);
     setPackCards([]);
+    setPackPendingRarities(new Set());
     setPackModalOpen(true);
     try {
       let cards;
@@ -349,6 +419,7 @@ export default function InventoryConsole({
             !item.card.card_sets?.[0]?.set_code ||
             !(item.rarity || item.card.card_sets?.[0]?.rarity_code || item.card.card_sets?.[0]?.set_rarity),
         );
+        setPackPendingRarities(new Set(pending.map((item) => packKey(item.card))));
         let nextIndex = 0;
         const resolveCodes = async () => {
           while (nextIndex < pending.length && packLoadVersion.current === loadVersion) {
@@ -363,9 +434,7 @@ export default function InventoryConsole({
                 { localize: false },
               );
               if (packLoadVersion.current !== loadVersion) return;
-              const detailSet =
-                detail?.card_sets?.find((set) => set.set_name === release.name && set.set_code) ||
-                detail?.card_sets?.find((set) => set.set_code);
+              const detailSet = resolveMatchingPokemonPrinting(detail, card.card_sets?.[0], release);
               if (!detailSet) continue;
               setPackCards((items) =>
                 items.map((item) =>
@@ -399,6 +468,14 @@ export default function InventoryConsole({
               );
             } catch {
               continue;
+            } finally {
+              if (packLoadVersion.current === loadVersion) {
+                setPackPendingRarities((current) => {
+                  const next = new Set(current);
+                  next.delete(packKey(card));
+                  return next;
+                });
+              }
             }
           }
         };
@@ -509,11 +586,9 @@ export default function InventoryConsole({
             card.card_images?.[0]?.image_url_small,
             intakeLanguage,
           );
-          const detailedSet =
-            detail?.card_sets?.find((candidate) => candidate.set_name === set.set_name && candidate.set_code) ||
-            detail?.card_sets?.find((candidate) => candidate.set_code);
+          const detailedSet = resolveMatchingPokemonPrinting(detail, set);
           if (!detailedSet?.set_code) {
-            window.alert(`${card.name} 카드 코드를 확인하지 못해 입고를 중단했습니다.`);
+            window.alert(`${card.name} 카드의 선택한 인쇄 정보를 확인하지 못해 입고를 중단했습니다.`);
             return;
           }
           card = detail;
@@ -628,11 +703,13 @@ export default function InventoryConsole({
     setImportOpen(false);
   };
   const closePackModal = () => {
+    packLoadVersion.current += 1;
     setPackModalOpen(false);
     setPackWindow(null);
     setPackQuery("");
     setPackMatches([]);
     setPackCards([]);
+    setPackPendingRarities(new Set());
     setPackLoading(false);
   };
   const openPackModal = () => {
@@ -674,7 +751,11 @@ export default function InventoryConsole({
     });
   const resizeColumn = (id, width) =>
     setColumns((current) =>
-      current.map((column) => (column.id === id ? { ...column, width: Math.min(id === "name" || id === "memo" ? 320 : 160, Math.max(60, width)) } : column)),
+      current.map((column) =>
+        column.id === id
+          ? { ...column, width: Math.min(id === "name" || id === "memo" ? 320 : 160, Math.max(60, width)) }
+          : column,
+      ),
     );
   const toggleItemSelected = (id) =>
     setSelectedIds((current) => {
@@ -780,7 +861,10 @@ export default function InventoryConsole({
     const results = exactCodeMatches.length ? exactCodeMatches : cards;
     setAddResults(results);
     if (intakeGame !== "pokemon") return;
-    const pending = results.filter((card) => !card.card_sets?.some((set) => set.set_code));
+    const pending = results.filter(
+      (card) =>
+        !card.card_sets?.some((set) => set.set_code && (intakeLanguage !== "ja" || set.rarity_code || set.set_rarity)),
+    );
     setPendingAddCodes(new Set(pending.map((card) => card.cardId)));
     let nextIndex = 0;
     const resolveCodes = async () => {
@@ -848,6 +932,10 @@ export default function InventoryConsole({
     setAddMemo("");
   };
   const closeAddModal = () => {
+    if (addSaveNoticeTimer.current) window.clearTimeout(addSaveNoticeTimer.current);
+    addSaveNoticeTimer.current = null;
+    setAddSaveSuccess("");
+    setAddSaveError("");
     addSearchVersion.current += 1;
     setPendingAddCodes(new Set());
     setAddModalOpen(false);
@@ -1677,6 +1765,11 @@ export default function InventoryConsole({
                                 {rarity}
                               </span>
                             )}
+                            {intakeGame === "pokemon" && !rarity && (
+                              <span className="pack-rarity-status">
+                                {packPendingRarities.has(packKey(card)) ? "레어도 확인 중" : "레어도 확인 필요"}
+                              </span>
+                            )}
                           </small>
                         </article>
                       ))}
@@ -1690,7 +1783,12 @@ export default function InventoryConsole({
                   <button
                     className="pack-save"
                     type="button"
-                    disabled={busy || packLoading || !packCards.some((item) => item.quantity)}
+                    disabled={
+                      busy ||
+                      packLoading ||
+                      !packCards.some((item) => item.quantity) ||
+                      packCards.some((item) => item.quantity > 0 && packPendingRarities.has(packKey(item.card)))
+                    }
                     onClick={savePack}
                   >
                     <PackagePlus size={17} /> 선택 수량 저장
@@ -1878,27 +1976,40 @@ export default function InventoryConsole({
                 </div>
               </div>
               <div className="inventory-add-content">
+                {addSaveSuccess && (
+                  <p className="inventory-add-save-notice" role="status" aria-live="polite">
+                    {addSaveSuccess}
+                  </p>
+                )}
+                {addSaveError && (
+                  <p className="inventory-add-save-error" role="alert">
+                    {addSaveError}
+                  </p>
+                )}
                 {!addCard ? (
                   <div className="add-search-results add-search-album">
-                    {addResults.map((card) => (
-                      <button type="button" key={card.cardId} onClick={() => chooseAddCard(card)}>
-                        {card.card_images?.[0]?.image_url_small ? (
-                          <img src={card.card_images[0].image_url_small} alt="" loading="lazy" />
-                        ) : (
-                          <span className="add-search-image-placeholder" aria-hidden="true">
-                            <PackagePlus size={18} />
-                          </span>
-                        )}
-                        <span>{card.koreanData?.cardName || card.localizedName || card.name}</span>
-                        {intakeGame === "pokemon" && (
-                          <small className="add-search-card-code">
-                            {[...new Set((card.card_sets || []).map((set) => set.set_code).filter(Boolean))].join(
-                              " · ",
-                            ) || (pendingAddCodes.has(card.cardId) ? "코드 조회 중" : "코드 없음")}
-                          </small>
-                        )}
-                      </button>
-                    ))}
+                    {addResults.map((card) => {
+                      const codes = [...new Set((card.card_sets || []).map((set) => set.set_code).filter(Boolean))];
+                      const metadataPending = pendingAddCodes.has(card.cardId);
+                      return (
+                        <button type="button" key={card.cardId} onClick={() => chooseAddCard(card)}>
+                          {card.card_images?.[0]?.image_url_small ? (
+                            <img src={card.card_images[0].image_url_small} alt="" loading="lazy" />
+                          ) : (
+                            <span className="add-search-image-placeholder" aria-hidden="true">
+                              <PackagePlus size={18} />
+                            </span>
+                          )}
+                          <span>{card.koreanData?.cardName || card.localizedName || card.name}</span>
+                          {intakeGame === "pokemon" && (
+                            <small className="add-search-card-code">
+                              {codes.join(" · ") || (metadataPending ? "코드·레어도 확인 중" : "코드 없음")}
+                              {codes.length > 0 && metadataPending && intakeLanguage === "ja" && " · 레어도 확인 중"}
+                            </small>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : (
                   <form
@@ -1922,16 +2033,36 @@ export default function InventoryConsole({
                         set_rarity: addRarity === set.rarity_code ? set.set_rarity || addRarity : addRarity,
                         rarity_code: addRarity,
                       };
-                      await onAddInventory({
-                        card: addCard,
-                        set: selectedSet,
-                        imageIndex: addImageIndex,
-                        condition: addCondition,
-                        price: addPrice,
-                        quantity: addQuantity,
-                        memo: addMemo,
-                      });
-                      closeAddModal();
+                      setAddSaveError("");
+                      try {
+                        const savedCount = await onAddInventory({
+                          card: addCard,
+                          set: selectedSet,
+                          imageIndex: addImageIndex,
+                          condition: addCondition,
+                          price: addPrice,
+                          quantity: addQuantity,
+                          memo: addMemo,
+                        });
+                        if (!savedCount) throw new Error("재고 저장 결과를 확인하지 못했습니다.");
+                        setAddCard(null);
+                        setAddCode("");
+                        setAddRarity("");
+                        setAddImageIndex(0);
+                        setAddCondition("S급 (신품급)");
+                        setAddPrice("");
+                        setAddQuantity(1);
+                        setAddMemo("");
+                        setAddRarityEditing(false);
+                        setAddSaveSuccess(`재고 ${savedCount}종 저장 완료 · 이어서 추가할 수 있습니다.`);
+                        if (addSaveNoticeTimer.current) window.clearTimeout(addSaveNoticeTimer.current);
+                        addSaveNoticeTimer.current = window.setTimeout(() => {
+                          setAddSaveSuccess("");
+                          addSaveNoticeTimer.current = null;
+                        }, 3000);
+                      } catch (error) {
+                        setAddSaveError(error.message || "재고를 저장하지 못했습니다.");
+                      }
                     }}
                   >
                     <div className="add-card-preview">

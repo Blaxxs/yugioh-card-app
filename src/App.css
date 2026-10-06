@@ -1362,6 +1362,24 @@ button:disabled {
   aspect-ratio: 0.72;
   object-fit: contain;
 }
+.inventory-add-save-notice,
+.inventory-add-save-error {
+  margin: 8px 12px;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.inventory-add-save-notice {
+  border: 1px solid #a8d9c5;
+  background: #effaf4;
+  color: #176b4b;
+}
+.inventory-add-save-error {
+  border: 1px solid #efc0c3;
+  background: #fff2f2;
+  color: #9d3038;
+}
 .inventory-add-form label {
   display: grid;
   gap: 4px;
@@ -2897,6 +2915,11 @@ button:disabled {
 }
 .pack-card-album .pack-card small {
   color: #768194;
+}
+.pack-card-album .pack-rarity-status {
+  color: #9a6700;
+  font-size: 10px;
+  font-weight: 700;
 }
 .pack-intake-dialog .pack-save {
   margin: 0 12px 12px;

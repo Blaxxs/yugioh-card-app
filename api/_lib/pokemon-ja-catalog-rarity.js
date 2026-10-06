@@ -36,6 +36,13 @@ const normalize = (value) =>
     .replace(/\s+/g, "")
     .replace("励ましの手紙", "はげましのてがみ")
     .toLowerCase();
+const normalizeCatalogCode = (value) =>
+  String(value || "")
+    .normalize("NFKC")
+    .replace(/\s/g, "")
+    .toUpperCase()
+    .replace(/^0*(\d+)(?=\/)/, (_match, number) => String(Number(number)))
+    .replace(/\/(?:0*)(\d+)$/, (_match, number) => `/${Number(number)}`);
 
 async function fetchHtml(path) {
   const cached = cache.get(path);
@@ -68,15 +75,11 @@ export function parseCatalogRarity(html, setPath, setCode, name, verifiedJapanes
     const href = block.find("a[href]").first().attr("href");
     if (href) fields[`${label}Path`] = new URL(href, ORIGIN).pathname;
   });
-  const normalizeCode = (value) =>
-    String(value || "")
-      .replace(/\s/g, "")
-      .replace(/^(\d+)\/(\d+)$/, (_match, first, second) => `${Number(first)}/${Number(second)}`);
   if (
     normalize(fields.jpn || verifiedJapaneseName) !== normalize(name) ||
     fields.setPath !== setPath ||
     fields.cardPath !== setPath ||
-    normalizeCode(fields.card) !== normalizeCode(setCode)
+    normalizeCatalogCode(fields.card) !== normalizeCatalogCode(setCode)
   )
     return null;
   const rawRarity = String(fields.rarity || "").trim();
@@ -93,7 +96,7 @@ export function parseCatalogRarity(html, setPath, setCode, name, verifiedJapanes
     code: rarity[0],
     label: rarity[1],
     source: "pokellector-ja",
-    metadataId: `${setPath}#${normalizeCode(setCode)}`,
+    metadataId: `${setPath}#${normalizeCatalogCode(setCode)}`,
     hasPrintedSymbol: null,
   };
 }
@@ -110,6 +113,53 @@ export function parseJapaneseCatalogSetPaths(html) {
     else if (!paths.has(code)) paths.set(code, url.pathname);
   });
   return paths;
+}
+
+export async function findCatalogJapaneseCardName(setId, setCode) {
+  const number = String(setCode || "").match(/^\s*0*(\d{1,3})\s*\/\s*(?:0*\d{1,3}|[A-Z][A-Z0-9-]*)\s*$/i);
+  if (!setId || !number) return null;
+  try {
+    const paths = parseJapaneseCatalogSetPaths(await fetchHtml("/sets"));
+    const path = paths.get(normalize(setId));
+    if (!path) return null;
+    const $ = load(await fetchHtml(path));
+    const cardNumber = Number(number[1]);
+    const links = [
+      ...new Set(
+        $("a[href]")
+          .toArray()
+          .flatMap((element) => {
+            const url = new URL($(element).attr("href"), ORIGIN);
+            return url.origin === ORIGIN &&
+              url.pathname.startsWith(path) &&
+              Number(url.pathname.match(/-Card-(\d+)$/)?.[1]) === cardNumber
+              ? [url.pathname]
+              : [];
+          }),
+      ),
+    ];
+    if (links.length !== 1) return null;
+    const detail = load(await fetchHtml(links[0]));
+    const fields = {};
+    detail(".infoblurb > div").each((_index, element) => {
+      const block = detail(element);
+      const label = block.find("strong").first().text().replace(/:$/, "").trim().toLowerCase();
+      if (!label) return;
+      fields[label] = block.clone().find("strong").remove().end().text().replace(/\s+/g, " ").trim();
+      const href = block.find("a[href]").first().attr("href");
+      if (href) fields[`${label}Path`] = new URL(href, ORIGIN).pathname;
+    });
+    if (
+      !fields.jpn ||
+      fields.setPath !== path ||
+      fields.cardPath !== path ||
+      normalizeCatalogCode(fields.card) !== normalizeCatalogCode(setCode)
+    )
+      return null;
+    return fields.jpn;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeCatalogResult(result, isHighClass) {
