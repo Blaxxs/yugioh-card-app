@@ -3941,6 +3941,7 @@ button:disabled {
     padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
   }
   .game-picker-panel {
+    --picker-card-width: clamp(133.5px, 42vw, 165px);
     gap: 10px;
   }
   .game-picker-panel h2 {
@@ -3948,10 +3949,10 @@ button:disabled {
   }
   .game-picker-stage {
     width: min(100%, 360px);
-    height: 240px;
+    height: calc(var(--picker-card-width) / 0.68 + 36px);
   }
   .game-picker-card {
-    width: clamp(133.5px, 42vw, 165px);
+    width: var(--picker-card-width);
   }
   .game-picker-selection {
     gap: 14px;
