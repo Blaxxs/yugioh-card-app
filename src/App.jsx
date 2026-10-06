@@ -100,7 +100,13 @@ function LanguageSwitcher({ activeLanguage, onSelect }) {
           className={activeLanguage === language.id ? "active" : ""}
           onClick={() => onSelect(language.id)}
         >
-          <img src={`https://flagcdn.com/w40/${language.country}.png`} width="20" height="14" alt="" aria-hidden="true" />
+          <img
+            src={`https://flagcdn.com/w40/${language.country}.png`}
+            width="20"
+            height="14"
+            alt=""
+            aria-hidden="true"
+          />
           <span className="language-name">{language.label}</span>
         </button>
       ))}
@@ -1548,7 +1554,13 @@ export default function App() {
               <span>로그아웃</span>
             </button>
           ) : (
-            <button className="auth-button login-btn" onClick={loginWithGoogle} disabled={!isSupabaseConfigured} title="로그인" aria-label="로그인">
+            <button
+              className="auth-button login-btn"
+              onClick={loginWithGoogle}
+              disabled={!isSupabaseConfigured}
+              title="로그인"
+              aria-label="로그인"
+            >
               <LogIn size={18} aria-hidden="true" />
               <span>로그인</span>
             </button>
