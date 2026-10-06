@@ -1187,6 +1187,51 @@ button:disabled {
   width: 100%;
   min-width: 0;
 }
+.inventory-intake-selectors.intake-button-selectors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.intake-button-selectors > div {
+  display: flex;
+  min-width: 0;
+  gap: 4px;
+}
+.intake-button-selectors button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--app-line);
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: var(--app-surface);
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.intake-button-selectors button[aria-pressed="true"] {
+  border-color: var(--app-primary);
+  background: var(--app-soft);
+  color: var(--app-primary-strong);
+}
+.intake-button-selectors button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.intake-button-selectors button img {
+  width: 18px;
+  height: 26px;
+  border-radius: 2px;
+  object-fit: contain;
+}
+.intake-button-selectors button img.intake-language-flag {
+  height: 12px;
+}
 .inventory-import-intake {
   flex: 1 1 260px;
 }
@@ -1402,9 +1447,20 @@ button:disabled {
 }
 @media (min-width: 701px) {
   .app-shell:has(.inventory-console) {
-    width: min(100%, 1120px);
-    max-width: 1120px;
+    width: min(100%, 1680px);
+    max-width: 1680px;
     padding: 28px 24px 48px;
+  }
+  .inventory-console .inventory-table {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .inventory-console .inventory-table th[class*="inventory-column-"] {
+    width: calc((100% - 84px) * var(--inventory-column-ratio)) !important;
+  }
+  .inventory-console .inventory-table th.inventory-select-cell,
+  .inventory-console .inventory-table th.inventory-view-cell {
+    width: 42px;
   }
 }
 .app-shell:has(.inventory-console) .inventory-console {
@@ -1748,7 +1804,6 @@ button:disabled {
   color: #4b5666;
   font-weight: 700;
   text-align: left;
-  position: relative;
   white-space: nowrap;
   padding-right: 30px;
 }
@@ -3823,6 +3878,9 @@ button:disabled {
   }
   .app-topbar .app-title h1 {
     white-space: nowrap;
+  }
+  .app-topbar:not(:has(.game-switcher)) .app-title {
+    margin-right: auto;
   }
   .app-topbar .auth-button {
     order: 1;

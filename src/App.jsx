@@ -1547,7 +1547,9 @@ export default function App() {
             </span>
             <h1>카드 도감</h1>
           </div>
-          <GameSwitcher activeGame={activeGame} compact pending={!gameSelectionComplete} onSelect={changeGame} />
+          {["search", "releases"].includes(activeTab) && (
+            <GameSwitcher activeGame={activeGame} compact pending={!gameSelectionComplete} onSelect={changeGame} />
+          )}
           {session ? (
             <button className="auth-button logout-button" onClick={logout} title="로그아웃" aria-label="로그아웃">
               <LogOut size={18} aria-hidden="true" />
@@ -1566,12 +1568,14 @@ export default function App() {
             </button>
           )}
         </header>
-        <LanguageSwitcher activeLanguage={activeLanguage} onSelect={changeLanguage} />
+        {["search", "releases"].includes(activeTab) && (
+          <LanguageSwitcher activeLanguage={activeLanguage} onSelect={changeLanguage} />
+        )}
       </div>
       {!isSupabaseConfigured && (
         <p className="setup-message">Supabase 환경변수를 설정하면 로그인을 사용할 수 있습니다.</p>
       )}
-      {!gameSelectionComplete && (
+      {!gameSelectionComplete && ["search", "releases"].includes(activeTab) && (
         <GamePicker
           activeGame={activeGame}
           isConfirming={Boolean(gameSelectionFlight)}

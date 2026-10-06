@@ -237,28 +237,26 @@ export default function InventoryConsole({
     setImportRows([]);
   };
   const renderIntakeSelectors = (disabled = false) => (
-    <div className="inventory-intake-selectors">
-      <label>
-        카드 종류
-        <select value={intakeGame} disabled={disabled} onChange={(event) => changeIntakeGame(event.target.value)}>
-          {CARD_GAMES.map((game) => (
-            <option value={game.id} key={game.id}>
-              {game.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        언어
-        <select
-          value={intakeLanguage}
-          disabled={disabled}
-          onChange={(event) => changeIntakeLanguage(event.target.value)}
-        >
-          <option value="ko">한글판</option>
-          <option value="ja">일본판</option>
-        </select>
-      </label>
+    <div className="inventory-intake-selectors intake-button-selectors">
+      <div role="group" aria-label="추가할 카드 종류">
+        {CARD_GAMES.map((game) => (
+          <button key={game.id} type="button" disabled={disabled} aria-pressed={intakeGame === game.id} title={game.label} onClick={() => changeIntakeGame(game.id)}>
+            <img src={game.cardBack} alt="" aria-hidden="true" />
+            <span>{game.label}</span>
+          </button>
+        ))}
+      </div>
+      <div role="group" aria-label="추가할 카드 언어">
+        {[
+          { id: "ko", label: "한국어", country: "kr" },
+          { id: "ja", label: "일본어", country: "jp" },
+        ].map((language) => (
+          <button key={language.id} type="button" disabled={disabled} aria-pressed={intakeLanguage === language.id} onClick={() => changeIntakeLanguage(language.id)}>
+            <img className="intake-language-flag" src={`https://flagcdn.com/w40/${language.country}.png`} alt="" aria-hidden="true" />
+            <span>{language.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
   useEffect(
@@ -676,7 +674,7 @@ export default function InventoryConsole({
     });
   const resizeColumn = (id, width) =>
     setColumns((current) =>
-      current.map((column) => (column.id === id ? { ...column, width: Math.max(60, width) } : column)),
+      current.map((column) => (column.id === id ? { ...column, width: Math.min(id === "name" || id === "memo" ? 320 : 160, Math.max(60, width)) } : column)),
     );
   const toggleItemSelected = (id) =>
     setSelectedIds((current) => {
@@ -1038,7 +1036,6 @@ export default function InventoryConsole({
               </div>
             </div>
             <div className="inventory-table-toolbar-actions">
-              <div className="inventory-import-intake">{renderIntakeSelectors()}</div>
               <div className="inventory-toolbar-group inventory-file-tools" role="group" aria-label="재고 파일 작업">
                 <button
                   type="button"
@@ -1161,7 +1158,7 @@ export default function InventoryConsole({
                         moveColumn(event.dataTransfer.getData("column"), column.id);
                       }}
                       onDragOver={(event) => event.preventDefault()}
-                      style={{ width: column.width }}
+                      style={{ width: column.width, "--inventory-column-ratio": column.width / (tableWidthTotal - 84) }}
                     >
                       <span
                         className="column-label"
