@@ -668,7 +668,91 @@ button:disabled {
   min-height: 0;
 }
 .search-slot.has-search {
-  min-height: 68px;
+  min-height: 0;
+}
+.catalog-search-header {
+  --catalog-control-height: 40px;
+  --catalog-action-width: 40px;
+  --catalog-submit-width: 64px;
+  margin: 0 0 12px;
+}
+.catalog-search-header h2 {
+  margin: 0 0 6px;
+  color: var(--app-ink);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+.catalog-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--catalog-action-width) var(--catalog-submit-width);
+  align-items: center;
+  gap: 6px;
+}
+.catalog-search-input {
+  display: flex;
+  min-width: 0;
+  height: var(--catalog-control-height);
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--app-line);
+  border-radius: 6px;
+  padding: 0 10px;
+  background: var(--app-surface);
+  color: var(--app-muted);
+}
+.catalog-search-input:focus-within {
+  border-color: var(--app-primary);
+}
+.catalog-search-input svg {
+  flex: 0 0 16px;
+}
+.catalog-search-input input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--app-ink);
+  font-size: 14px;
+}
+.catalog-search-action button,
+.catalog-search-submit {
+  position: relative;
+  display: inline-flex;
+  width: 100%;
+  height: var(--catalog-control-height);
+  min-height: var(--catalog-control-height);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--app-line);
+  border-radius: 6px;
+  padding: 0;
+  background: var(--app-surface);
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.catalog-search-action button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.catalog-search-action button[aria-expanded="true"] {
+  border-color: var(--app-primary);
+  color: var(--app-primary-strong);
+}
+.catalog-search-action .search-filter-toggle b {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+}
+.catalog-search-submit {
+  border-color: var(--app-primary);
+  background: var(--app-primary);
+  color: #fff;
 }
 .search-slot .search-bar {
   margin-bottom: 0;
@@ -1313,9 +1397,6 @@ button:disabled {
 }
 
 /* Inventory workstation: dense desktop back-office layout */
-.app-shell:has(.inventory-console) .app-tabs {
-  margin-bottom: 10px;
-}
 .app-shell:has(.inventory-console) .management-panel {
   width: 100%;
 }
@@ -1330,6 +1411,9 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
+}
+.app-shell:has(.inventory-console) .catalog-search-header {
+  grid-column: 1 / -1;
 }
 .app-shell:has(.inventory-console) .inventory-metrics,
 .app-shell:has(.inventory-console) .inventory-table-section {
@@ -1534,15 +1618,18 @@ button:disabled {
 .inventory-table-toolbar {
   position: relative;
   z-index: 2;
-  display: grid;
+  display: none;
   gap: 8px;
   border-bottom: 1px solid #c9ced8;
   padding: 10px 12px;
   background: var(--app-surface);
 }
+.inventory-table-toolbar.tools-expanded {
+  display: grid;
+}
 .inventory-table-toolbar-main {
   display: grid;
-  grid-template-columns: auto minmax(160px, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
 }
@@ -2807,12 +2894,12 @@ button:disabled {
   .inventory-table-toolbar.tools-expanded .inventory-table-toolbar-main > select {
     display: block;
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 1;
   }
   .inventory-table-toolbar.tools-expanded .inventory-view-tools {
     display: flex;
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 1;
   }
   .inventory-table-toolbar.tools-expanded .inventory-table-toolbar-actions {
     display: flex;
@@ -3706,6 +3793,16 @@ button:disabled {
 @media (max-width: 700px) {
   body {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+  .catalog-search-header {
+    --catalog-control-height: 36px;
+    --catalog-action-width: 36px;
+    --catalog-submit-width: 54px;
+    margin-bottom: 10px;
+  }
+  .catalog-search-header h2 {
+    font-size: 14px;
+    line-height: 18px;
   }
   .app-shell {
     width: 100%;

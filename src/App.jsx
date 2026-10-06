@@ -7,7 +7,6 @@ import {
   LogIn,
   LogOut,
   RotateCcw,
-  Search,
   SlidersHorizontal,
   X,
 } from "lucide-react";
@@ -30,6 +29,7 @@ import {
 import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
+import CatalogSearchHeader from "./components/CatalogSearchHeader";
 
 const getPokemonCollectorNumber = (card) => {
   if (Number.isFinite(card.collectorNumber)) return card.collectorNumber;
@@ -1622,38 +1622,29 @@ export default function App() {
       />
       <div className={`search-slot ${activeTab === "search" ? "has-search" : ""}`}>
         {activeTab === "search" && (
-          <form
-            className="search-bar"
-            onSubmit={(event) => {
-              event.preventDefault();
-              searchCard();
-            }}
-          >
-            <label className="search-input-wrap">
-              <Search size={20} aria-hidden="true" />
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder={`${getGameById(activeGame).label} 카드 이름을 검색하세요`}
-                aria-label="카드 이름 검색"
-              />
-            </label>
-            <button
-              className={`search-filter-toggle ${searchFiltersOpen ? "active" : ""}`}
-              type="button"
-              aria-expanded={searchFiltersOpen}
-              onClick={() => setSearchFiltersOpen((open) => !open)}
-            >
-              <SlidersHorizontal size={17} aria-hidden="true" />
-              <span>필터</span>
-              {Object.values(searchFilters).filter(Boolean).length > 0 && (
-                <b>{Object.values(searchFilters).filter(Boolean).length}</b>
-              )}
-            </button>
-            <button className="search-submit" type="submit">
-              검색
-            </button>
-          </form>
+          <CatalogSearchHeader
+            title="카드 검색"
+            value={searchTerm}
+            onChange={setSearchTerm}
+            onSubmit={searchCard}
+            placeholder="카드명 검색"
+            inputLabel="카드 이름 검색"
+            action={
+              <button
+                className={`search-filter-toggle ${searchFiltersOpen ? "active" : ""}`}
+                type="button"
+                title="검색 필터"
+                aria-label="검색 필터"
+                aria-expanded={searchFiltersOpen}
+                onClick={() => setSearchFiltersOpen((open) => !open)}
+              >
+                <SlidersHorizontal size={16} aria-hidden="true" />
+                {Object.values(searchFilters).filter(Boolean).length > 0 && (
+                  <b>{Object.values(searchFilters).filter(Boolean).length}</b>
+                )}
+              </button>
+            }
+          />
         )}
         {activeTab === "search" && searchFiltersOpen && (
           <SearchFilterPanel
@@ -1786,24 +1777,24 @@ export default function App() {
             </>
           ) : (
             <>
-              <div className="release-heading">
-                <div>
-                  <span>OFFICIAL DATABASE</span>
-                  <h2>수록 카드</h2>
-                  <p>상품을 선택해 수록 카드를 확인하세요.</p>
-                </div>
-              </div>
-              <label className="release-search">
-                <Search size={18} aria-hidden="true" />
-                <input
-                  value={releaseQuery}
-                  onChange={(event) => setReleaseQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") event.preventDefault();
-                  }}
-                  placeholder="상품명 검색"
-                />
-              </label>
+              <CatalogSearchHeader
+                title="수록 검색"
+                value={releaseQuery}
+                onChange={setReleaseQuery}
+                placeholder="상품명 검색"
+                inputLabel="수록 검색"
+                action={
+                  <button
+                    type="button"
+                    title="검색어 지우기"
+                    aria-label="검색어 지우기"
+                    disabled={!releaseQuery}
+                    onClick={() => setReleaseQuery("")}
+                  >
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                }
+              />
               {releaseLoading ? (
                 <p className="release-loading">
                   <LoaderCircle size={18} aria-hidden="true" /> 상품 목록을 불러오는 중입니다.
