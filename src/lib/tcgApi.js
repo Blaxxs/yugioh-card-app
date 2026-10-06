@@ -5,6 +5,7 @@ import {
   searchOfficialCards,
 } from "./officialCardApi";
 import { fetchCardApi as fetchGameApi } from "./cardApiClient";
+import { getYugiohReleaseDisplayName, getYugiohReleaseSearchTerms } from "./yugiohReleaseNames.js";
 
 const fetchJapaneseNameBatch = async (game, kind, items) => {
   const params = new URLSearchParams({ game, lang: "ja", translate: "display", kind });
@@ -152,12 +153,19 @@ export async function fetchGameReleaseList(game, language = "ko") {
     game === "yugioh"
       ? await fetchYugiohReleaseList(language)
       : await fetchGameApi({ game, lang: language, releases: "1" });
+  if (game === "yugioh" && language === "ja") {
+    return releases.map((release) => ({ ...release, localizedName: getYugiohReleaseDisplayName(release.name) }));
+  }
   return language === "ja" ? localizeJapaneseReleases(game, releases) : releases;
 }
 
 export async function translateJapaneseReleaseQuery(game, term) {
   const query = String(term || "").trim();
   if (!query || !/[\uac00-\ud7a3]/.test(query)) return [];
+  if (game === "yugioh") {
+    const terms = getYugiohReleaseSearchTerms(query);
+    if (terms.length) return terms;
+  }
   return fetchGameApi({ game, lang: "ja", q: query, translate: "release" });
 }
 

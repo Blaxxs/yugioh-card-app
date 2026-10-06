@@ -1,3 +1,5 @@
+import { getYugiohReleaseDisplayName, getYugiohReleaseSearchTerms } from "../../src/lib/yugiohReleaseNames.js";
+
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const translationCache = new Map();
@@ -199,6 +201,11 @@ export async function translateJapaneseDisplayNames(game, sourceNames, target = 
   const results = new Array(names.length).fill("");
   const missingByKey = new Map();
   names.forEach((name, index) => {
+    const knownName = game === "yugioh" && target === "release" ? getYugiohReleaseDisplayName(name) : name;
+    if (knownName !== name) {
+      results[index] = knownName;
+      return;
+    }
     const cacheKey = `display:${target}:${game}:${normalizeQuery(name)}`;
     const cached = translationCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) results[index] = cached.terms[0];
@@ -243,6 +250,10 @@ async function mapChunksWithConcurrency(chunks, concurrency, mapChunk) {
 async function translateJapaneseTerms(game, query, target) {
   const normalizedQuery = normalizeQuery(query).slice(0, 80);
   if (!normalizedQuery || !/[\uac00-\ud7a3]/.test(normalizedQuery)) return [];
+  if (game === "yugioh" && target === "release") {
+    const terms = getYugiohReleaseSearchTerms(query);
+    if (terms.length) return terms;
+  }
 
   const dictionaryTerms =
     target === "card"

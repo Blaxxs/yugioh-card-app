@@ -17,6 +17,7 @@ import {
   translateJapaneseSearchTerms,
 } from "./_lib/japanese-search-translator.js";
 import { getSupabaseAdmin } from "./_lib/supabase-admin.js";
+import { getYugiohReleaseDisplayName } from "../src/lib/yugiohReleaseNames.js";
 
 const DETAIL_CACHE_DAYS = 30;
 const SEARCH_CACHE_DAYS = 1;
@@ -213,6 +214,10 @@ async function localizeJapaneseReleases(game, releases) {
     koreanReleases.map((release) => [onePieceReleaseCode(release.name), release.name]).filter(([code]) => code),
   );
   const matchedNames = releases.map((release) => {
+    if (game === "yugioh") {
+      const knownName = getYugiohReleaseDisplayName(release.name);
+      if (knownName !== release.name) return knownName;
+    }
     const sameId = koreanById.get(String(release.id || release.path));
     const sameCode = game === "onepiece" ? koreanByCode.get(onePieceReleaseCode(release.name)) : null;
     return sameId || sameCode || null;

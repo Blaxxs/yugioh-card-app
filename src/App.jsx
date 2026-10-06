@@ -14,6 +14,7 @@ import {
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { getReleaseSetVariants, hydrateCardPreviews, isQuarterCenturyChronicleRelease } from "./lib/officialCardApi";
 import { CARD_GAMES, DEFAULT_GAME_ID, getGameById } from "./lib/cardGames";
+import { normalizeYugiohReleaseSearch } from "./lib/yugiohReleaseNames.js";
 import { getInventoryVariantKey, INVENTORY_VARIANT_CONFLICT, normalizeInventoryMemo } from "./lib/inventoryVariants";
 import { scanPokemonRarityRepairs } from "./lib/pokemonRarityRepair";
 import {
@@ -574,7 +575,13 @@ export default function App() {
 
   useEffect(() => {
     if (!window.history.state?.ygoView || !savedHistoryMatches) {
-      window.history.replaceState({ ...window.history.state, ygoView: { index: 0, ...viewRef.current } }, "");
+      window.history.replaceState(
+        {
+          ...window.history.state,
+          ygoView: { index: 0, ...viewRef.current, game: activeGame, language: activeLanguage },
+        },
+        "",
+      );
     }
 
     const restoreHistoryView = (event) => {
@@ -780,6 +787,10 @@ export default function App() {
     loadReleaseCards();
     return () => {
       cancelled = true;
+      if (loadedReleasePath.current === releaseLoadKey) {
+        loadedReleasePath.current = null;
+        setReleaseLoading(false);
+      }
     };
   }, [selectedRelease, activeGame, activeLanguage]);
 
@@ -1785,10 +1796,12 @@ export default function App() {
                   {releases
                     .filter((release) => {
                       const normalize = (value) =>
-                        String(value || "")
-                          .normalize("NFKC")
-                          .replace(/[\s・._-]/g, "")
-                          .toLowerCase();
+                        activeGame === "yugioh" && activeLanguage === "ja"
+                          ? normalizeYugiohReleaseSearch(value)
+                          : String(value || "")
+                              .normalize("NFKC")
+                              .replace(/[\s・._-]/g, "")
+                              .toLowerCase();
                       const translatedTerms =
                         releaseSearchTerms.query === releaseQuery.trim() &&
                         releaseSearchTerms.game === activeGame &&
