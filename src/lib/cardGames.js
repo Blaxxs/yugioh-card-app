@@ -16,3 +16,36 @@ export const GAME_FIELD_LABELS = {
 export const getGameById = (gameId) => CARD_GAMES.find((game) => game.id === gameId) || CARD_GAMES[0];
 
 export const getGameFieldLabels = (gameId) => GAME_FIELD_LABELS[gameId] || GAME_FIELD_LABELS[DEFAULT_GAME_ID];
+
+export const POKEMON_RARITY_LABELS = {
+  N: "노멀",
+  C: "커먼",
+  U: "언커먼",
+  R: "레어",
+  RR: "더블 레어",
+  RRR: "트리플 레어",
+  SR: "슈퍼 레어",
+  SSR: "색이 다른 슈퍼 레어",
+  UR: "울트라 레어",
+  HR: "하이퍼 레어",
+  AR: "아트 레어",
+  SAR: "스페셜 아트 레어",
+  S: "색이 다른 포켓몬",
+  K: "찬란한 포켓몬",
+  ACE: "ACE SPEC",
+  MA: "메가 어택 레어",
+  MUR: "메가 울트라 레어",
+  BWR: "블랙 화이트 레어",
+  CHR: "캐릭터 레어",
+  CSR: "캐릭터 슈퍼 레어",
+  PROMO: "프로모",
+};
+export const POKEMON_RARITY_CODES = Object.keys(POKEMON_RARITY_LABELS);
+export const getPokemonRarityLabel = (value) =>
+  POKEMON_RARITY_LABELS[
+    String(value || "")
+      .trim()
+      .toUpperCase()
+  ] ||
+  value ||
+  "레어도 미확인";

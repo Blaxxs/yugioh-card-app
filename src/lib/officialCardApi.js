@@ -1,4 +1,6 @@
-import { fetchCardApi } from "./cardApiClient";
+import { fetchCardApi as requestCardApi } from "./cardApiClient";
+
+const fetchCardApi = (params) => requestCardApi({ ...params, imageLocaleVersion: "2" });
 
 const OFFICIAL_SITE_ORIGIN = "https://www.db.yugioh-card.com";
 const USE_CARD_API = !import.meta.env.DEV || import.meta.env.VITE_USE_CARD_API === "true";
@@ -9,7 +11,11 @@ const toOfficialImageUrl = (source, language = "ko") => {
   const proxyPrefix = "/official-ygo";
   const isProxied = source.startsWith(`${proxyPrefix}/`);
   const url = new URL(isProxied ? source.slice(proxyPrefix.length) : source, OFFICIAL_SITE_ORIGIN);
-  if (language === "ja" && url.pathname.endsWith("/get_image.action")) url.searchParams.set("osplang", "1");
+  if (url.pathname.endsWith("/get_image.action")) {
+    url.searchParams.set("request_locale", language === "ja" ? "ja" : "ko");
+    if (language === "ja") url.searchParams.set("osplang", "1");
+    else url.searchParams.delete("osplang");
+  }
   return url.origin === OFFICIAL_SITE_ORIGIN ? `${proxyPrefix}${url.pathname}${url.search}` : url.href;
 };
 
@@ -163,12 +169,12 @@ const createCardNumberSearchUrl = (code, language = "ko") => {
   return url;
 };
 
-const findOfficialImageUrl = (document, cardId) => {
+const findOfficialImageUrl = (document, cardId, language = "ko") => {
   const match = document.documentElement.innerHTML.match(
     new RegExp(`get_image\\.action\\?type=1[^"'\\s<]*?cid=${cardId}[^"'\\s<]*`),
   );
   return match
-    ? toOfficialImageUrl(new URL(match[0].replaceAll("&amp;", "&"), `${OFFICIAL_SITE_ORIGIN}/yugiohdb/`).href)
+    ? toOfficialImageUrl(new URL(match[0].replaceAll("&amp;", "&"), `${OFFICIAL_SITE_ORIGIN}/yugiohdb/`).href, language)
     : null;
 };
 
@@ -190,8 +196,8 @@ const findCardEntries = (document, term, language = "ko") => {
       ),
       imageUrl:
         image.getAttribute("src") && image.getAttribute("src") !== "null"
-          ? toOfficialImageUrl(new URL(image.getAttribute("src"), OFFICIAL_SITE_ORIGIN).href)
-          : findOfficialImageUrl(document, cardId),
+          ? toOfficialImageUrl(new URL(image.getAttribute("src"), OFFICIAL_SITE_ORIGIN).href, language)
+          : findOfficialImageUrl(document, cardId, language),
       name: row.querySelector(".card_name")?.textContent.trim() || "",
     }));
 };

@@ -15,11 +15,13 @@ import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { getReleaseSetVariants, hydrateCardPreviews, isQuarterCenturyChronicleRelease } from "./lib/officialCardApi";
 import { CARD_GAMES, DEFAULT_GAME_ID, getGameById } from "./lib/cardGames";
 import { getInventoryVariantKey, INVENTORY_VARIANT_CONFLICT, normalizeInventoryMemo } from "./lib/inventoryVariants";
+import { scanPokemonRarityRepairs } from "./lib/pokemonRarityRepair";
 import {
   fetchGameCardById,
   fetchGameReleaseCards,
   fetchGameReleaseCardsPage,
   fetchGameReleaseList,
+  isGameCardDetailLoaded,
   translateJapaneseReleaseQuery,
   searchGameCards,
   searchGameCardsPage,
@@ -413,40 +415,6 @@ export default function App() {
       return {};
     }
   })();
-  const [searchTerm, setSearchTerm] = useState(savedView.searchTerm || "");
-  const [cards, setCards] = useState(savedView.cards || []);
-  const [loading, setLoading] = useState(false);
-  const [searchNextOffset, setSearchNextOffset] = useState(null);
-  const [searchMoreLoading, setSearchMoreLoading] = useState(false);
-  const searchLoadMoreSentinelRef = useRef(null);
-  const searchMoreLockRef = useRef(false);
-  const [cardDetailLoading, setCardDetailLoading] = useState(false);
-  const [session, setSession] = useState(null);
-  const [selectedCard, setSelectedCard] = useState(savedHistory?.selectedCard || savedView.selectedCard || null);
-  const [favoriteIds, setFavoriteIds] = useState(new Set());
-  const [favoriteCards, setFavoriteCards] = useState([]);
-  const [inventoryItems, setInventoryItems] = useState([]);
-  const [inventory, setInventory] = useState(null);
-  const [inventoryTransactions, setInventoryTransactions] = useState([]);
-  const [salesHistory, setSalesHistory] = useState([]);
-  const [inventoryBusy, setInventoryBusy] = useState(false);
-  const [activeTab, setActiveTab] = useState(savedHistory?.activeTab || savedView.activeTab || "search");
-  const [viewModes, setViewModes] = useState(
-    savedView.viewModes || { search: "album", inventory: "album", favorites: "album" },
-  );
-  const [actionError, setActionError] = useState("");
-  const [releases, setReleases] = useState([]);
-  const [releaseQuery, setReleaseQuery] = useState("");
-  const [releaseSearchTerms, setReleaseSearchTerms] = useState({ query: "", terms: [] });
-  const [selectedRelease, setSelectedRelease] = useState(savedHistory?.selectedRelease || null);
-  const [releaseCards, setReleaseCards] = useState([]);
-  const [releaseLoading, setReleaseLoading] = useState(false);
-  const [releaseNextOffset, setReleaseNextOffset] = useState(null);
-  const [releaseMoreLoading, setReleaseMoreLoading] = useState(false);
-  const releaseLoadMoreSentinelRef = useRef(null);
-  const releaseMoreLockRef = useRef(false);
-  const searchMoreHandlerRef = useRef(null);
-  const releaseMoreHandlerRef = useRef(null);
   const [activeGame, setActiveGame] = useState(() => {
     try {
       return localStorage.getItem("ygo-active-game") || DEFAULT_GAME_ID;
@@ -461,6 +429,68 @@ export default function App() {
       return "ko";
     }
   });
+  const savedHistoryMatches = savedHistory?.game === activeGame && savedHistory?.language === activeLanguage;
+  const savedViewMatches =
+    (!savedView.activeGame || savedView.activeGame === activeGame) &&
+    (!savedView.activeLanguage || savedView.activeLanguage === activeLanguage);
+  const restoredCard = savedHistoryMatches
+    ? savedHistory.selectedCard
+    : savedViewMatches
+      ? savedView.selectedCard
+      : null;
+  const restoredRelease =
+    savedHistoryMatches &&
+    savedHistory.selectedRelease?.game === activeGame &&
+    savedHistory.selectedRelease?.language === activeLanguage
+      ? savedHistory.selectedRelease
+      : null;
+  const [searchTerm, setSearchTerm] = useState(savedViewMatches ? savedView.searchTerm || "" : "");
+  const [cards, setCards] = useState(savedViewMatches ? savedView.cards || [] : []);
+  const [loading, setLoading] = useState(false);
+  const [searchNextOffset, setSearchNextOffset] = useState(null);
+  const [searchMoreLoading, setSearchMoreLoading] = useState(false);
+  const searchLoadMoreSentinelRef = useRef(null);
+  const searchMoreLockRef = useRef(false);
+  const [cardDetailLoading, setCardDetailLoading] = useState(false);
+  const [session, setSession] = useState(null);
+  const [selectedCard, setSelectedCard] = useState(
+    restoredCard &&
+      (!restoredCard.game || restoredCard.game === activeGame) &&
+      (!restoredCard.language || restoredCard.language === activeLanguage)
+      ? restoredCard
+      : null,
+  );
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
+  const [favoriteCards, setFavoriteCards] = useState([]);
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [inventory, setInventory] = useState(null);
+  const [inventoryTransactions, setInventoryTransactions] = useState([]);
+  const [salesHistory, setSalesHistory] = useState([]);
+  const [inventoryBusy, setInventoryBusy] = useState(false);
+  const [activeTab, setActiveTab] = useState(
+    (savedHistoryMatches ? savedHistory.activeTab : null) || savedView.activeTab || "search",
+  );
+  const [viewModes, setViewModes] = useState(
+    savedView.viewModes || { search: "album", inventory: "album", favorites: "album" },
+  );
+  const [actionError, setActionError] = useState("");
+  const [releases, setReleases] = useState([]);
+  const [releaseQuery, setReleaseQuery] = useState("");
+  const [releaseSearchTerms, setReleaseSearchTerms] = useState({
+    query: "",
+    game: activeGame,
+    language: activeLanguage,
+    terms: [],
+  });
+  const [selectedRelease, setSelectedRelease] = useState(restoredRelease);
+  const [releaseCards, setReleaseCards] = useState([]);
+  const [releaseLoading, setReleaseLoading] = useState(false);
+  const [releaseNextOffset, setReleaseNextOffset] = useState(null);
+  const [releaseMoreLoading, setReleaseMoreLoading] = useState(false);
+  const releaseLoadMoreSentinelRef = useRef(null);
+  const releaseMoreLockRef = useRef(false);
+  const searchMoreHandlerRef = useRef(null);
+  const releaseMoreHandlerRef = useRef(null);
   const [searchFilters, setSearchFilters] = useState({});
   const [searchFiltersOpen, setSearchFiltersOpen] = useState(false);
   const [searchFilterReleases, setSearchFilterReleases] = useState([]);
@@ -469,9 +499,11 @@ export default function App() {
   const [gameSelectionComplete, setGameSelectionComplete] = useState(false);
   const [gameSelectionFlight, setGameSelectionFlight] = useState(null);
   const gameSelectionTimer = useRef(null);
-  const historyIndex = useRef(savedHistory?.index || 0);
-  const viewRef = useRef({ activeTab, selectedCard, selectedRelease });
+  const historyIndex = useRef(savedHistoryMatches ? savedHistory.index || 0 : 0);
+  const viewRef = useRef({ activeTab, selectedCard, selectedRelease, activeGame, activeLanguage });
   const loadedReleasePath = useRef(null);
+  const releaseListRequestKey = useRef(null);
+  const releaseContextRef = useRef(`${activeGame}:${activeLanguage}`);
   const searchFilterOptionKey = `${activeGame}:${activeLanguage}`;
 
   useEffect(() => {
@@ -481,10 +513,10 @@ export default function App() {
     const timer = window.setTimeout(() => {
       translateJapaneseReleaseQuery(activeGame, query)
         .then((terms) => {
-          if (!cancelled) setReleaseSearchTerms({ query, terms });
+          if (!cancelled) setReleaseSearchTerms({ query, game: activeGame, language: activeLanguage, terms });
         })
         .catch(() => {
-          if (!cancelled) setReleaseSearchTerms({ query, terms: [] });
+          if (!cancelled) setReleaseSearchTerms({ query, game: activeGame, language: activeLanguage, terms: [] });
         });
     }, 250);
     return () => {
@@ -521,13 +553,13 @@ export default function App() {
   useEffect(() => {
     sessionStorage.setItem(
       "ygo-view-state",
-      JSON.stringify({ searchTerm, cards, selectedCard, activeTab, viewModes, activeLanguage }),
+      JSON.stringify({ searchTerm, cards, selectedCard, activeTab, viewModes, activeGame, activeLanguage }),
     );
-  }, [searchTerm, cards, selectedCard, activeTab, viewModes, activeLanguage]);
+  }, [searchTerm, cards, selectedCard, activeTab, viewModes, activeGame, activeLanguage]);
 
   useEffect(() => {
-    viewRef.current = { activeTab, selectedCard, selectedRelease };
-  }, [activeTab, selectedCard, selectedRelease]);
+    viewRef.current = { activeTab, selectedCard, selectedRelease, activeGame, activeLanguage };
+  }, [activeTab, selectedCard, selectedRelease, activeGame, activeLanguage]);
 
   useEffect(
     () => () => {
@@ -541,7 +573,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!window.history.state?.ygoView) {
+    if (!window.history.state?.ygoView || !savedHistoryMatches) {
       window.history.replaceState({ ...window.history.state, ygoView: { index: 0, ...viewRef.current } }, "");
     }
 
@@ -551,12 +583,29 @@ export default function App() {
       setActionError("");
       historyIndex.current = view.index || 0;
       setActiveTab(view.activeTab);
-      setSelectedCard(view.selectedCard || null);
-      setSelectedRelease(view.selectedRelease || null);
+      const sameGameAndLanguage = view.game === activeGame && view.language === activeLanguage;
+      setSelectedCard(
+        sameGameAndLanguage && view.selectedCard?.game === activeGame && view.selectedCard?.language === activeLanguage
+          ? view.selectedCard
+          : null,
+      );
+      setSelectedRelease(
+        sameGameAndLanguage &&
+          view.selectedRelease?.game === activeGame &&
+          view.selectedRelease?.language === activeLanguage
+          ? view.selectedRelease
+          : null,
+      );
+      if (!sameGameAndLanguage) {
+        setReleases([]);
+        setReleaseCards([]);
+        setReleaseNextOffset(null);
+        loadedReleasePath.current = null;
+      }
     };
     window.addEventListener("popstate", restoreHistoryView);
     return () => window.removeEventListener("popstate", restoreHistoryView);
-  }, []);
+  }, [activeGame, activeLanguage, savedHistoryMatches]);
 
   useEffect(() => {
     if (!supabase) return undefined;
@@ -621,26 +670,66 @@ export default function App() {
   }, [session, selectedCard]);
 
   useEffect(() => {
-    if (activeTab !== "releases" || releases.length || releaseLoading) return;
+    if (
+      !selectedCard ||
+      (selectedCard.game || activeGame) !== "pokemon" ||
+      (selectedCard.language || activeLanguage) !== "ja" ||
+      isGameCardDetailLoaded(selectedCard, "pokemon", "ja")
+    )
+      return undefined;
+    let cancelled = false;
+    const refreshDetail = async () => {
+      try {
+        const detail = await fetchGameCardById(
+          "pokemon",
+          selectedCard.cardId,
+          selectedCard.name,
+          selectedCard.card_images?.[0]?.image_url_small,
+          "ja",
+        );
+        if (!cancelled && detail) setSelectedCard(detail);
+      } catch (error) {
+        if (!cancelled) setActionError(error.message);
+      }
+    };
+    refreshDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCard, activeGame, activeLanguage]);
+
+  useEffect(() => {
+    const releaseContext = `${activeGame}:${activeLanguage}`;
+    if (activeTab !== "releases" || releases.length || releaseListRequestKey.current === releaseContext) return;
+    let cancelled = false;
+    releaseListRequestKey.current = releaseContext;
     const loadReleases = async () => {
       await Promise.resolve();
+      if (cancelled) return;
       setReleaseLoading(true);
       try {
-        setReleases(await fetchGameReleaseList(activeGame, activeLanguage));
+        const result = await fetchGameReleaseList(activeGame, activeLanguage);
+        if (!cancelled && releaseContextRef.current === releaseContext) setReleases(result);
       } catch (error) {
-        setActionError(error.message);
+        if (!cancelled && releaseContextRef.current === releaseContext) setActionError(error.message);
       } finally {
-        setReleaseLoading(false);
+        if (!cancelled && releaseContextRef.current === releaseContext) setReleaseLoading(false);
       }
     };
     loadReleases();
-  }, [activeTab, releaseLoading, releases.length, activeGame, activeLanguage]);
+    return () => {
+      cancelled = true;
+      if (releaseListRequestKey.current === releaseContext) releaseListRequestKey.current = null;
+    };
+  }, [activeTab, releases.length, activeGame, activeLanguage]);
 
   useEffect(() => {
     const releaseLoadKey = `${activeGame}:${activeLanguage}:${selectedRelease?.path || ""}`;
     if (!selectedRelease || loadedReleasePath.current === releaseLoadKey) return;
+    let cancelled = false;
     const loadReleaseCards = async () => {
       await Promise.resolve();
+      if (cancelled) return;
       loadedReleasePath.current = releaseLoadKey;
       setReleaseCards([]);
       setReleaseNextOffset(null);
@@ -654,6 +743,7 @@ export default function App() {
                 nextOffset: null,
               };
         const previews = page.cards;
+        if (cancelled || releaseContextRef.current !== `${activeGame}:${activeLanguage}`) return;
         setReleaseNextOffset(page.nextOffset);
         if (activeGame !== "yugioh" || !isQuarterCenturyChronicleRelease(selectedRelease.name)) {
           setReleaseCards(
@@ -663,6 +753,7 @@ export default function App() {
         }
         const detailedCards = [];
         await hydrateCardPreviews(previews, (card) => detailedCards.push(card), activeLanguage);
+        if (cancelled || releaseContextRef.current !== `${activeGame}:${activeLanguage}`) return;
         const detailsById = new Map(detailedCards.map((card) => [card.cardId, card]));
         setReleaseCards(
           previews
@@ -678,13 +769,18 @@ export default function App() {
             ),
         );
       } catch (error) {
-        loadedReleasePath.current = null;
-        setActionError(error.message);
+        if (!cancelled && releaseContextRef.current === `${activeGame}:${activeLanguage}`) {
+          loadedReleasePath.current = null;
+          setActionError(error.message);
+        }
       } finally {
-        setReleaseLoading(false);
+        if (!cancelled && releaseContextRef.current === `${activeGame}:${activeLanguage}`) setReleaseLoading(false);
       }
     };
     loadReleaseCards();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedRelease, activeGame, activeLanguage]);
 
   const loadMoreReleaseCards = async () => {
@@ -720,7 +816,7 @@ export default function App() {
   const logout = () => supabase?.auth.signOut();
 
   const pushView = (nextView) => {
-    const view = { ...viewRef.current, ...nextView };
+    const view = { ...viewRef.current, ...nextView, game: activeGame, language: activeLanguage };
     historyIndex.current += 1;
     window.history.pushState({ ...window.history.state, ygoView: { index: historyIndex.current, ...view } }, "");
     setActiveTab(view.activeTab);
@@ -779,7 +875,9 @@ export default function App() {
       // ignore storage failures (private browsing, quota, etc.)
     }
     if (gameId === activeGame) return;
+    releaseContextRef.current = `${gameId}:${activeLanguage}`;
     setActiveGame(gameId);
+    viewRef.current = { ...viewRef.current, activeGame: gameId, selectedCard: null, selectedRelease: null };
     setActionError("");
     setSearchTerm("");
     setSearchFilters({});
@@ -789,6 +887,7 @@ export default function App() {
     setSelectedCard(null);
     setReleases([]);
     setReleaseCards([]);
+    setReleaseLoading(false);
     setReleaseNextOffset(null);
     setSelectedRelease(null);
     loadedReleasePath.current = null;
@@ -802,10 +901,24 @@ export default function App() {
 
   const openRelease = (release) => {
     setActionError("");
-    pushView({ activeTab: "releases", selectedCard: null, selectedRelease: release });
+    pushView({
+      activeTab: "releases",
+      selectedCard: null,
+      selectedRelease: { ...release, game: activeGame, language: activeLanguage },
+    });
   };
 
-  const openReleaseByName = async (releaseName) => {
+  const openReleaseByName = async (releaseName, set) => {
+    if (activeGame === "pokemon" && activeLanguage === "ja" && set?.set_id) {
+      openRelease({
+        id: set.set_id,
+        path: set.set_id,
+        name: releaseName,
+        localizedName: set.localizedName,
+        date: set.set_date || "",
+      });
+      return;
+    }
     let release = releases.find((item) => item.name === releaseName);
     if (!release) {
       try {
@@ -827,7 +940,7 @@ export default function App() {
   const openCardWindow = async (card) => {
     if (!card) return;
     if (selectedCard?.cardId === card.cardId || cardDetailLoading) return;
-    if (card.isDetailLoaded) {
+    if (isGameCardDetailLoaded(card, card.game || activeGame, card.language || activeLanguage)) {
       pushView({ selectedCard: card });
       return;
     }
@@ -936,6 +1049,9 @@ export default function App() {
       const savedItems = [];
       for (const card of uniqueCards) {
         const set = card.card_sets?.[0];
+        if (card.game === "pokemon" && !(set?.rarity_code || set?.set_rarity)) {
+          throw new Error("포켓몬 카드의 레어도를 확인한 뒤 입고해 주세요.");
+        }
         const setCode = set?.set_code || "";
         const rarityCode = set?.rarity_code || "";
         const current = currentByVariant.get(getInventoryVariantKey(card));
@@ -990,6 +1106,79 @@ export default function App() {
     const variants = new Map(inventoryItems.map((item) => [getInventoryVariantKey(item), item]));
     for (const { card, quantity, price, memo } of items) {
       await addInventoryCards([{ ...card, purchase_price: price, memo: memo ?? card.memo }], quantity, variants);
+    }
+  };
+
+  const repairInventoryRarities = async (mode, payload, onProgress) => {
+    if (!supabase || !session || inventoryBusy) throw new Error("로그인 후 다시 시도해 주세요.");
+    setInventoryBusy(true);
+    try {
+      const userId = session.user.id;
+      if (mode === "preview") {
+        const owned = [];
+        let offset = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from("inventory_items")
+            .select("*")
+            .eq("user_id", userId)
+            .gt("quantity", 0)
+            .order("id")
+            .range(offset, offset + 999);
+          if (error) throw error;
+          owned.push(...data);
+          if (data.length < 1000) break;
+          offset += 1000;
+        }
+        const plans = await scanPokemonRarityRepairs(
+          owned,
+          (item) =>
+            fetchGameCardById(
+              "pokemon",
+              item.card_id,
+              item.card_name,
+              item.card_snapshot?.card_images?.[0]?.image_url_small,
+              "ja",
+              { localize: false },
+            ),
+          onProgress,
+        );
+        return { userId, plans };
+      }
+      if (mode !== "apply" || payload?.userId !== userId) throw new Error("보정 계정을 확인해 주세요.");
+      const results = [];
+      const updated = new Map();
+      for (const plan of payload.plans) {
+        if (!plan.patch) {
+          results.push(plan);
+          continue;
+        }
+        try {
+          let query = supabase
+            .from("inventory_items")
+            .update(plan.patch)
+            .eq("user_id", userId)
+            .eq("id", plan.item.id)
+            .eq("set_code", plan.item.set_code);
+          query =
+            plan.item.rarity_code == null
+              ? query.is("rarity_code", null)
+              : query.eq("rarity_code", plan.item.rarity_code);
+          query =
+            plan.item.updated_at == null ? query.is("updated_at", null) : query.eq("updated_at", plan.item.updated_at);
+          const { data, error } = await query.select("*");
+          if (error) throw error;
+          if (data.length === 1) updated.set(data[0].id, data[0]);
+          results.push({ ...plan, reason: data.length === 1 ? "보완 완료" : "재고 변경 감지 · 건너뜀" });
+        } catch (error) {
+          results.push({ ...plan, reason: error.code === "23505" ? "기존 재고와 충돌 · 건너뜀" : error.message });
+        }
+        onProgress?.(results.length, payload.plans.length);
+      }
+      setInventoryItems((items) => items.map((item) => updated.get(item.id) || item));
+      return { userId, plans: results, updated: updated.size };
+    } finally {
+      setInventoryBusy(false);
     }
   };
 
@@ -1215,7 +1404,9 @@ export default function App() {
 
   const changeLanguage = async (language) => {
     if (language === activeLanguage) return;
+    releaseContextRef.current = `${activeGame}:${language}`;
     setActiveLanguage(language);
+    viewRef.current = { ...viewRef.current, activeLanguage: language, selectedCard: null, selectedRelease: null };
     try {
       localStorage.setItem("ygo-active-language", language);
     } catch {
@@ -1229,6 +1420,7 @@ export default function App() {
     setSelectedCard(null);
     setReleases([]);
     setReleaseCards([]);
+    setReleaseLoading(false);
     setReleaseNextOffset(null);
     setSelectedRelease(null);
     loadedReleasePath.current = null;
@@ -1392,6 +1584,7 @@ export default function App() {
         showContent={!selectedCard}
         inventoryBusy={inventoryBusy}
         onBatchIntake={batchIntake}
+        onRepairInventoryRarities={repairInventoryRarities}
         onAddInventory={addInventoryVariant}
         onDeleteInventory={deleteInventoryItems}
         onUpdateInventory={updateInventoryItems}
@@ -1597,7 +1790,11 @@ export default function App() {
                           .replace(/[\s・._-]/g, "")
                           .toLowerCase();
                       const translatedTerms =
-                        releaseSearchTerms.query === releaseQuery.trim() ? releaseSearchTerms.terms : [];
+                        releaseSearchTerms.query === releaseQuery.trim() &&
+                        releaseSearchTerms.game === activeGame &&
+                        releaseSearchTerms.language === activeLanguage
+                          ? releaseSearchTerms.terms
+                          : [];
                       const terms = [releaseQuery, ...translatedTerms].map(normalize).filter(Boolean);
                       return terms.some(
                         (term) =>

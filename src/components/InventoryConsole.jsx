@@ -1,12 +1,13 @@
-import { Download, Minus, PackagePlus, Plus, Save, Search, ShoppingCart, X } from "lucide-react";
+import { Download, Minus, PackagePlus, Plus, RefreshCw, Save, Search, ShoppingCart, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { hydrateCardPreviews, getRarityCode, getRarityLabel, ALL_RARITY_CODES } from "../lib/officialCardApi";
-import { CARD_GAMES, getGameById } from "../lib/cardGames";
+import { CARD_GAMES, getGameById, getPokemonRarityLabel, POKEMON_RARITY_CODES } from "../lib/cardGames";
 import {
   fetchGameCardById,
   fetchGameReleaseCards,
   fetchGameReleaseCardsPage,
   fetchGameReleaseList,
+  isGameCardDetailLoaded,
   localizeJapaneseCards,
   searchGameCards,
   translateJapaneseReleaseQuery,
@@ -32,6 +33,7 @@ export default function InventoryConsole({
   inventoryItems,
   busy,
   onBatchIntake,
+  onRepairInventoryRarities,
   onAddInventory,
   onDeleteInventory,
   onUpdateInventory,
@@ -78,6 +80,12 @@ export default function InventoryConsole({
   const [sellModalOpen, setSellModalOpen] = useState(false);
   const [sellItems, setSellItems] = useState([]);
   const [salesHistoryOpen, setSalesHistoryOpen] = useState(false);
+  const [rarityRepairOpen, setRarityRepairOpen] = useState(false);
+  const [rarityRepairLoading, setRarityRepairLoading] = useState(false);
+  const [rarityRepairResult, setRarityRepairResult] = useState(null);
+  const [rarityRepairProgress, setRarityRepairProgress] = useState("");
+  const [rarityRepairError, setRarityRepairError] = useState("");
+  const [rarityRepairBackupSaved, setRarityRepairBackupSaved] = useState(false);
   const [columns, setColumns] = useState(() => {
     const isMobile = typeof window !== "undefined" && window.innerWidth <= 700;
     return [
@@ -317,8 +325,12 @@ export default function InventoryConsole({
       setPackQuery(release.name);
       setPackLoading(false);
       listReady = true;
-      if (intakeGame === "pokemon" && intakeLanguage === "ja") {
-        const pending = variants.filter((item) => !item.card.card_sets?.[0]?.set_code);
+      if (intakeGame === "pokemon") {
+        const pending = variants.filter(
+          (item) =>
+            !item.card.card_sets?.[0]?.set_code ||
+            !(item.rarity || item.card.card_sets?.[0]?.rarity_code || item.card.card_sets?.[0]?.set_rarity),
+        );
         let nextIndex = 0;
         const resolveCodes = async () => {
           while (nextIndex < pending.length && packLoadVersion.current === loadVersion) {
@@ -342,17 +354,24 @@ export default function InventoryConsole({
                   item.card.id === card.id
                     ? {
                         ...item,
+                        rarity: item.rarity || getRarityCode(detailSet.rarity_code || detailSet.set_rarity) || "",
                         card: {
                           ...item.card,
                           ...detail,
                           id: item.card.id,
                           localizedName: item.card.localizedName || detail.localizedName,
-                          koreanData: { ...detail.koreanData, ...item.card.koreanData },
+                          koreanData: {
+                            ...detail.koreanData,
+                            ...item.card.koreanData,
+                            cardName: item.card.koreanData?.cardName || detail.koreanData?.cardName || detail.name,
+                          },
                           card_sets: [
                             {
                               ...detailSet,
                               ...item.card.card_sets?.[0],
                               set_code: item.card.card_sets?.[0]?.set_code || detailSet.set_code,
+                              rarity_code: item.card.card_sets?.[0]?.rarity_code || detailSet.rarity_code,
+                              set_rarity: item.card.card_sets?.[0]?.set_rarity || detailSet.set_rarity,
                             },
                           ],
                         },
@@ -463,7 +482,8 @@ export default function InventoryConsole({
       for (const item of selected) {
         let card = item.card;
         let set = card.card_sets?.[0] || {};
-        if (!set.set_code) {
+        const requireRarity = intakeGame === "pokemon";
+        if (!set.set_code || (requireRarity && !(item.rarity || set.rarity_code || set.set_rarity))) {
           const detail = await fetchGameCardById(
             intakeGame,
             card.cardId,
@@ -481,6 +501,10 @@ export default function InventoryConsole({
           card = detail;
           set = detailedSet;
         }
+        if (requireRarity && !(item.rarity || set.rarity_code || set.set_rarity)) {
+          window.alert(`${card.name} 레어도를 확인하지 못해 입고를 중단했습니다. 잠시 후 다시 시도해 주세요.`);
+          return;
+        }
         resolved.push({
           ...item,
           card: {
@@ -488,7 +512,12 @@ export default function InventoryConsole({
             game: intakeGame,
             language: intakeLanguage,
             card_sets: [
-              { ...set, rarity_code: item.rarity || set.rarity_code, set_rarity: item.rarity || set.set_rarity },
+              {
+                ...set,
+                rarity_code: item.rarity || set.rarity_code,
+                set_rarity:
+                  item.rarity && item.rarity !== set.rarity_code ? item.rarity : set.set_rarity || item.rarity,
+              },
             ],
           },
         });
@@ -750,16 +779,22 @@ export default function InventoryConsole({
           );
           if (addSearchVersion.current !== searchVersion) return;
           if (detail) {
-            setAddResults((items) => items.map((item) => item.cardId === card.cardId ? {
-              ...item,
-              ...detail,
-              localizedName: item.localizedName || detail.localizedName,
-              koreanData: {
-                ...item.koreanData,
-                ...detail.koreanData,
-                cardName: item.koreanData?.cardName || detail.koreanData?.cardName || detail.name,
-              },
-            } : item));
+            setAddResults((items) =>
+              items.map((item) =>
+                item.cardId === card.cardId
+                  ? {
+                      ...item,
+                      ...detail,
+                      localizedName: item.localizedName || detail.localizedName,
+                      koreanData: {
+                        ...item.koreanData,
+                        ...detail.koreanData,
+                        cardName: item.koreanData?.cardName || detail.koreanData?.cardName || detail.name,
+                      },
+                    }
+                  : item,
+              ),
+            );
           }
         } catch {
           continue;
@@ -778,7 +813,7 @@ export default function InventoryConsole({
   };
   const chooseAddCard = async (card) => {
     setAddWindow(null);
-    const detailed = card.isDetailLoaded
+    const detailed = isGameCardDetailLoaded(card, intakeGame, intakeLanguage)
       ? card
       : await fetchGameCardById(
           intakeGame,
@@ -838,6 +873,56 @@ export default function InventoryConsole({
     closeSellModal();
   };
 
+  const previewRarityRepair = async () => {
+    setRarityRepairOpen(true);
+    setRarityRepairLoading(true);
+    setRarityRepairResult(null);
+    setRarityRepairError("");
+    setRarityRepairBackupSaved(false);
+    setRarityRepairProgress("레어도 조회 중");
+    try {
+      const result = await onRepairInventoryRarities("preview", null, (completed, total) =>
+        setRarityRepairProgress(`레어도 조회 ${completed}/${total}`),
+      );
+      setRarityRepairResult(result);
+      setRarityRepairProgress("조회 완료");
+    } catch (error) {
+      setRarityRepairError(error.message || "레어도를 조회하지 못했습니다.");
+    } finally {
+      setRarityRepairLoading(false);
+    }
+  };
+  const backupRarityRepair = () => {
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      userId: rarityRepairResult.userId,
+      items: rarityRepairResult.plans.filter((plan) => plan.patch).map((plan) => plan.item),
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "pokemon-inventory-before-rarity-repair.json";
+    link.click();
+    URL.revokeObjectURL(url);
+    setRarityRepairBackupSaved(true);
+  };
+  const applyRarityRepair = async () => {
+    if (!rarityRepairBackupSaved || rarityRepairLoading) return;
+    setRarityRepairLoading(true);
+    setRarityRepairError("");
+    try {
+      const result = await onRepairInventoryRarities("apply", rarityRepairResult, (completed, total) =>
+        setRarityRepairProgress(`보완 ${completed}/${total}`),
+      );
+      setRarityRepairResult(result);
+      setRarityRepairProgress(`보완 완료 ${result.updated}건`);
+    } catch (error) {
+      setRarityRepairError(error.message || "레어도를 보완하지 못했습니다.");
+    } finally {
+      setRarityRepairLoading(false);
+    }
+  };
+
   return (
     <section className={`inventory-console density-${rowDensity}`}>
       <div className="inventory-metrics">
@@ -863,6 +948,11 @@ export default function InventoryConsole({
         <button className="inventory-sales-history-open" type="button" onClick={() => setSalesHistoryOpen(true)}>
           판매 내역
         </button>
+        {onRepairInventoryRarities && (
+          <button type="button" disabled={busy || rarityRepairLoading} onClick={previewRarityRepair}>
+            <RefreshCw size={16} /> 레어도 보완
+          </button>
+        )}
       </div>
       <section className="inventory-table-section">
         <div className="inventory-table-toolbar">
@@ -1122,6 +1212,90 @@ export default function InventoryConsole({
           </table>
         </div>
       </section>
+      {rarityRepairOpen && (
+        <div className="pack-intake-modal" role="dialog" aria-modal="true" aria-labelledby="rarity-repair-title">
+          <button className="pack-intake-backdrop" type="button" aria-label="레어도 보완 배경" tabIndex={-1} />
+          <section
+            className="pack-intake-dialog inventory-edit-dialog rarity-repair-dialog"
+            aria-busy={rarityRepairLoading}
+          >
+            <header className="pack-intake-header">
+              <div className="pack-intake-title">
+                <h3 id="rarity-repair-title">일본판 포켓몬 레어도 보완</h3>
+              </div>
+              <button
+                type="button"
+                aria-label="레어도 보완 닫기"
+                disabled={rarityRepairLoading}
+                onClick={() => setRarityRepairOpen(false)}
+              >
+                <X size={19} />
+              </button>
+            </header>
+            <div className="rarity-repair-content">
+              <p role="status">{rarityRepairProgress}</p>
+              {rarityRepairError && (
+                <p className="inventory-edit-error" role="alert">
+                  {rarityRepairError}
+                </p>
+              )}
+              {rarityRepairResult && (
+                <>
+                  <p>
+                    대상 {rarityRepairResult.plans.length}건 · 보완 가능{" "}
+                    {rarityRepairResult.plans.filter((plan) => plan.patch).length}건
+                  </p>
+                  <div className="rarity-repair-table-wrap">
+                    <table className="set-table">
+                      <thead>
+                        <tr>
+                          <th>카드</th>
+                          <th>코드</th>
+                          <th>비고</th>
+                          <th>레어도</th>
+                          <th>상태</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rarityRepairResult.plans.map((plan) => (
+                          <tr key={plan.item.id}>
+                            <td>{plan.item.card_name}</td>
+                            <td>{plan.item.set_code || "-"}</td>
+                            <td>{plan.item.memo || "-"}</td>
+                            <td>{plan.rarity || "-"}</td>
+                            <td>{plan.reason || "보완 대기"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+            <footer className="inventory-edit-footer">
+              <button
+                type="button"
+                disabled={
+                  rarityRepairLoading ||
+                  !rarityRepairResult?.plans.some((plan) => plan.patch) ||
+                  rarityRepairResult?.updated != null
+                }
+                onClick={backupRarityRepair}
+              >
+                <Download size={16} /> 원본 백업
+              </button>
+              <button
+                className="pack-save"
+                type="button"
+                disabled={rarityRepairLoading || !rarityRepairBackupSaved || rarityRepairResult?.updated != null}
+                onClick={applyRarityRepair}
+              >
+                <Save size={16} /> 레어도 적용
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
       {viewItem && (
         <div className="inventory-view-modal" role="dialog" aria-modal="true">
           <button className="pack-intake-backdrop" onClick={() => setViewItem(null)} />
@@ -1405,7 +1579,7 @@ export default function InventoryConsole({
                               className={`rarity-chip rarity-${getRarityCode(rarity)
                                 .replace(/[^a-z0-9+]/gi, "")
                                 .toLowerCase()}`}
-                              title={getRarityLabel(rarity)}
+                              title={intakeGame === "pokemon" ? getPokemonRarityLabel(rarity) : getRarityLabel(rarity)}
                             >
                               {rarity}
                             </span>
@@ -1625,8 +1799,9 @@ export default function InventoryConsole({
                       <span>{card.koreanData?.cardName || card.localizedName || card.name}</span>
                       {intakeGame === "pokemon" && (
                         <small className="add-search-card-code">
-                          {[...new Set((card.card_sets || []).map((set) => set.set_code).filter(Boolean))].join(" · ") ||
-                            (pendingAddCodes.has(card.cardId) ? "코드 조회 중" : "코드 없음")}
+                          {[...new Set((card.card_sets || []).map((set) => set.set_code).filter(Boolean))].join(
+                            " · ",
+                          ) || (pendingAddCodes.has(card.cardId) ? "코드 조회 중" : "코드 없음")}
                         </small>
                       )}
                     </button>
@@ -1648,7 +1823,12 @@ export default function InventoryConsole({
                       ) ||
                       addCard.card_sets?.find((item) => item.set_code === addCode) ||
                       {};
-                    const selectedSet = { ...set, set_code: addCode, set_rarity: addRarity, rarity_code: addRarity };
+                    const selectedSet = {
+                      ...set,
+                      set_code: addCode,
+                      set_rarity: addRarity === set.rarity_code ? set.set_rarity || addRarity : addRarity,
+                      rarity_code: addRarity,
+                    };
                     await onAddInventory({
                       card: addCard,
                       set: selectedSet,
@@ -1717,7 +1897,7 @@ export default function InventoryConsole({
                       </button>
                       {addRarityEditing && (
                         <ul className="rarity-options">
-                          {ALL_RARITY_CODES.map((rarity) => (
+                          {(intakeGame === "pokemon" ? POKEMON_RARITY_CODES : ALL_RARITY_CODES).map((rarity) => (
                             <li key={rarity}>
                               <button
                                 type="button"

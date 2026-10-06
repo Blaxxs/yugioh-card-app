@@ -5,7 +5,11 @@ const toOfficialImageUrl = (source, language = "ko") => {
   const proxyPrefix = "/official-ygo";
   const isProxied = source.startsWith(`${proxyPrefix}/`);
   const url = new URL(isProxied ? source.slice(proxyPrefix.length) : source, `${OFFICIAL_SITE_ORIGIN}/yugiohdb/`);
-  if (language === "ja" && url.pathname.endsWith("/get_image.action")) url.searchParams.set("osplang", "1");
+  if (url.pathname.endsWith("/get_image.action")) {
+    url.searchParams.set("request_locale", language === "ja" ? "ja" : "ko");
+    if (language === "ja") url.searchParams.set("osplang", "1");
+    else url.searchParams.delete("osplang");
+  }
   return url.origin === OFFICIAL_SITE_ORIGIN ? `${proxyPrefix}${url.pathname}${url.search}` : url.href;
 };
 
@@ -98,7 +102,7 @@ export const createDetailUrl = (cardId, language = "ko") =>
     OFFICIAL_SITE_ORIGIN,
   );
 
-export const parseSearchResults = (html, searchTerm) => {
+export const parseSearchResults = (html, searchTerm, language = "ko") => {
   const $ = load(html);
   const term = normalizeSearchTerm(searchTerm);
   const seen = new Set();
@@ -110,10 +114,12 @@ export const parseSearchResults = (html, searchTerm) => {
     const cardId = row.find("input.cid").attr("value");
     if (!cardId || !normalizeSearchTerm(name).includes(term) || seen.has(cardId)) return;
     seen.add(cardId);
-    const imageUrl = findImageUrls(html, cardId)[0];
+    const imageUrl = findImageUrls(html, cardId, 1, language)[0];
     cards.push({
       id: cardId,
       cardId,
+      game: "yugioh",
+      language,
       name,
       card_images: imageUrl ? [{ id: `${cardId}-1`, image_url_small: imageUrl }] : [],
       koreanData: { cardName: name },

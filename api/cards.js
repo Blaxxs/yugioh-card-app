@@ -312,13 +312,21 @@ const setResponseCache = (response) => {
   response.setHeader("Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
 };
 
-const proxyOfficialCardImages = (card) => ({
+const proxyOfficialCardImages = (card, language = card.language || "ko") => ({
   ...card,
   card_images: (card.card_images || []).map((image) => {
     const source = image.image_url_small;
-    if (!source || source.startsWith("/official-ygo/")) return image;
+    if (!source) return image;
     try {
-      const url = new URL(source, "https://www.db.yugioh-card.com");
+      const url = new URL(
+        source.startsWith("/official-ygo/") ? source.slice("/official-ygo".length) : source,
+        "https://www.db.yugioh-card.com",
+      );
+      if (url.origin === "https://www.db.yugioh-card.com" && url.pathname.endsWith("/get_image.action")) {
+        url.searchParams.set("request_locale", language === "ja" ? "ja" : "ko");
+        if (language === "ja") url.searchParams.set("osplang", "1");
+        else url.searchParams.delete("osplang");
+      }
       return url.origin === "https://www.db.yugioh-card.com"
         ? { ...image, image_url_small: `/official-ygo${url.pathname}${url.search}` }
         : image;
@@ -533,7 +541,8 @@ async function getCardDetail(cardId, database, language) {
       .eq("card_id", cardId)
       .maybeSingle();
     staleCard = data?.detail_loaded ? data.data : null;
-    if (staleCard && isFresh(data.updated_at)) return { data: proxyOfficialCardImages(staleCard), cache: "HIT" };
+    if (staleCard && isFresh(data.updated_at))
+      return { data: proxyOfficialCardImages(staleCard, language), cache: "HIT" };
   }
 
   try {
@@ -553,9 +562,9 @@ async function getCardDetail(cardId, database, language) {
           updated_at: new Date().toISOString(),
         });
     }
-    return { data: proxyOfficialCardImages(card), cache: database ? "MISS" : "BYPASS" };
+    return { data: proxyOfficialCardImages(card, language), cache: database ? "MISS" : "BYPASS" };
   } catch (error) {
-    if (staleCard) return { data: proxyOfficialCardImages(staleCard), cache: "STALE" };
+    if (staleCard) return { data: proxyOfficialCardImages(staleCard, language), cache: "STALE" };
     throw error;
   }
 }
@@ -563,7 +572,7 @@ async function getCardDetail(cardId, database, language) {
 async function searchCards(query, database, language, filters = {}) {
   const normalizedTerm = normalizeSearchTerm(query);
   const filterKey = JSON.stringify(Object.fromEntries(Object.entries(filters).filter(([, value]) => value)));
-  const queryKey = `yugioh:v12:${language}:${normalizedTerm}:${filterKey}`;
+  const queryKey = `yugioh:v13:${language}:${normalizedTerm}:${filterKey}`;
   if (database) {
     if (Date.now() - lastExpiredCacheCleanup > 60 * 60 * 1000) {
       lastExpiredCacheCleanup = Date.now();
@@ -576,7 +585,7 @@ async function searchCards(query, database, language, filters = {}) {
       .maybeSingle();
     if (data && new Date(data.expires_at).getTime() > Date.now()) {
       const cards = language === "ja" ? await localizeJapaneseCards("yugioh", data.results, database) : data.results;
-      return { data: cards, cache: "HIT" };
+      return { data: cards.map((card) => proxyOfficialCardImages(card, language)), cache: "HIT" };
     }
   }
 
@@ -594,7 +603,7 @@ async function searchCards(query, database, language, filters = {}) {
         const codeUrl = createSearchUrl(code, language, filters);
         codeUrl.searchParams.set("stype", "4");
         const html = await fetchOfficialHtml(codeUrl, language).catch(() => "");
-        return html ? parseSearchResults(html, "") : [];
+        return html ? parseSearchResults(html, "", language) : [];
       });
       cards = [...new Map(prefixResults.flat().map((card) => [card.cardId, card])).values()];
     }
@@ -605,7 +614,7 @@ async function searchCards(query, database, language, filters = {}) {
     const codeUrl = createSearchUrl(query.toUpperCase(), language, filters);
     codeUrl.searchParams.set("stype", "4");
     const codeHtml = await fetchOfficialHtml(codeUrl, language).catch(() => "");
-    if (codeHtml) cards = parseSearchResults(codeHtml, "");
+    if (codeHtml) cards = parseSearchResults(codeHtml, "", language);
   }
 
   const koreanJapaneseQuery = language === "ja" && /[\uac00-\ud7a3]/i.test(query);
@@ -615,20 +624,20 @@ async function searchCards(query, database, language, filters = {}) {
       const translatedHtml = await fetchOfficialHtml(createSearchUrl(term, language, filters), language).catch(
         () => "",
       );
-      return translatedHtml ? parseSearchResults(translatedHtml, term) : [];
+      return translatedHtml ? parseSearchResults(translatedHtml, term, language) : [];
     });
     cards = [...new Map(translatedResults.flat().map((card) => [card.cardId, card])).values()];
   }
   if (!cards.length && !koreanJapaneseQuery) {
     const html = await fetchOfficialHtml(createSearchUrl(query, language, filters), language);
-    cards = parseSearchResults(html, query);
+    cards = parseSearchResults(html, query, language);
   }
   if (!cards.length && !koreanJapaneseQuery && normalizedTerm.length > 1) {
     const fallbackHtml = await fetchOfficialHtml(
       createSearchUrl(normalizedTerm.slice(0, 2), language, filters),
       language,
     );
-    cards = parseSearchResults(fallbackHtml, query);
+    cards = parseSearchResults(fallbackHtml, query, language);
   }
   if (language === "ja") cards = await localizeJapaneseCards("yugioh", cards, database);
 
@@ -772,9 +781,11 @@ export default async function handler(request, response) {
                   language,
                   searchFilters,
                 )
-        : cardId
-          ? await getCardDetail(cardId, database, language)
-          : await searchCards(query, database, language, searchFilters);
+        : releases
+          ? { data: await getYugiohReleaseNames(language), cache: "BYPASS" }
+          : cardId
+            ? await getCardDetail(cardId, database, language)
+            : await searchCards(query, database, language, searchFilters);
     setResponseCache(response);
     response.setHeader("X-Card-Cache", result.cache);
     if ((game === "pokemon" || game === "onepiece") && Number.isSafeInteger(result.nextOffset)) {

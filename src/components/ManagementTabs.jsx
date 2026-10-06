@@ -42,6 +42,7 @@ export default function ManagementTabs({
   showContent = true,
   inventoryBusy,
   onBatchIntake,
+  onRepairInventoryRarities,
   onAddInventory,
   onDeleteInventory,
   onUpdateInventory,
@@ -92,6 +93,7 @@ export default function ManagementTabs({
               inventoryItems={inventoryItems}
               busy={inventoryBusy}
               onBatchIntake={onBatchIntake}
+              onRepairInventoryRarities={onRepairInventoryRarities}
               onAddInventory={onAddInventory}
               onDeleteInventory={onDeleteInventory}
               onUpdateInventory={onUpdateInventory}

@@ -127,6 +127,9 @@ export async function searchGameCardsPage(game, term, offset = 0, language = "ko
   return language === "ja" ? { ...page, cards: await localizeJapaneseCards(game, page.cards) } : page;
 }
 
+export const isGameCardDetailLoaded = (card, game = card?.game, language = card?.language) =>
+  Boolean(card?.isDetailLoaded && (game !== "pokemon" || language !== "ja" || card.detailSchemaVersion >= 8));
+
 export async function fetchGameCardById(game, cardId, fallbackName = "", imageUrl = "", language = "ko", options = {}) {
   if (!cardId) return null;
   const card =
@@ -136,6 +139,7 @@ export async function fetchGameCardById(game, cardId, fallbackName = "", imageUr
           game,
           id: String(cardId),
           lang: language,
+          ...(game === "pokemon" && language === "ja" ? { detailVersion: "8" } : {}),
           ...(options.localize === false ? { localize: "0" } : {}),
         });
   return language === "ja" && card && options.localize !== false
