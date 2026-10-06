@@ -1,4 +1,4 @@
-import { Download, Minus, PackagePlus, Plus, RefreshCw, Save, Search, ShoppingCart, X } from "lucide-react";
+import { Columns3, Download, FileCheck2, FileDown, History, Minus, PackagePlus, Pencil, Plus, RefreshCw, Save, Search, ShoppingCart, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { hydrateCardPreviews, getRarityCode, getRarityLabel, ALL_RARITY_CODES } from "../lib/officialCardApi";
 import { CARD_GAMES, getGameById, getPokemonRarityLabel, POKEMON_RARITY_CODES } from "../lib/cardGames";
@@ -102,6 +102,7 @@ export default function InventoryConsole({
   });
   const [columnFilters, setColumnFilters] = useState({});
   const [columnMenu, setColumnMenu] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [openFilter, setOpenFilter] = useState(null);
   const [filterSelections, setFilterSelections] = useState({});
   const [filterSearch, setFilterSearch] = useState("");
@@ -925,37 +926,41 @@ export default function InventoryConsole({
 
   return (
     <section className={`inventory-console density-${rowDensity}`}>
-      <div className="inventory-metrics">
-        <div>
-          <span>보유 종류</span>
-          <strong>{inventoryItems.length}</strong>
+      <div className="inventory-summary">
+        <div className="inventory-metrics">
+          <div>
+            <span>보유 종류</span>
+            <strong>{inventoryItems.length}</strong>
+          </div>
+          <div>
+            <span>총 수량</span>
+            <strong>{inventoryItems.reduce((total, item) => total + item.quantity, 0)}</strong>
+          </div>
         </div>
-        <div>
-          <span>총 수량</span>
-          <strong>{inventoryItems.reduce((total, item) => total + item.quantity, 0)}</strong>
-        </div>
-      </div>
-      <div className="inventory-action-buttons">
-        <button className="pack-intake-open" type="button" onClick={openPackModal}>
-          일괄 재고 추가
-        </button>
-        <button className="inventory-add-open" type="button" onClick={openAddModal}>
-          재고 추가
-        </button>
-        <button className="inventory-sell-open" type="button" disabled={!selectedIds.size} onClick={openSellModal}>
-          판매
-        </button>
-        <button className="inventory-sales-history-open" type="button" onClick={() => setSalesHistoryOpen(true)}>
-          판매 내역
-        </button>
-        {onRepairInventoryRarities && (
-          <button type="button" disabled={busy || rarityRepairLoading} onClick={previewRarityRepair}>
-            <RefreshCw size={16} /> 레어도 보완
+        <div className="inventory-action-buttons">
+          <button className="pack-intake-open" type="button" onClick={openPackModal}>
+            <PackagePlus size={16} aria-hidden="true" /> 일괄 재고 추가
           </button>
-        )}
+          <button className="inventory-add-open" type="button" onClick={openAddModal}>
+            <Plus size={16} aria-hidden="true" /> 재고 추가
+          </button>
+          <button className="inventory-sell-open" type="button" disabled={!selectedIds.size} onClick={openSellModal}>
+            <ShoppingCart size={16} aria-hidden="true" /> 판매
+          </button>
+        </div>
+        <div className="inventory-utility-actions">
+          <button className="inventory-sales-history-open" type="button" onClick={() => setSalesHistoryOpen(true)}>
+            <History size={16} aria-hidden="true" /> 판매 내역
+          </button>
+          {onRepairInventoryRarities && (
+            <button className="inventory-repair-open" type="button" title="레어도 보완" aria-label="레어도 보완" disabled={busy || rarityRepairLoading} onClick={previewRarityRepair}>
+              <RefreshCw size={16} aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
       <section className="inventory-table-section">
-        <div className="inventory-table-toolbar">
+        <div className={`inventory-table-toolbar${toolsOpen ? " tools-expanded" : ""}`}>
           <div className="inventory-table-toolbar-main">
             <strong>보유 재고</strong>
             <input
@@ -969,19 +974,39 @@ export default function InventoryConsole({
               <option value="name">카드명순</option>
               <option value="quantity">수량 많은순</option>
             </select>
+            <div className="inventory-toolbar-group inventory-view-tools">
+              <button type="button" title="열 설정" aria-label="열 설정" aria-expanded={columnMenu} onClick={() => setColumnMenu((value) => !value)}>
+                <Columns3 size={16} aria-hidden="true" />
+              </button>
+              <select value={rowDensity} onChange={(event) => setRowDensity(event.target.value)} aria-label="행 높이" title="행 높이">
+                <option value="compact">압축</option>
+                <option value="normal">기본</option>
+                <option value="comfortable">여유</option>
+              </select>
+            </div>
+            <button className="inventory-tools-toggle" type="button" title="재고 도구" aria-label="재고 도구" aria-expanded={toolsOpen} onClick={() => {
+              setToolsOpen((value) => !value);
+              setColumnMenu(false);
+            }}>
+              <SlidersHorizontal size={16} aria-hidden="true" />
+            </button>
           </div>
           <div className="inventory-table-toolbar-actions">
             <div className="inventory-import-intake">{renderIntakeSelectors()}</div>
-            <div className="inventory-toolbar-group">
-              <button type="button" onClick={() => importFileRef.current?.click()}>
-                엑셀 업로드
+            <div className="inventory-toolbar-group inventory-file-tools" role="group" aria-label="재고 파일 작업">
+              <button type="button" title="엑셀 업로드" aria-label="엑셀 업로드" onClick={() => importFileRef.current?.click()}>
+                <Upload size={16} aria-hidden="true" />
               </button>
-              <button type="button" onClick={downloadImportTemplate}>
-                양식 다운
+              <button type="button" title="엑셀 양식 다운로드" aria-label="엑셀 양식 다운로드" onClick={downloadImportTemplate}>
+                <FileDown size={16} aria-hidden="true" />
               </button>
-              <span className="inventory-import-filename" title={importFileName || "선택된 파일 없음"}>
-                {importFileName || "선택된 파일 없음"}
-              </span>
+              <button type="button" title="전체 CSV 다운로드" aria-label="전체 CSV 다운로드" onClick={() => exportCsv(false)}>
+                <Download size={16} aria-hidden="true" />
+              </button>
+              <button type="button" title="선택 CSV 다운로드" aria-label="선택 CSV 다운로드" disabled={!selectedIds.size} onClick={() => exportCsv(true)}>
+                <FileCheck2 size={16} aria-hidden="true" />
+              </button>
+              {importFileName && <span className="inventory-import-filename" title={importFileName}>{importFileName}</span>}
               <input
                 ref={importFileRef}
                 className="inventory-import-input"
@@ -992,31 +1017,13 @@ export default function InventoryConsole({
                 hidden
               />
             </div>
-            <div className="inventory-toolbar-group">
-              <button type="button" onClick={() => exportCsv(false)}>
-                <Download size={16} aria-hidden="true" /> 전체 CSV
+            <div className="inventory-toolbar-group inventory-selection-tools" role="group" aria-label="선택한 재고 작업">
+              <button type="button" title="선택 수정" aria-label="선택 수정" disabled={!selectedIds.size} onClick={openEditModal}>
+                <Pencil size={16} aria-hidden="true" />
               </button>
-              <button type="button" disabled={!selectedIds.size} onClick={() => exportCsv(true)}>
-                <Download size={16} aria-hidden="true" /> 선택 CSV
+              <button type="button" title="선택 삭제" aria-label="선택 삭제" disabled={!selectedIds.size} onClick={deleteSelected}>
+                <Trash2 size={16} aria-hidden="true" />
               </button>
-            </div>
-            <div className="inventory-toolbar-group">
-              <button type="button" disabled={!selectedIds.size} onClick={openEditModal}>
-                선택 수정
-              </button>
-              <button type="button" disabled={!selectedIds.size} onClick={deleteSelected}>
-                선택 삭제
-              </button>
-            </div>
-            <div className="inventory-toolbar-group">
-              <button type="button" onClick={() => setColumnMenu((value) => !value)}>
-                열 설정
-              </button>
-              <select value={rowDensity} onChange={(event) => setRowDensity(event.target.value)} aria-label="행 높이">
-                <option value="compact">행 높이: 압축</option>
-                <option value="normal">행 높이: 기본</option>
-                <option value="comfortable">행 높이: 여유</option>
-              </select>
             </div>
           </div>
           {columnMenu && (

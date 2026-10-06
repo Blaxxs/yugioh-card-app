@@ -85,20 +85,23 @@ function GameSwitcher({ activeGame, compact = false, pending = false, onSelect }
 
 function LanguageSwitcher({ activeLanguage, onSelect }) {
   return (
-    <div className="language-switcher" role="group" aria-label="카드 판본">
-      <span>판본</span>
+    <div className="language-switcher" role="group" aria-label="카드 언어">
+      <span>언어</span>
       {[
-        { id: "ko", label: "한글판" },
-        { id: "ja", label: "일본판" },
+        { id: "ko", label: "한국어", country: "kr" },
+        { id: "ja", label: "일본어", country: "jp" },
       ].map((language) => (
         <button
           key={language.id}
           type="button"
+          aria-label={language.label}
+          title={language.label}
           aria-pressed={activeLanguage === language.id}
           className={activeLanguage === language.id ? "active" : ""}
           onClick={() => onSelect(language.id)}
         >
-          {language.label}
+          <img src={`https://flagcdn.com/w40/${language.country}.png`} width="20" height="14" alt="" aria-hidden="true" />
+          <span className="language-name">{language.label}</span>
         </button>
       ))}
     </div>
@@ -1530,26 +1533,29 @@ export default function App() {
 
   return (
     <main className={`app-shell auth-state ${session ? "logged-in" : "logged-out"}`}>
-      <header className="app-header">
-        <div className="app-title">
-          <span className="app-mark" aria-hidden="true">
-            YG
-          </span>
-          <h1>카드 도감</h1>
-        </div>
-        <GameSwitcher activeGame={activeGame} compact pending={!gameSelectionComplete} onSelect={changeGame} />
-        {session ? (
-          <button className="auth-button logout-button" onClick={logout} title="로그아웃">
-            <LogOut size={18} aria-hidden="true" />
-            <span>로그아웃</span>
-          </button>
-        ) : (
-          <button className="auth-button login-btn" onClick={loginWithGoogle} disabled={!isSupabaseConfigured}>
-            <LogIn size={18} aria-hidden="true" />
-            <span>로그인</span>
-          </button>
-        )}
-      </header>
+      <div className="app-topbar">
+        <header className="app-header">
+          <div className="app-title">
+            <span className="app-mark" aria-hidden="true">
+              YG
+            </span>
+            <h1>카드 도감</h1>
+          </div>
+          <GameSwitcher activeGame={activeGame} compact pending={!gameSelectionComplete} onSelect={changeGame} />
+          {session ? (
+            <button className="auth-button logout-button" onClick={logout} title="로그아웃" aria-label="로그아웃">
+              <LogOut size={18} aria-hidden="true" />
+              <span>로그아웃</span>
+            </button>
+          ) : (
+            <button className="auth-button login-btn" onClick={loginWithGoogle} disabled={!isSupabaseConfigured} title="로그인" aria-label="로그인">
+              <LogIn size={18} aria-hidden="true" />
+              <span>로그인</span>
+            </button>
+          )}
+        </header>
+        <LanguageSwitcher activeLanguage={activeLanguage} onSelect={changeLanguage} />
+      </div>
       {!isSupabaseConfigured && (
         <p className="setup-message">Supabase 환경변수를 설정하면 로그인을 사용할 수 있습니다.</p>
       )}
@@ -1578,7 +1584,6 @@ export default function App() {
           }}
         />
       )}
-      <LanguageSwitcher activeLanguage={activeLanguage} onSelect={changeLanguage} />
       <ManagementTabs
         activeTab={activeTab}
         activeGame={activeGame}
