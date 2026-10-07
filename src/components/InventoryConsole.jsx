@@ -32,6 +32,7 @@ import {
 } from "../lib/tcgApi";
 import SalesHistory from "./SalesHistory";
 import CatalogSearchHeader from "./CatalogSearchHeader";
+import { downloadInventoryWorkbook } from "../lib/inventoryExport.js";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
@@ -207,27 +208,13 @@ export default function InventoryConsole({
             : new Date(right.updated_at) - new Date(left.updated_at),
       );
   }, [inventoryItems, query, columnFilters, sort]);
-  const exportCsv = (selectedOnly) => {
-    const items = selectedOnly ? visibleItems.filter((item) => selectedIds.has(item.id)) : visibleItems;
-    const rows = [
-      ["카드명", "수록 코드", "레어도", "수량", "최종 수정"],
-      ...items.map((item) => [
-        item.card_name,
-        item.set_code || "",
-        item.rarity || "",
-        item.quantity,
-        new Date(item.updated_at).toLocaleString("ko-KR"),
-      ]),
-    ];
-    const blob = new Blob(
-      [`\uFEFF${rows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")).join("\n")}`],
-      { type: "text/csv;charset=utf-8" },
-    );
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "ygo-inventory.csv";
-    link.click();
-    URL.revokeObjectURL(link.href);
+  const exportExcel = async (selectedOnly) => {
+    const items = selectedOnly ? inventoryItems.filter((item) => selectedIds.has(item.id)) : inventoryItems;
+    try {
+      await downloadInventoryWorkbook(items, selectedOnly ? "tcg-inventory-selected.xlsx" : "tcg-inventory.xlsx");
+    } catch (error) {
+      window.alert(`엑셀 파일을 만들지 못했습니다: ${error.message}`);
+    }
   };
   const downloadImportTemplate = () => {
     const link = document.createElement("a");
@@ -1143,18 +1130,18 @@ export default function InventoryConsole({
                 </button>
                 <button
                   type="button"
-                  title="전체 CSV 다운로드"
-                  aria-label="전체 CSV 다운로드"
-                  onClick={() => exportCsv(false)}
+                  title="전체 엑셀 다운로드"
+                  aria-label="전체 엑셀 다운로드"
+                  onClick={() => exportExcel(false)}
                 >
                   <Download size={16} aria-hidden="true" />
                 </button>
                 <button
                   type="button"
-                  title="선택 CSV 다운로드"
-                  aria-label="선택 CSV 다운로드"
+                  title="선택 엑셀 다운로드"
+                  aria-label="선택 엑셀 다운로드"
                   disabled={!selectedIds.size}
-                  onClick={() => exportCsv(true)}
+                  onClick={() => exportExcel(true)}
                 >
                   <FileCheck2 size={16} aria-hidden="true" />
                 </button>

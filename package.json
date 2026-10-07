@@ -13,10 +13,16 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
     "cheerio": "^1.2.0",
+    "exceljs": "^4.4.0",
     "lucide-react": "^1.46.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "read-excel-file": "^9.3.10"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
