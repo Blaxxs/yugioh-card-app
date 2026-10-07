@@ -118,6 +118,19 @@ const getGameId = (item) =>
 const getRarity = (item) =>
   String(item.rarity_code || item.card_snapshot?.card_sets?.[0]?.rarity_code || item.rarity || "").trim();
 const normalizeRarity = (rarity) => RARITY_ALIASES.get(rarity.toLowerCase()) || rarity.toUpperCase();
+const parsePokemonCode = (value) => {
+  const match = String(value || "")
+    .normalize("NFKC")
+    .match(/^\s*0*(\d+)\s*\/\s*(\d+|[a-z][a-z0-9-]*)\s*$/i);
+  return match ? { number: Number(match[1]), pack: match[2] } : null;
+};
+const comparePokemonCodes = (leftCode, rightCode) => {
+  const left = parsePokemonCode(leftCode);
+  const right = parsePokemonCode(rightCode);
+  if (left && right) return collator.compare(left.pack, right.pack) || left.number - right.number;
+  if (left || right) return left ? -1 : 1;
+  return collator.compare(leftCode || "", rightCode || "");
+};
 
 export function sortInventoryForExport(items) {
   return [...items].sort((left, right) => {
@@ -128,10 +141,13 @@ export function sortInventoryForExport(items) {
       (GAME_ORDER.get(getGameId(right)) ?? GAME_ORDER.get("yugioh"));
     if (gameDifference) return gameDifference;
 
-    const codeDifference = collator.compare(left.set_code || "", right.set_code || "");
+    const gameId = getGameId(left);
+    const codeDifference =
+      gameId === "pokemon"
+        ? comparePokemonCodes(left.set_code, right.set_code)
+        : collator.compare(left.set_code || "", right.set_code || "");
     if (codeDifference) return codeDifference;
 
-    const gameId = getGameId(left);
     const rarityOrder = GAME_RARITY_ORDER[gameId] || [];
     const leftRarity = normalizeRarity(getRarity(left));
     const rightRarity = normalizeRarity(getRarity(right));
