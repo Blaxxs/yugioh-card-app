@@ -1536,6 +1536,40 @@ export default function App() {
       (activeGame !== "pokemon" && activeGame !== "onepiece") ||
       searchNextOffset == null ||
       loading ||
+      searchMoreLoading
+    )
+      return;
+    searchMoreHandlerRef.current?.();
+  }, [activeTab, selectedCard, activeGame, cards.length, searchNextOffset, loading, searchMoreLoading]);
+
+  useEffect(() => {
+    if (
+      activeTab !== "releases" ||
+      !selectedRelease ||
+      (activeGame !== "pokemon" && activeGame !== "onepiece") ||
+      releaseNextOffset == null ||
+      releaseLoading ||
+      releaseMoreLoading
+    )
+      return;
+    releaseMoreHandlerRef.current?.();
+  }, [
+    activeTab,
+    selectedRelease,
+    activeGame,
+    releaseCards.length,
+    releaseNextOffset,
+    releaseLoading,
+    releaseMoreLoading,
+  ]);
+
+  useEffect(() => {
+    if (
+      activeTab !== "search" ||
+      selectedCard ||
+      (activeGame !== "pokemon" && activeGame !== "onepiece") ||
+      searchNextOffset == null ||
+      loading ||
       searchMoreLoading ||
       !searchLoadMoreSentinelRef.current ||
       typeof IntersectionObserver === "undefined"
