@@ -70,6 +70,8 @@ Supabase와 Google은 무료 사용량 구간에서 시작할 수 있지만, 저
 
 키는 서버 환경변수로만 설정하고 `VITE_` 접두사를 붙이지 마세요. AI에는 카드/팩 이름만 보내며, 카드 데이터는 각 공식 DB에서 조회합니다. 키가 없거나 Gemini가 실패하면 공식 ID·코드 매핑을 우선 사용하고, 그것도 없으면 일본어 원본 이름을 유지합니다.
 
+한국어 카드명·팩명 검색 사전과 성공한 AI 번역은 서버 프로세스 메모리뿐 아니라 Supabase의 `japanese_search_dictionary`에도 저장합니다. 이 테이블은 API 서버의 `SUPABASE_SERVICE_ROLE_KEY`로만 접근하며 브라우저 권한은 부여하지 않습니다. 서버 사전 테이블을 준비하려면 Supabase SQL Editor에서 [supabase-migration-japanese-search-dictionary.sql](supabase-migration-japanese-search-dictionary.sql)을 한 번 실행한 뒤 배포하세요. 마이그레이션을 적용하지 않았거나 서버 DB 연결이 없으면 코드 내 기본 사전과 Gemini fallback으로 계속 동작합니다.
+
 ## 포켓몬 · 원피스 카드 지원
 
 앱 상단의 게임 선택 UI에서 유희왕/포켓몬/원피스를 전환할 수 있습니다. 포켓몬과 원피스 카드 데이터는

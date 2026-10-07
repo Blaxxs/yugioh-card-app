@@ -1,9 +1,11 @@
 import { getYugiohReleaseDisplayName, getYugiohReleaseSearchTerms } from "../../src/lib/yugiohReleaseNames.js";
+import { getSupabaseAdmin } from "./supabase-admin.js";
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const CACHE_TTL = 24 * 60 * 60 * 1000;
 const translationCache = new Map();
 const geminiRequests = new Map();
+let dictionaryStorageUnavailable = false;
 
 async function fetchGemini(body, timeout) {
   const key = JSON.stringify(body);
@@ -55,7 +57,12 @@ const SEARCH_DICTIONARY = {
 };
 
 const RELEASE_SEARCH_DICTIONARY = {
-  yugioh: new Map([["스톰", ["ストーム"]]]),
+  yugioh: new Map([
+    ["스톰", ["ストーム"]],
+    ["리미티드", ["LIMITED PACK GX"]],
+    ["리미티드팩", ["LIMITED PACK GX"]],
+    ["리미티드팩gx", ["LIMITED PACK GX"]],
+  ]),
   pokemon: new Map([
     ["스톰", ["ストーム"]],
     ["메가드림", ["MEGAドリームex", "メガドリーム"]],
@@ -68,7 +75,105 @@ const normalizeQuery = (query) =>
     .replace(/[\s.・·_-]/g, "")
     .toLowerCase();
 
-const normalizeJapaneseTerms = (value) => {
+async function readServerDictionary(game, target, normalizedQuery) {
+  if (dictionaryStorageUnavailable) return { available: false, terms: null };
+  const database = getSupabaseAdmin();
+  if (!database) return { available: false, terms: null };
+  try {
+    const { data, error } = await database
+      .from("japanese_search_dictionary")
+      .select("japanese_terms, source")
+      .eq("game", game)
+      .eq("target", target)
+      .eq("normalized_query", normalizedQuery)
+      .maybeSingle();
+    if (error) throw error;
+    const terms = normalizeJapaneseTerms(JSON.stringify(data?.japanese_terms || []), target === "release");
+    return { available: true, terms: terms.length ? terms : null, source: data?.source || null };
+  } catch {
+    dictionaryStorageUnavailable = true;
+    console.warn("Server Japanese search dictionary is unavailable; using local fallback.");
+    return { available: false, terms: null };
+  }
+}
+
+async function writeServerDictionary(game, target, normalizedQuery, terms, source) {
+  if (dictionaryStorageUnavailable) return;
+  const database = getSupabaseAdmin();
+  if (!database) return false;
+  try {
+    const { error } = await database
+      .from("japanese_search_dictionary")
+      .upsert(
+        {
+          game,
+          target,
+          normalized_query: normalizedQuery,
+          japanese_terms: terms,
+          source,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "game,target,normalized_query" },
+      );
+    if (error) throw error;
+    return true;
+  } catch {
+    dictionaryStorageUnavailable = true;
+    console.warn("Could not save Japanese search terms to the server dictionary.");
+    return false;
+  }
+}
+
+export async function clearJapaneseSearchDictionary(game, query, target = "card") {
+  const normalizedQuery = normalizeQuery(query).slice(0, 80);
+  translationCache.delete(`${target}:${game}:${normalizedQuery}`);
+  const database = getSupabaseAdmin();
+  if (!database || !normalizedQuery) return false;
+  try {
+    const { error } = await database
+      .from("japanese_search_dictionary")
+      .delete()
+      .eq("game", game)
+      .eq("target", target)
+      .eq("normalized_query", normalizedQuery);
+    if (error) throw error;
+    return true;
+  } catch {
+    console.warn("Could not clear the previous Japanese search dictionary entry.");
+    return false;
+  }
+}
+
+export async function generateJapaneseSearchCorrection(game, query, correction = "", target = "card") {
+  const gameLabel =
+    game === "pokemon" ? "포켓몬 카드 게임" : game === "onepiece" ? "원피스 카드 게임" : "유희왕 오피셜 카드 게임";
+  const normalizedQuery = String(query || "")
+    .trim()
+    .slice(0, 80);
+  const automaticCorrection =
+    String(correction || "").trim() ||
+    (target === "release"
+      ? `${gameLabel}의 일본판 공식 상품·팩 목록에서 '${normalizedQuery}'에 해당하는 정확한 상품명을 찾아줘. 상품명 전체를 검색 후보로 제시해.`
+      : game === "onepiece"
+        ? `원피스 카드의 '${normalizedQuery}'와 관련된 인물·카드를 정확히 식별하고, 일본판 공식 카드명은 무엇인지 찾아줘.`
+        : game === "pokemon"
+          ? `포켓몬 일본판 카드에서 '${normalizedQuery}'에 해당하는 포켓몬·카드를 식별하고, 공식 일본어 카드명은 무엇인지 찾아줘.`
+          : `유희왕 일본판에서 '${normalizedQuery}' 카드의 공식 일본 카드명은 무엇인지 찾아줘. 비슷한 이름의 다른 카드는 혼동하지 마.`);
+  return translateWithGemini(normalizedQuery, game, gameLabel, target, automaticCorrection);
+}
+
+export async function saveJapaneseSearchDictionary(game, query, terms, target = "card", source = "correction") {
+  const normalizedQuery = normalizeQuery(query).slice(0, 80);
+  const normalizedTerms = normalizeJapaneseTerms(JSON.stringify(terms || []), target === "release");
+  if (!normalizedQuery || !normalizedTerms.length) return false;
+  translationCache.set(`${target}:${game}:${normalizedQuery}`, {
+    terms: normalizedTerms,
+    expiresAt: Date.now() + CACHE_TTL,
+  });
+  return writeServerDictionary(game, target, normalizedQuery, normalizedTerms, source);
+}
+
+const normalizeJapaneseTerms = (value, allowLatin = false) => {
   let terms;
   try {
     const parsed = JSON.parse(
@@ -93,7 +198,11 @@ const normalizeJapaneseTerms = (value) => {
             .trim()
             .slice(0, 80),
         )
-        .filter((term) => term && /[\u3040-\u30ff\u3400-\u9fff]/.test(term)),
+        .filter(
+          (term) =>
+            term &&
+            (/[\u3040-\u30ff\u3400-\u9fff]/.test(term) || (allowLatin && /^[a-z0-9][a-z0-9\s._-]*$/i.test(term))),
+        ),
     ),
   ].slice(0, 3);
 };
@@ -119,7 +228,7 @@ const normalizeKoreanNames = (value, count) => {
   });
 };
 
-async function translateWithGemini(query, game, gameLabel, target) {
+async function translateWithGemini(query, game, gameLabel, target, correction = "") {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return [];
   const prompt = [
@@ -129,6 +238,12 @@ async function translateWithGemini(query, game, gameLabel, target) {
     target === "release"
       ? "Identify the intended official product or release; do not translate the words literally."
       : `Resolve it as a specific ${gameLabel} card or character name, not as a literal dictionary translation.`,
+    ...(correction
+      ? [
+          "The previous search result was incorrect. Treat the user's correction as the intended card/person and prioritize its exact official Japanese name.",
+          `User correction: ${String(correction).trim().slice(0, 180)}`,
+        ]
+      : []),
     ...(game === "pokemon" ? ['For example, Pokemon character "빛나" is officially named "ヒカリ" in Japanese.'] : []),
     "Return up to 3 short Japanese search queries ordered by confidence. Include common Japanese aliases when useful.",
     'Return only JSON in this shape: {"terms":["...", "..."]}. Do not add explanations.',
@@ -156,7 +271,10 @@ async function translateWithGemini(query, game, gameLabel, target) {
     return [];
   }
   const body = await response.json();
-  return normalizeJapaneseTerms(body.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join(""));
+  return normalizeJapaneseTerms(
+    body.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join(""),
+    target === "release",
+  );
 }
 
 async function translateDisplayNamesWithGemini(names, game, gameLabel, target) {
@@ -251,9 +369,21 @@ async function mapChunksWithConcurrency(chunks, concurrency, mapChunk) {
 async function translateJapaneseTerms(game, query, target) {
   const normalizedQuery = normalizeQuery(query).slice(0, 80);
   if (!normalizedQuery || !/[\uac00-\ud7a3]/.test(normalizedQuery)) return [];
+  const dictionary = await readServerDictionary(game, target, normalizedQuery);
+  if (dictionary.source === "correction" && dictionary.terms) {
+    translationCache.set(`${target}:${game}:${normalizedQuery}`, {
+      terms: dictionary.terms,
+      expiresAt: Date.now() + CACHE_TTL,
+    });
+    return dictionary.terms;
+  }
+
   if (game === "yugioh" && target === "release") {
     const terms = getYugiohReleaseSearchTerms(query);
-    if (terms.length) return terms;
+    if (terms.length) {
+      await writeServerDictionary(game, target, normalizedQuery, terms, "curated");
+      return terms;
+    }
   }
 
   const dictionaryTerms =
@@ -262,7 +392,17 @@ async function translateJapaneseTerms(game, query, target) {
       : target === "release"
         ? RELEASE_SEARCH_DICTIONARY[game]?.get(normalizedQuery)
         : null;
-  if (dictionaryTerms) return dictionaryTerms;
+  if (dictionaryTerms) {
+    await writeServerDictionary(game, target, normalizedQuery, dictionaryTerms, "curated");
+    return dictionaryTerms;
+  }
+  if (dictionary.terms) {
+    translationCache.set(`${target}:${game}:${normalizedQuery}`, {
+      terms: dictionary.terms,
+      expiresAt: Date.now() + CACHE_TTL,
+    });
+    return dictionary.terms;
+  }
 
   const cacheKey = `${target}:${game}:${normalizedQuery}`;
   const cached = translationCache.get(cacheKey);
@@ -275,7 +415,6 @@ async function translateJapaneseTerms(game, query, target) {
       console.warn("Gemini translation request could not be completed.");
       return [];
     });
-    if (terms.length) translationCache.set(cacheKey, { terms, expiresAt: Date.now() + CACHE_TTL });
     return terms;
   } catch {
     return [];

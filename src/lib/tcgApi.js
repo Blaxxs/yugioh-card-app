@@ -4,7 +4,7 @@ import {
   fetchReleaseList as fetchYugiohReleaseList,
   searchOfficialCards,
 } from "./officialCardApi";
-import { fetchCardApi as fetchGameApi } from "./cardApiClient";
+import { fetchCardApi as fetchGameApi, invalidateCardApiCache } from "./cardApiClient";
 import { getYugiohReleaseDisplayName, getYugiohReleaseSearchTerms } from "./yugiohReleaseNames.js";
 
 const fetchJapaneseNameBatch = async (game, kind, items) => {
@@ -127,6 +127,47 @@ export async function searchGameCardsPage(game, term, offset = 0, language = "ko
   );
   return language === "ja" ? { ...page, cards: await localizeJapaneseCards(game, page.cards) } : page;
 }
+
+export async function improveJapaneseCardSearchPage(game, term, filters = {}) {
+  const query = String(term || "").trim();
+  if (!query) return { cards: [], nextOffset: null, dictionarySaved: false };
+  const params = {
+    game,
+    lang: "ja",
+    q: query,
+    ...(game === "yugioh" ? { imageLocaleVersion: "2" } : {}),
+    improve: "1",
+    ...(game === "onepiece" ? { series: "all" } : {}),
+    ...toFilterParams(filters),
+    ...(game === "pokemon" || game === "onepiece" ? { offset: 0 } : {}),
+  };
+  const page = await fetchGameApi(params, true, { bypassCache: true });
+  const cacheParams = { ...params };
+  delete cacheParams.improve;
+  delete cacheParams.correction;
+  invalidateCardApiCache(cacheParams);
+  return languageLocalizedJapanesePage(game, page);
+}
+
+export async function improveJapaneseReleaseSearchList(game, term, knownReleases = []) {
+  const query = String(term || "").trim();
+  if (!query) return { releases: [], dictionarySaved: false };
+  const params = { game, lang: "ja", q: query, improve: "1", improveTarget: "release" };
+  const result = await fetchGameApi(params, true, { bypassCache: true });
+  const localizedById = new Map(knownReleases.map((release) => [String(release.id || release.path), release]));
+  const releases = result.cards.map((release) => ({
+    ...(localizedById.get(String(release.id || release.path)) || {}),
+    ...release,
+    localizedName:
+      localizedById.get(String(release.id || release.path))?.localizedName || release.localizedName || release.name,
+  }));
+  return { releases, dictionarySaved: result.dictionarySaved };
+}
+
+const languageLocalizedJapanesePage = async (game, page) => ({
+  ...page,
+  cards: await localizeJapaneseCards(game, page.cards),
+});
 
 export const isGameCardDetailLoaded = (card, game = card?.game, language = card?.language) =>
   Boolean(card?.isDetailLoaded && (game !== "pokemon" || language !== "ja" || card.detailSchemaVersion >= 8));

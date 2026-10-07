@@ -7,6 +7,7 @@ import {
   LogIn,
   LogOut,
   RotateCcw,
+  Sparkles,
   SlidersHorizontal,
   X,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import {
   fetchGameReleaseCardsPage,
   fetchGameReleaseList,
   isGameCardDetailLoaded,
+  improveJapaneseCardSearchPage,
   translateJapaneseReleaseQuery,
   searchGameCards,
   searchGameCardsPage,
@@ -456,9 +458,11 @@ export default function App() {
       : null;
   const [searchTerm, setSearchTerm] = useState(savedViewMatches ? savedView.searchTerm || "" : "");
   const [cards, setCards] = useState(savedViewMatches ? savedView.cards || [] : []);
+  const [searchImprovementMessage, setSearchImprovementMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [searchNextOffset, setSearchNextOffset] = useState(null);
   const [searchMoreLoading, setSearchMoreLoading] = useState(false);
+  const searchRequestVersion = useRef(0);
   const searchLoadMoreSentinelRef = useRef(null);
   const searchMoreLockRef = useRef(false);
   const [cardDetailLoading, setCardDetailLoading] = useState(false);
@@ -1400,6 +1404,8 @@ export default function App() {
   };
 
   const searchCard = async (language = activeLanguage) => {
+    const requestVersion = ++searchRequestVersion.current;
+    setSearchImprovementMessage("");
     setSelectedCard(null);
     setActiveTab("search");
     setSearchNextOffset(null);
@@ -1409,16 +1415,46 @@ export default function App() {
     try {
       if (activeGame === "pokemon" || activeGame === "onepiece") {
         const page = await searchGameCardsPage(activeGame, searchTerm, 0, language, searchFilters);
+        if (searchRequestVersion.current !== requestVersion) return;
         setCards(page.cards);
         setSearchNextOffset(page.nextOffset);
       } else {
-        setCards(await searchGameCards(activeGame, searchTerm, language, searchFilters));
+        const results = await searchGameCards(activeGame, searchTerm, language, searchFilters);
+        if (searchRequestVersion.current !== requestVersion) return;
+        setCards(results);
       }
     } catch (error) {
+      if (searchRequestVersion.current !== requestVersion) return;
       setActionError(error.message);
       setCards([]);
     } finally {
-      setLoading(false);
+      if (searchRequestVersion.current === requestVersion) setLoading(false);
+    }
+  };
+
+  const improveSearchResults = async () => {
+    if (!searchTerm.trim() || activeLanguage !== "ja") return;
+    const requestVersion = ++searchRequestVersion.current;
+    setLoading(true);
+    setActionError("");
+    setSearchImprovementMessage("");
+    try {
+      const page = await improveJapaneseCardSearchPage(activeGame, searchTerm, searchFilters);
+      if (searchRequestVersion.current !== requestVersion) return;
+      setCards(page.cards);
+      setSearchNextOffset(page.nextOffset);
+      setSearchImprovementMessage(
+        page.cards.length === 0
+          ? "결과가 없어 새 사전 항목은 저장하지 않았습니다. 보정 내용을 바꿔 다시 요청해 주세요."
+          : page.dictionarySaved
+            ? `개선된 검색어로 ${page.cards.length}건을 찾고 사전에 반영했습니다.`
+            : `${page.cards.length}건을 찾았지만 서버 사전 저장을 확인하지 못했습니다.`,
+      );
+    } catch (error) {
+      if (searchRequestVersion.current !== requestVersion) return;
+      setActionError(error.message || "검색 결과를 개선하지 못했습니다.");
+    } finally {
+      if (searchRequestVersion.current === requestVersion) setLoading(false);
     }
   };
 
@@ -1662,6 +1698,14 @@ export default function App() {
           />
         )}
       </div>
+      {activeTab === "search" && activeLanguage === "ja" && searchTerm.trim() && (
+        <section className="search-improvement">
+          <button className="search-improvement-toggle" type="button" disabled={loading} onClick={improveSearchResults}>
+            <Sparkles size={16} aria-hidden="true" /> {loading ? "AI가 결과 재검색 중" : "결과 재검색"}
+          </button>
+          {searchImprovementMessage && <p role="status">{searchImprovementMessage}</p>}
+        </section>
+      )}
       {loading && <p>카드를 검색하고 있습니다...</p>}
       {cardDetailLoading && <p>카드 상세를 불러오는 중입니다...</p>}
       {actionError && (

@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Save,
   Search,
+  Sparkles,
   ShoppingCart,
   SlidersHorizontal,
   Trash2,
@@ -25,6 +26,8 @@ import {
   fetchGameReleaseCards,
   fetchGameReleaseCardsPage,
   fetchGameReleaseList,
+  improveJapaneseCardSearchPage,
+  improveJapaneseReleaseSearchList,
   isGameCardDetailLoaded,
   localizeJapaneseCards,
   searchGameCards,
@@ -113,6 +116,8 @@ export default function InventoryConsole({
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [packQuery, setPackQuery] = useState("");
   const [packMatches, setPackMatches] = useState([]);
+  const [packSearchMessage, setPackSearchMessage] = useState("");
+  const [packImproveLoading, setPackImproveLoading] = useState(false);
   const [packCards, setPackCards] = useState([]);
   const [packPendingRarities, setPackPendingRarities] = useState(new Set());
   const [packModalOpen, setPackModalOpen] = useState(false);
@@ -131,6 +136,8 @@ export default function InventoryConsole({
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addQuery, setAddQuery] = useState("");
   const [addResults, setAddResults] = useState([]);
+  const [addSearchMessage, setAddSearchMessage] = useState("");
+  const [addImproveLoading, setAddImproveLoading] = useState(false);
   const [pendingAddCodes, setPendingAddCodes] = useState(new Set());
   const [addCard, setAddCard] = useState(null);
   const [addCode, setAddCode] = useState("");
@@ -222,10 +229,31 @@ export default function InventoryConsole({
     link.download = "inventory-import-template.xlsx";
     link.click();
   };
-  const findPacks = async () => {
+  const findPacks = async ({ improve = false } = {}) => {
     setPackWindow(null);
-    const releases = await fetchGameReleaseList(intakeGame, intakeLanguage);
     const query = packQuery.trim();
+    if (!query) return;
+    setPackSearchMessage("");
+    const knownReleases = await fetchGameReleaseList(intakeGame, intakeLanguage);
+    if (improve && intakeLanguage === "ja") {
+      setPackImproveLoading(true);
+      try {
+        const result = await improveJapaneseReleaseSearchList(intakeGame, query, knownReleases);
+        setPackMatches(result.releases.slice(0, 12));
+        setPackSearchMessage(
+          result.releases.length === 0
+            ? "결과가 없어 새 팩 검색어는 사전에 저장하지 않았습니다."
+            : result.dictionarySaved
+              ? `AI가 팩 이름을 보정해 ${result.releases.length}건을 찾고 사전에 저장했습니다.`
+              : `${result.releases.length}건을 찾았지만 서버 사전 저장을 확인하지 못했습니다.`,
+        );
+      } catch (error) {
+        setPackSearchMessage(error.message || "팩 검색 결과를 개선하지 못했습니다.");
+      } finally {
+        setPackImproveLoading(false);
+      }
+      return;
+    }
     const terms = [query];
     if (intakeLanguage === "ja" && /[\uac00-\ud7a3]/.test(query)) {
       const translatedTerms = await translateJapaneseReleaseQuery(intakeGame, query).catch(() => []);
@@ -238,7 +266,7 @@ export default function InventoryConsole({
         .toLowerCase();
     const normalizedTerms = terms.map(normalize).filter(Boolean);
     setPackMatches(
-      releases
+      knownReleases
         .filter((release) =>
           normalizedTerms.some(
             (term) => normalize(release.name).includes(term) || normalize(release.localizedName).includes(term),
@@ -246,6 +274,7 @@ export default function InventoryConsole({
         )
         .slice(0, 12),
     );
+    setPackSearchMessage("");
   };
   const changeIntakeGame = (game) => {
     addSearchVersion.current += 1;
@@ -255,6 +284,7 @@ export default function InventoryConsole({
     setAddWindow(null);
     setPackMatches([]);
     setPackCards([]);
+    setPackSearchMessage("");
     setPackPendingRarities(new Set());
     setAddResults([]);
     setAddCard(null);
@@ -268,6 +298,7 @@ export default function InventoryConsole({
     setAddWindow(null);
     setPackMatches([]);
     setPackCards([]);
+    setPackSearchMessage("");
     setPackPendingRarities(new Set());
     setAddResults([]);
     setAddCard(null);
@@ -824,17 +855,36 @@ export default function InventoryConsole({
   };
   const changeEditField = (field, value) =>
     setEditDrafts((drafts) => ({ ...drafts, [editItem.id]: { ...drafts[editItem.id], [field]: value } }));
-  const searchAddCards = async () => {
+  const searchAddCards = async ({ improve = false } = {}) => {
     const searchVersion = ++addSearchVersion.current;
     const query = addQuery.trim();
     setPendingAddCodes(new Set());
     setAddWindow(null);
     setAddCard(null);
+    setAddSearchMessage("");
     if (!query) {
       setAddResults([]);
       return;
     }
-    const cards = await searchGameCards(intakeGame, query, intakeLanguage);
+    let cards;
+    let dictionarySaved = null;
+    if (improve && intakeLanguage === "ja") setAddImproveLoading(true);
+    try {
+      if (improve && intakeLanguage === "ja") {
+        const page = await improveJapaneseCardSearchPage(intakeGame, query);
+        cards = page.cards;
+        dictionarySaved = page.dictionarySaved;
+      } else {
+        cards = await searchGameCards(intakeGame, query, intakeLanguage);
+      }
+    } catch (error) {
+      if (addSearchVersion.current === searchVersion) {
+        setAddSearchMessage(error.message || "카드 재검색에 실패했습니다.");
+      }
+      return;
+    } finally {
+      if (improve && addSearchVersion.current === searchVersion) setAddImproveLoading(false);
+    }
     if (addSearchVersion.current !== searchVersion) return;
     const normalizeCode = (value) =>
       String(value || "")
@@ -847,6 +897,15 @@ export default function InventoryConsole({
     );
     const results = exactCodeMatches.length ? exactCodeMatches : cards;
     setAddResults(results);
+    if (improve) {
+      setAddSearchMessage(
+        results.length === 0
+          ? "결과가 없어 새 카드 검색어는 사전에 저장하지 않았습니다."
+          : dictionarySaved
+            ? `AI가 카드명을 보정해 ${results.length}건을 찾고 사전에 저장했습니다.`
+            : `${results.length}건을 찾았지만 서버 사전 저장을 확인하지 못했습니다.`,
+      );
+    }
     if (intakeGame !== "pokemon") return;
     const pending = results.filter(
       (card) =>
@@ -1674,8 +1733,23 @@ export default function InventoryConsole({
                   <button type="button" disabled={packLoading} onClick={findPacks}>
                     <Search size={16} aria-hidden="true" /> 찾기
                   </button>
+                  {intakeLanguage === "ja" && (
+                    <button
+                      type="button"
+                      disabled={packLoading || packImproveLoading || !packQuery.trim()}
+                      onClick={() => findPacks({ improve: true })}
+                    >
+                      <Sparkles size={15} aria-hidden="true" />
+                      {packImproveLoading ? "AI 재검색 중" : "결과 재검색"}
+                    </button>
+                  )}
                 </div>
               </div>
+              {packSearchMessage && (
+                <p className="intake-search-message" role="status">
+                  {packSearchMessage}
+                </p>
+              )}
               <div className="pack-intake-content">
                 {!packLoading && packMatches.length > 0 && (
                   <div className="pack-match-list">
@@ -1960,8 +2034,23 @@ export default function InventoryConsole({
                   <button type="button" disabled={!addQuery.trim()} onClick={searchAddCards}>
                     <Search size={16} /> 검색
                   </button>
+                  {intakeLanguage === "ja" && (
+                    <button
+                      type="button"
+                      disabled={!addQuery.trim() || addImproveLoading || pendingAddCodes.size > 0}
+                      onClick={() => searchAddCards({ improve: true })}
+                    >
+                      <Sparkles size={15} aria-hidden="true" />
+                      {addImproveLoading ? "AI 재검색 중" : "결과 재검색"}
+                    </button>
+                  )}
                 </div>
               </div>
+              {addSearchMessage && (
+                <p className="intake-search-message" role="status">
+                  {addSearchMessage}
+                </p>
+              )}
               <div className="inventory-add-content">
                 {addSaveSuccess && (
                   <p className="inventory-add-save-notice" role="status" aria-live="polite">

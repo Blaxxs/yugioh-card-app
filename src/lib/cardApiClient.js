@@ -15,16 +15,32 @@ const requestCardApi = async (searchParams) => {
   const body = await response.json();
   if (!response.ok) throw new Error(body.error || "카드 데이터를 불러오지 못했습니다.");
   const nextOffset = response.headers.get("X-Card-Next-Offset");
-  return { cards: body, nextOffset: nextOffset == null ? null : Number(nextOffset) };
+  const dictionarySaved = response.headers.get("X-Japanese-Dictionary-Saved");
+  return {
+    cards: body,
+    nextOffset: nextOffset == null ? null : Number(nextOffset),
+    dictionarySaved: dictionarySaved == null ? null : dictionarySaved === "true",
+  };
 };
 
-export async function fetchCardApi(params, includePageInfo = false) {
+export function invalidateCardApiCache(params) {
+  const expected = new URLSearchParams(params);
+  for (const key of apiCache.keys()) {
+    const actual = new URLSearchParams(key);
+    const matches = [...expected].every(([name, value]) => actual.get(name) === value);
+    if (matches) apiCache.delete(key);
+  }
+}
+
+export async function fetchCardApi(params, includePageInfo = false, { bypassCache = false } = {}) {
   const searchParams = new URLSearchParams(params);
   searchParams.sort();
   const key = searchParams.toString();
   const cached = apiCache.get(key);
   let page;
-  if (cached && cached.expiresAt > Date.now()) {
+  if (bypassCache) {
+    page = await requestCardApi(searchParams);
+  } else if (cached && cached.expiresAt > Date.now()) {
     page = cached.page;
   } else {
     if (!apiRequests.has(key)) {
