@@ -1,4 +1,5 @@
 import { load } from "cheerio";
+import { sortCardsByCode } from "../../src/lib/cardCodeOrder.js";
 
 const ORIGIN = "https://pokemoncard.co.kr";
 const AJAX_URL = `${ORIGIN}/v2/ajax2_dev2`;
@@ -65,7 +66,7 @@ export async function searchCards(term, offset = 0, filters = {}) {
     search_params: filters.search_params || "all",
     limit: String(offset),
   });
-  const cards = Object.values(response.result || {}).map(previewCard);
+  const cards = sortCardsByCode(Object.values(response.result || {}).map(previewCard));
   const nextOffset = Number(response.limit);
   return {
     cards,
@@ -109,7 +110,9 @@ export async function fetchSetCards(packName, offset = 0) {
       };
     }),
   );
-  const cards = [...new Map(pages.flatMap((page) => page.cards).map((card) => [card.cardId, card])).values()];
+  const cards = sortCardsByCode(
+    [...new Map(pages.flatMap((page) => page.cards).map((card) => [card.cardId, card])).values()],
+  );
   const nextOffsets = pages.map((page) => page.nextOffset).filter((value) => value != null);
   const nextOffset = nextOffsets.length ? Math.max(...nextOffsets) : null;
   return { cards, nextOffset: Number.isFinite(nextOffset) && nextOffset > offset ? nextOffset : null };

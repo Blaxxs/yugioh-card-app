@@ -1,4 +1,6 @@
 import { load } from "cheerio";
+import { parseDeclaredResultTotal } from "../../src/lib/setCompleteness.js";
+import { sortCardsByCode } from "../../src/lib/cardCodeOrder.js";
 
 const OFFICIAL_SITE_ORIGIN = "https://www.db.yugioh-card.com";
 const toOfficialImageUrl = (source, language = "ko") => {
@@ -75,7 +77,7 @@ const findImageUrls = (html, cardId, imageType = 1, language = "ko") =>
     ),
   ].map((path) => toOfficialImageUrl(path, language));
 
-export const createSearchUrl = (keyword, language = "ko", filters = {}) => {
+export const createSearchUrl = (keyword, language = "ko", filters = {}, page = 1) => {
   const url = new URL(`${OFFICIAL_SITE_ORIGIN}/yugiohdb/card_search.action`);
   url.search = new URLSearchParams({
     request_locale: language === "ja" ? "ja" : "ko",
@@ -93,7 +95,17 @@ export const createSearchUrl = (keyword, language = "ko", filters = {}) => {
   });
   if (filters.ctype) url.searchParams.set("ctype", filters.ctype);
   if (filters.attr) url.searchParams.set("attr", filters.attr);
+  if (page > 1) url.searchParams.set("page", String(page));
   return url;
+};
+
+// The official site reports the authoritative result count as "검색결과 N건" (ko) /
+// "検索結果 N件" (ja) regardless of how many of those results fit on the current
+// page (rp=100). We use this to know whether a pack/search needs more pages.
+export const parseResultTotal = (html) => {
+  const $ = load(html);
+  const text = $(".sort_set .text").first().text() || $("body").text();
+  return parseDeclaredResultTotal(text);
 };
 
 export const createDetailUrl = (cardId, language = "ko") =>
@@ -127,7 +139,7 @@ export const parseSearchResults = (html, searchTerm, language = "ko") => {
       isDetailLoaded: false,
     });
   });
-  return cards;
+  return sortCardsByCode(cards);
 };
 
 export const parseCardDetail = (html, cardId, fallbackName = "", fallbackImageUrl = "", language = "ko") => {

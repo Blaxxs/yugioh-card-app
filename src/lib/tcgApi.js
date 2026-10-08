@@ -6,6 +6,7 @@ import {
 } from "./officialCardApi";
 import { fetchCardApi as fetchGameApi, invalidateCardApiCache } from "./cardApiClient";
 import { getYugiohReleaseDisplayName, getYugiohReleaseSearchTerms } from "./yugiohReleaseNames.js";
+import { sortCardsByCode } from "./cardCodeOrder.js";
 
 const fetchJapaneseNameBatch = async (game, kind, items) => {
   const params = new URLSearchParams({ game, lang: "ja", translate: "display", kind });
@@ -95,7 +96,7 @@ export async function searchGameCards(game, term, language = "ko", filters = {})
   if (!query) return [];
   if (game === "yugioh") {
     const cards = await searchOfficialCards(query, language, filters);
-    return language === "ja" ? localizeJapaneseCards(game, cards) : cards;
+    return sortCardsByCode(language === "ja" ? await localizeJapaneseCards(game, cards) : cards);
   }
   const cards = await fetchGameApi({
     game,
@@ -104,7 +105,7 @@ export async function searchGameCards(game, term, language = "ko", filters = {})
     ...(game === "onepiece" ? { series: "all" } : {}),
     ...toFilterParams(filters),
   });
-  return language === "ja" ? localizeJapaneseCards(game, cards) : cards;
+  return sortCardsByCode(language === "ja" ? await localizeJapaneseCards(game, cards) : cards);
 }
 
 export async function searchGameCardsPage(game, term, offset = 0, language = "ko", filters = {}) {
@@ -112,7 +113,10 @@ export async function searchGameCardsPage(game, term, offset = 0, language = "ko
   if (!query) return { cards: [], nextOffset: null };
   if (game === "yugioh") {
     const cards = await searchOfficialCards(query, language, filters);
-    return { cards: language === "ja" ? await localizeJapaneseCards(game, cards) : cards, nextOffset: null };
+    return {
+      cards: sortCardsByCode(language === "ja" ? await localizeJapaneseCards(game, cards) : cards),
+      nextOffset: null,
+    };
   }
   const page = await fetchGameApi(
     {
@@ -125,7 +129,8 @@ export async function searchGameCardsPage(game, term, offset = 0, language = "ko
     },
     true,
   );
-  return language === "ja" ? { ...page, cards: await localizeJapaneseCards(game, page.cards) } : page;
+  const cards = language === "ja" ? await localizeJapaneseCards(game, page.cards) : page.cards;
+  return { ...page, cards: sortCardsByCode(cards) };
 }
 
 export async function improveJapaneseCardSearchPage(game, term, filters = {}) {
@@ -213,8 +218,8 @@ export async function translateJapaneseReleaseQuery(game, term) {
 export async function fetchGameReleaseCards(game, path, language = "ko") {
   if (!path) return [];
   if (game === "yugioh") {
-    const cards = await fetchYugiohReleaseCards(path, language);
-    return language === "ja" ? localizeJapaneseCards(game, cards) : cards;
+    const { cards } = await fetchYugiohReleaseCards(path, language);
+    return sortCardsByCode(language === "ja" ? await localizeJapaneseCards(game, cards) : cards);
   }
   if (game === "onepiece") {
     const cards = [];
@@ -224,21 +229,23 @@ export async function fetchGameReleaseCards(game, path, language = "ko") {
       cards.push(...page.cards);
       offset = page.nextOffset;
     }
-    return language === "ja" ? localizeJapaneseCards(game, cards) : cards;
+    return sortCardsByCode(language === "ja" ? await localizeJapaneseCards(game, cards) : cards);
   }
   const cards = await fetchGameApi({ game, lang: language, setId: path });
-  return language === "ja" ? localizeJapaneseCards(game, cards) : cards;
+  return sortCardsByCode(language === "ja" ? await localizeJapaneseCards(game, cards) : cards);
 }
 
 export async function fetchGameReleaseCardsPage(game, path, offset = 0, language = "ko") {
   if (!path) return { cards: [], nextOffset: null };
   if (game === "yugioh") {
-    const cards = await fetchYugiohReleaseCards(path, language);
-    return { cards: language === "ja" ? await localizeJapaneseCards(game, cards) : cards, nextOffset: null };
+    const { cards, expectedTotal } = await fetchYugiohReleaseCards(path, language);
+    const localized = language === "ja" ? await localizeJapaneseCards(game, cards) : cards;
+    return { cards: sortCardsByCode(localized), nextOffset: null, expectedTotal };
   }
   const page = await fetchGameApi(
     { game, lang: language, setId: path, ...(game === "pokemon" || game === "onepiece" ? { offset } : {}) },
     true,
   );
-  return language === "ja" ? { ...page, cards: await localizeJapaneseCards(game, page.cards) } : page;
+  const cards = language === "ja" ? await localizeJapaneseCards(game, page.cards) : page.cards;
+  return { ...page, cards: sortCardsByCode(cards) };
 }

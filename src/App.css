@@ -960,6 +960,20 @@ button:disabled {
 .results-toolbar strong {
   font-size: 15px;
 }
+.release-completeness {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.release-completeness.ok {
+  color: #1a7f37;
+  background: rgba(26, 127, 55, 0.12);
+}
+.release-completeness.warning {
+  color: #b35900;
+  background: rgba(179, 89, 0, 0.12);
+}
 .auto-load-sentinel {
   display: grid;
   min-height: 12px;
@@ -1670,6 +1684,21 @@ button:disabled {
 }
 .pack-match small {
   color: #788397;
+}
+.pack-completeness {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.pack-completeness.ok {
+  color: #1a7f37;
+  background: rgba(26, 127, 55, 0.12);
+}
+.pack-completeness.warning {
+  color: #b35900;
+  background: rgba(179, 89, 0, 0.12);
 }
 .pack-card-list {
   display: grid;

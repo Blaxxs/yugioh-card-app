@@ -4,6 +4,7 @@ import {
   createSearchUrl,
   normalizeSearchTerm,
   parseCardDetail,
+  parseResultTotal,
   parseSearchResults,
 } from "./_lib/official-card-parser.js";
 import * as pokemonKr from "./_lib/pokemon-kr-parser.js";
@@ -22,6 +23,29 @@ import {
 import { findCatalogJapaneseCardName } from "./_lib/pokemon-ja-catalog-rarity.js";
 import { getSupabaseAdmin } from "./_lib/supabase-admin.js";
 import { getYugiohReleaseDisplayName } from "../src/lib/yugiohReleaseNames.js";
+import { sortCardsByCode } from "../src/lib/cardCodeOrder.js";
+import { evaluateCompleteness } from "../src/lib/setCompleteness.js";
+
+// Yu-Gi-Oh search/release pages cap at 100 cards (`rp=100`); the official site still
+// declares the true total ("검색결과 N건"), so keep requesting subsequent pages until
+// every declared card has been collected (capped to stay well above any real pack size).
+const MAX_YUGIOH_PAGES = 15;
+
+async function fetchAllYugiohPages(buildUrl, language, searchTerm) {
+  const firstHtml = await fetchOfficialHtml(buildUrl(1), language);
+  let cards = parseSearchResults(firstHtml, searchTerm, language);
+  const expectedTotal = parseResultTotal(firstHtml);
+  const seen = new Set(cards.map((card) => card.cardId));
+  for (let page = 2; page <= MAX_YUGIOH_PAGES && expectedTotal && cards.length < expectedTotal; page++) {
+    const html = await fetchOfficialHtml(buildUrl(page), language).catch(() => "");
+    const pageCards = html ? parseSearchResults(html, searchTerm, language) : [];
+    const newCards = pageCards.filter((card) => !seen.has(card.cardId));
+    if (!newCards.length) break;
+    newCards.forEach((card) => seen.add(card.cardId));
+    cards = cards.concat(newCards);
+  }
+  return { cards, completeness: evaluateCompleteness(expectedTotal, cards.length, "official") };
+}
 
 const DETAIL_CACHE_DAYS = 30;
 const SEARCH_CACHE_DAYS = 1;
@@ -67,10 +91,20 @@ let lastExpiredCacheCleanup = 0;
 const normalizeExternalPage = (result, game, offset) => {
   if (!Array.isArray(result) && Array.isArray(result?.cards)) {
     const nextOffset = Number(result.nextOffset);
-    return { cards: result.cards, nextOffset: Number.isFinite(nextOffset) && nextOffset > offset ? nextOffset : null };
+    return {
+      cards: result.cards,
+      nextOffset: Number.isFinite(nextOffset) && nextOffset > offset ? nextOffset : null,
+      expectedTotal: Number.isFinite(Number(result.expectedTotal)) ? Number(result.expectedTotal) : null,
+      expectedPageCount: Number.isFinite(Number(result.expectedPageCount)) ? Number(result.expectedPageCount) : null,
+    };
   }
   const cards = Array.isArray(result) ? result : [];
-  return { cards, nextOffset: game === "pokemon" && cards.length ? offset + cards.length : null };
+  return {
+    cards,
+    nextOffset: game === "pokemon" && cards.length ? offset + cards.length : null,
+    expectedTotal: null,
+    expectedPageCount: null,
+  };
 };
 
 async function mapWithConcurrency(items, concurrency, mapItem) {
@@ -319,7 +353,7 @@ async function searchJapanesePokemonByCollectorNumber(query) {
       .then((detail) => detail && { ...detail, requestedSetId: card.requestedSetId })
       .catch(() => null),
   );
-  return [
+  return sortCardsByCode([
     ...new Map(
       japaneseCards
         .filter(
@@ -338,7 +372,7 @@ async function searchJapanesePokemonByCollectorNumber(query) {
           return [card.cardId, { ...card, card_sets: matchingSets }];
         }),
     ).values(),
-  ];
+  ]);
 }
 
 const pageCacheKey = (baseKey, offset) => (offset ? `${baseKey}:offset:${offset}` : baseKey);
@@ -452,7 +486,13 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
     if (data && new Date(data.expires_at).getTime() > Date.now()) {
       const page = normalizeExternalPage(data.results, game, offset);
       const cards = language === "ja" ? await localizeJapaneseCards(game, page.cards, database) : page.cards;
-      return { data: cards, nextOffset: page.nextOffset, cache: "HIT" };
+      return {
+        data: sortCardsByCode(cards),
+        nextOffset: page.nextOffset,
+        expectedTotal: page.expectedTotal,
+        expectedPageCount: page.expectedPageCount,
+        cache: "HIT",
+      };
     }
   }
   if (database && options.skipSearchCache) {
@@ -494,6 +534,16 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
       .map((page) => page.nextOffset)
       .filter((value) => value != null)
       .sort((a, b) => b - a)[0] ?? null;
+  const expectedTotal =
+    searchPages
+      .map((page) => page.expectedTotal)
+      .filter((value) => value != null)
+      .sort((a, b) => b - a)[0] ?? null;
+  const expectedPageCount =
+    searchPages
+      .map((page) => page.expectedPageCount)
+      .filter((value) => value != null)
+      .sort((a, b) => b - a)[0] ?? null;
   if (translatedTerms.length) {
     cards = cards.filter((card) => translatedTerms.some((term) => matchesJapaneseCardName(game, card.name, term)));
     const getMatchRank = (card) => {
@@ -517,6 +567,7 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
     cards = detailed;
   }
   if (language === "ja") cards = await localizeJapaneseCards(game, cards, database);
+  cards = sortCardsByCode(cards);
   const shouldStoreTerms = language === "ja" && translatedTerms.length > 0 && cards.length > 0;
   const dictionarySaved = shouldStoreTerms
     ? await saveJapaneseSearchDictionary(game, query, translatedTerms, "correction")
@@ -541,10 +592,14 @@ async function getExternalSearch(game, query, database, offset = 0, language = "
       const expiresAt = new Date(Date.now() + SEARCH_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
       await database
         .from("card_search_cache")
-        .upsert({ query_key: queryKey, results: { cards, nextOffset }, expires_at: expiresAt });
+        .upsert({
+          query_key: queryKey,
+          results: { cards, nextOffset, expectedTotal, expectedPageCount },
+          expires_at: expiresAt,
+        });
     }
   }
-  return { data: cards, nextOffset, cache: database ? "MISS" : "BYPASS", dictionarySaved };
+  return { data: cards, nextOffset, expectedTotal, expectedPageCount, cache: database ? "MISS" : "BYPASS", dictionarySaved };
 }
 
 async function getExternalReleaseList(game, database, language) {
@@ -583,22 +638,40 @@ async function getExternalReleaseCards(game, setId, database, offset = 0, langua
     if (data && new Date(data.expires_at).getTime() > Date.now()) {
       const page = normalizeExternalPage(data.results, game, offset);
       const cards = language === "ja" ? await localizeJapaneseCards(game, page.cards, database) : page.cards;
-      return { data: cards, nextOffset: page.nextOffset, cache: "HIT" };
+      return {
+        data: sortCardsByCode(cards),
+        nextOffset: page.nextOffset,
+        expectedTotal: page.expectedTotal,
+        expectedPageCount: page.expectedPageCount,
+        cache: "HIT",
+      };
     }
   }
   let page = normalizeExternalPage(await EXTERNAL_GAMES[game][language].releaseCards(setId, offset), game, offset);
   if (language === "ja") page = { ...page, cards: await localizeJapaneseCards(game, page.cards, database) };
+  page = { ...page, cards: sortCardsByCode(page.cards) };
   if (database) {
     const expiresAt = new Date(Date.now() + RELEASE_CACHE_DAYS * 24 * 60 * 60 * 1000).toISOString();
     await database
       .from("card_search_cache")
       .upsert({
         query_key: queryKey,
-        results: { cards: page.cards, nextOffset: page.nextOffset },
+        results: {
+          cards: page.cards,
+          nextOffset: page.nextOffset,
+          expectedTotal: page.expectedTotal,
+          expectedPageCount: page.expectedPageCount,
+        },
         expires_at: expiresAt,
       });
   }
-  return { data: page.cards, nextOffset: page.nextOffset, cache: database ? "MISS" : "BYPASS" };
+  return {
+    data: page.cards,
+    nextOffset: page.nextOffset,
+    expectedTotal: page.expectedTotal,
+    expectedPageCount: page.expectedPageCount,
+    cache: database ? "MISS" : "BYPASS",
+  };
 }
 
 async function getCardDetail(cardId, database, language) {
@@ -658,11 +731,15 @@ async function searchCards(query, database, language, filters = {}, options = {}
       .maybeSingle();
     if (data && new Date(data.expires_at).getTime() > Date.now()) {
       const cards = language === "ja" ? await localizeJapaneseCards("yugioh", data.results, database) : data.results;
-      return { data: cards.map((card) => proxyOfficialCardImages(card, language)), cache: "HIT" };
+      return {
+        data: sortCardsByCode(cards).map((card) => proxyOfficialCardImages(card, language)),
+        cache: "HIT",
+      };
     }
   }
 
   let cards = [];
+  let completeness = null;
   if (language === "ja") {
     const prefixMatch = query.toUpperCase().match(/^([A-Z0-9]{2,8})(?:-?JP)?$/);
     const prefix = prefixMatch?.[1];
@@ -684,10 +761,18 @@ async function searchCards(query, database, language, filters = {}, options = {}
 
   const looksLikeSetCode = /^[a-z0-9]{2,}(?:-[a-z0-9]+)+$/i.test(query);
   if (!cards.length && looksLikeSetCode) {
-    const codeUrl = createSearchUrl(query.toUpperCase(), language, filters);
-    codeUrl.searchParams.set("stype", "4");
-    const codeHtml = await fetchOfficialHtml(codeUrl, language).catch(() => "");
-    if (codeHtml) cards = parseSearchResults(codeHtml, "", language);
+    const setCodeTerm = query.toUpperCase();
+    const result = await fetchAllYugiohPages(
+      (page) => {
+        const codeUrl = createSearchUrl(setCodeTerm, language, filters, page);
+        codeUrl.searchParams.set("stype", "4");
+        return codeUrl;
+      },
+      language,
+      "",
+    );
+    cards = result.cards;
+    completeness = result.completeness;
   }
 
   const koreanJapaneseQuery = language === "ja" && /[\uac00-\ud7a3]/i.test(query);
@@ -703,8 +788,9 @@ async function searchCards(query, database, language, filters = {}, options = {}
     cards = [...new Map(translatedResults.flat().map((card) => [card.cardId, card])).values()];
   }
   if (!cards.length && !koreanJapaneseQuery) {
-    const html = await fetchOfficialHtml(createSearchUrl(query, language, filters), language);
-    cards = parseSearchResults(html, query, language);
+    const result = await fetchAllYugiohPages((page) => createSearchUrl(query, language, filters, page), language, query);
+    cards = result.cards;
+    completeness = result.completeness;
   }
   if (!cards.length && !koreanJapaneseQuery && normalizedTerm.length > 1) {
     const fallbackHtml = await fetchOfficialHtml(
@@ -713,6 +799,7 @@ async function searchCards(query, database, language, filters = {}, options = {}
     );
     cards = parseSearchResults(fallbackHtml, query, language);
   }
+  cards = sortCardsByCode(cards);
   if (language === "ja") cards = await localizeJapaneseCards("yugioh", cards, database);
   const dictionarySaved =
     translatedTerms.length && cards.length
@@ -740,7 +827,7 @@ async function searchCards(query, database, language, filters = {}, options = {}
       await database.from("card_search_cache").upsert({ query_key: queryKey, results: cards, expires_at: expiresAt });
     }
   }
-  return { data: cards, cache: database ? "MISS" : "BYPASS", dictionarySaved };
+  return { data: cards, cache: database ? "MISS" : "BYPASS", dictionarySaved, completeness };
 }
 
 export default async function handler(request, response) {
@@ -929,6 +1016,15 @@ export default async function handler(request, response) {
     }
     if ((game === "pokemon" || game === "onepiece") && Number.isSafeInteger(result.nextOffset)) {
       response.setHeader("X-Card-Next-Offset", String(result.nextOffset));
+    }
+    if (Number.isFinite(result.expectedTotal)) {
+      response.setHeader("X-Card-Expected-Total", String(result.expectedTotal));
+    }
+    if (Number.isFinite(result.expectedPageCount)) {
+      response.setHeader("X-Card-Expected-Page-Count", String(result.expectedPageCount));
+    }
+    if (result.completeness) {
+      response.setHeader("X-Card-Completeness", JSON.stringify(result.completeness));
     }
     return response.status(200).json(result.data);
   } catch (error) {

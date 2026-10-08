@@ -17,9 +17,10 @@ import { CARD_GAMES, DEFAULT_GAME_ID, getGameById } from "./lib/cardGames";
 import { normalizeYugiohReleaseSearch } from "./lib/yugiohReleaseNames.js";
 import { getInventoryVariantKey, INVENTORY_VARIANT_CONFLICT, normalizeInventoryMemo } from "./lib/inventoryVariants";
 import { scanPokemonRarityRepairs } from "./lib/pokemonRarityRepair";
+import { sortCardsByCode } from "./lib/cardCodeOrder.js";
+import { evaluateCompleteness } from "./lib/setCompleteness.js";
 import {
   fetchGameCardById,
-  fetchGameReleaseCards,
   fetchGameReleaseCardsPage,
   fetchGameReleaseList,
   isGameCardDetailLoaded,
@@ -32,23 +33,6 @@ import CardDetail from "./components/CardDetail";
 import CardResult from "./components/CardResult";
 import ManagementTabs from "./components/ManagementTabs";
 import CatalogSearchHeader from "./components/CatalogSearchHeader";
-
-const getPokemonCollectorNumber = (card) => {
-  if (Number.isFinite(card.collectorNumber)) return card.collectorNumber;
-  const setCode = card.card_sets?.[0]?.set_code || "";
-  const match = String(setCode).match(/^(\d+)/);
-  return match ? Number(match[1]) : null;
-};
-
-const sortPokemonReleaseCards = (cards) =>
-  [...cards].sort((left, right) => {
-    const leftNumber = getPokemonCollectorNumber(left);
-    const rightNumber = getPokemonCollectorNumber(right);
-    if (leftNumber == null && rightNumber != null) return 1;
-    if (leftNumber != null && rightNumber == null) return -1;
-    if (leftNumber != null && rightNumber != null && leftNumber !== rightNumber) return leftNumber - rightNumber;
-    return String(left.cardId).localeCompare(String(right.cardId), "en", { numeric: true, sensitivity: "base" });
-  });
 
 function GameSwitcher({ activeGame, compact = false, pending = false, onSelect }) {
   return (
@@ -500,6 +484,8 @@ export default function App() {
   const [releaseCards, setReleaseCards] = useState([]);
   const [releaseLoading, setReleaseLoading] = useState(false);
   const [releaseNextOffset, setReleaseNextOffset] = useState(null);
+  const [releaseExpectedTotal, setReleaseExpectedTotal] = useState(null);
+  const [releasePageProgress, setReleasePageProgress] = useState(null);
   const [releaseMoreLoading, setReleaseMoreLoading] = useState(false);
   const releaseLoadMoreSentinelRef = useRef(null);
   const releaseMoreLockRef = useRef(false);
@@ -620,6 +606,8 @@ export default function App() {
         setReleases([]);
         setReleaseCards([]);
         setReleaseNextOffset(null);
+        setReleaseExpectedTotal(null);
+        setReleasePageProgress(null);
         loadedReleasePath.current = null;
       }
     };
@@ -753,22 +741,18 @@ export default function App() {
       loadedReleasePath.current = releaseLoadKey;
       setReleaseCards([]);
       setReleaseNextOffset(null);
+      setReleaseExpectedTotal(null);
+      setReleasePageProgress(null);
       setReleaseLoading(true);
       try {
-        const page =
-          activeGame === "pokemon" || activeGame === "onepiece"
-            ? await fetchGameReleaseCardsPage(activeGame, selectedRelease.path, 0, activeLanguage)
-            : {
-                cards: await fetchGameReleaseCards(activeGame, selectedRelease.path, activeLanguage),
-                nextOffset: null,
-              };
+        const page = await fetchGameReleaseCardsPage(activeGame, selectedRelease.path, 0, activeLanguage);
         const previews = page.cards;
         if (cancelled || releaseContextRef.current !== `${activeGame}:${activeLanguage}`) return;
         setReleaseNextOffset(page.nextOffset);
+        setReleaseExpectedTotal(page.expectedTotal ?? null);
+        if (page.expectedPageCount != null) setReleasePageProgress({ pagesFetched: 1, expectedPageCount: page.expectedPageCount });
         if (activeGame !== "yugioh" || !isQuarterCenturyChronicleRelease(selectedRelease.name)) {
-          setReleaseCards(
-            activeGame === "pokemon" && activeLanguage === "ko" ? sortPokemonReleaseCards(previews) : previews,
-          );
+          setReleaseCards(previews);
           return;
         }
         const detailedCards = [];
@@ -776,17 +760,19 @@ export default function App() {
         if (cancelled || releaseContextRef.current !== `${activeGame}:${activeLanguage}`) return;
         const detailsById = new Map(detailedCards.map((card) => [card.cardId, card]));
         setReleaseCards(
-          previews
-            .map((preview) => detailsById.get(preview.cardId) || preview)
-            .flatMap((card) =>
-              getReleaseSetVariants(card.card_sets, selectedRelease.name).length
-                ? getReleaseSetVariants(card.card_sets, selectedRelease.name).map((set) => ({
-                    ...card,
-                    id: `${card.cardId}-${set.set_code}-${set.rarity_code}`,
-                    card_sets: [set],
-                  }))
-                : [card],
-            ),
+          sortCardsByCode(
+            previews
+              .map((preview) => detailsById.get(preview.cardId) || preview)
+              .flatMap((card) =>
+                getReleaseSetVariants(card.card_sets, selectedRelease.name).length
+                  ? getReleaseSetVariants(card.card_sets, selectedRelease.name).map((set) => ({
+                      ...card,
+                      id: `${card.cardId}-${set.set_code}-${set.rarity_code}`,
+                      card_sets: [set],
+                    }))
+                  : [card],
+              ),
+          ),
         );
       } catch (error) {
         if (!cancelled && releaseContextRef.current === `${activeGame}:${activeLanguage}`) {
@@ -823,10 +809,16 @@ export default function App() {
       const page = await fetchGameReleaseCardsPage(activeGame, selectedRelease.path, releaseNextOffset, activeLanguage);
       setReleaseCards((current) => {
         const seen = new Set(current.map((card) => card.cardId));
-        const cards = [...current, ...page.cards.filter((card) => !seen.has(card.cardId))];
-        return activeGame === "pokemon" && activeLanguage === "ko" ? sortPokemonReleaseCards(cards) : cards;
+        return sortCardsByCode([...current, ...page.cards.filter((card) => !seen.has(card.cardId))]);
       });
       setReleaseNextOffset(page.nextOffset);
+      if (page.expectedTotal != null) setReleaseExpectedTotal(page.expectedTotal);
+      if (page.expectedPageCount != null) {
+        setReleasePageProgress((current) => ({
+          pagesFetched: (current?.pagesFetched || 1) + 1,
+          expectedPageCount: page.expectedPageCount,
+        }));
+      }
     } catch (error) {
       setActionError(error.message);
     } finally {
@@ -913,6 +905,8 @@ export default function App() {
     setReleaseCards([]);
     setReleaseLoading(false);
     setReleaseNextOffset(null);
+    setReleaseExpectedTotal(null);
+    setReleasePageProgress(null);
     setSelectedRelease(null);
     loadedReleasePath.current = null;
   };
@@ -1478,6 +1472,8 @@ export default function App() {
     setReleaseCards([]);
     setReleaseLoading(false);
     setReleaseNextOffset(null);
+    setReleaseExpectedTotal(null);
+    setReleasePageProgress(null);
     setSelectedRelease(null);
     loadedReleasePath.current = null;
     if (activeTab === "search" && searchTerm.trim()) {
@@ -1829,6 +1825,35 @@ export default function App() {
                 <>
                   <div className="results-toolbar">
                     <strong>수록 카드 {releaseCards.length}장</strong>
+                    {releaseNextOffset == null &&
+                      (() => {
+                        const completeness = evaluateCompleteness(releaseExpectedTotal, releaseCards.length);
+                        if (completeness.expectedTotal != null) {
+                          return completeness.ok ? (
+                            <span className="release-completeness ok">
+                              ✅ 공식 사이트 수량과 일치 ({completeness.actualCount}/{completeness.expectedTotal})
+                            </span>
+                          ) : (
+                            <span className="release-completeness warning">
+                              ⚠ 공식 사이트 기준 {completeness.expectedTotal}장 중 {completeness.actualCount}장만 확인됨
+                            </span>
+                          );
+                        }
+                        if (releasePageProgress) {
+                          const { pagesFetched, expectedPageCount } = releasePageProgress;
+                          const ok = pagesFetched >= expectedPageCount;
+                          return ok ? (
+                            <span className="release-completeness ok">
+                              ✅ 공식 사이트 전체 {expectedPageCount}페이지 확인 완료
+                            </span>
+                          ) : (
+                            <span className="release-completeness warning">
+                              ⚠ 공식 사이트 기준 전체 {expectedPageCount}페이지 중 {pagesFetched}페이지만 확인됨
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                   </div>
                   <div className="card-grid release-results view-album">
                     {releaseCards.map((card, index) => (

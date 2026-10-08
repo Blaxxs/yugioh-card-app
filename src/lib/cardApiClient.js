@@ -16,10 +16,16 @@ const requestCardApi = async (searchParams) => {
   if (!response.ok) throw new Error(body.error || "카드 데이터를 불러오지 못했습니다.");
   const nextOffset = response.headers.get("X-Card-Next-Offset");
   const dictionarySaved = response.headers.get("X-Japanese-Dictionary-Saved");
+  const expectedTotal = response.headers.get("X-Card-Expected-Total");
+  const expectedPageCount = response.headers.get("X-Card-Expected-Page-Count");
+  const completenessHeader = response.headers.get("X-Card-Completeness");
   return {
     cards: body,
     nextOffset: nextOffset == null ? null : Number(nextOffset),
     dictionarySaved: dictionarySaved == null ? null : dictionarySaved === "true",
+    expectedTotal: expectedTotal == null ? null : Number(expectedTotal),
+    expectedPageCount: expectedPageCount == null ? null : Number(expectedPageCount),
+    completeness: completenessHeader ? JSON.parse(completenessHeader) : null,
   };
 };
 

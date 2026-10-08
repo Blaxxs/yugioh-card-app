@@ -142,7 +142,7 @@ const fetchOfficialHtml = async (url) => {
   return new DOMParser().parseFromString(await response.text(), "text/html");
 };
 
-const createSearchUrl = (keyword, language = "ko", filters = {}) => {
+const createSearchUrl = (keyword, language = "ko", filters = {}, page = 1) => {
   const url = new URL(`${OFFICIAL_SITE_ORIGIN}/yugiohdb/card_search.action`);
   url.search = new URLSearchParams({
     request_locale: language === "ja" ? "ja" : "ko",
@@ -160,7 +160,19 @@ const createSearchUrl = (keyword, language = "ko", filters = {}) => {
   });
   if (filters.ctype) url.searchParams.set("ctype", filters.ctype);
   if (filters.attr) url.searchParams.set("attr", filters.attr);
+  if (page > 1) url.searchParams.set("page", String(page));
   return url;
+};
+
+// The official site declares the authoritative result count as "검색결과 N건" (ko) /
+// "検索結果 N件" (ja) even though only 100 cards (rp=100) render per page. Parsing
+// this lets us know whether a release/pack needs additional pages to be complete.
+const parseResultTotal = (document) => {
+  const text = document.querySelector(".sort_set .text")?.textContent || document.body?.textContent || "";
+  const match = /([\d,]+)\s*(?:건|件)/.exec(text);
+  if (!match) return null;
+  const value = Number(match[1].replace(/,/g, ""));
+  return Number.isFinite(value) && value > 0 ? value : null;
 };
 
 const createCardNumberSearchUrl = (code, language = "ko") => {
@@ -398,13 +410,29 @@ export async function searchOfficialCards(searchTerm, language = "ko", filters =
   return entries.map(createCardPreview);
 }
 
+const MAX_YUGIOH_RELEASE_PAGES = 15;
+
 export async function fetchReleaseCards(path, language = "ko") {
-  if (!path) return [];
-  const url = new URL(path, OFFICIAL_SITE_ORIGIN);
-  url.searchParams.set("request_locale", language === "ja" ? "ja" : "ko");
-  const document = await fetchOfficialHtml(url);
-  const entries = findCardEntries(document, "", language);
-  return entries.map(createCardPreview);
+  if (!path) return { cards: [], expectedTotal: null };
+  const buildUrl = (page) => {
+    const url = new URL(path, OFFICIAL_SITE_ORIGIN);
+    url.searchParams.set("request_locale", language === "ja" ? "ja" : "ko");
+    if (page > 1) url.searchParams.set("page", String(page));
+    return url;
+  };
+  const firstDocument = await fetchOfficialHtml(buildUrl(1));
+  let entries = findCardEntries(firstDocument, "", language);
+  const expectedTotal = parseResultTotal(firstDocument);
+  const seen = new Set(entries.map((entry) => entry.cardId));
+  for (let page = 2; page <= MAX_YUGIOH_RELEASE_PAGES && expectedTotal && entries.length < expectedTotal; page++) {
+    const document = await fetchOfficialHtml(buildUrl(page)).catch(() => null);
+    const pageEntries = document ? findCardEntries(document, "", language) : [];
+    const newEntries = pageEntries.filter((entry) => !seen.has(entry.cardId));
+    if (!newEntries.length) break;
+    newEntries.forEach((entry) => seen.add(entry.cardId));
+    entries = entries.concat(newEntries);
+  }
+  return { cards: entries.map(createCardPreview), expectedTotal };
 }
 
 const searchCardsByReleaseCode = async (searchTerm, language) => {
@@ -429,7 +457,9 @@ const searchCardsByReleaseCode = async (searchTerm, language) => {
 
     const releases = await fetchReleaseList(language);
     const release = releases.find((item) => item.name === setName);
-    return release ? fetchReleaseCards(release.path, language) : [card];
+    if (!release) return [card];
+    const { cards } = await fetchReleaseCards(release.path, language);
+    return cards;
   }
 
   return [];

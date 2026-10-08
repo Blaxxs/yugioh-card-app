@@ -1,4 +1,5 @@
 import { load } from "cheerio";
+import { sortCardsByCode } from "../../src/lib/cardCodeOrder.js";
 
 const ORIGIN = "https://onepiece-cardgame.kr";
 const PAGE_SIZE = 20;
@@ -72,10 +73,15 @@ async function fetchCardList(params, page = 0) {
   const response = await fetch(url, { headers: headers() });
   if (!response.ok) throw new Error(`원피스 카드 DB 요청 실패 (${response.status})`);
   const $ = load(await response.text());
-  const cards = $(".card_sch_list .item")
-    .map((_index, element) => parseItem($, element))
-    .get()
-    .filter(Boolean);
+  const cards = sortCardsByCode(
+    $(".card_sch_list .item")
+      .map((_index, element) => parseItem($, element))
+      .get()
+      .filter(Boolean),
+  );
+  // The site renders the last reachable page number in its own pagination links
+  // (including the "last page" shortcut), so the first response already reveals
+  // how many pages exist in total without any extra request.
   const pageIndexes = $("a[href*='cardlist.do?page=']")
     .map((_index, element) => {
       const href = $(element).attr("href");
@@ -83,7 +89,12 @@ async function fetchCardList(params, page = 0) {
     })
     .get()
     .filter(Number.isSafeInteger);
-  return { cards, nextOffset: pageIndexes.some((pageIndex) => pageIndex > page) ? page + 1 : null };
+  const maxKnownPage = pageIndexes.length ? Math.max(...pageIndexes, page) : page;
+  return {
+    cards,
+    nextOffset: pageIndexes.some((pageIndex) => pageIndex > page) ? page + 1 : null,
+    expectedPageCount: maxKnownPage + 1,
+  };
 }
 
 export async function searchCards(term, page = 0, filters = {}) {

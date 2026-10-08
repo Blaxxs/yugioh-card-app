@@ -63,7 +63,8 @@ async function requestCards({ term = "", packId = "", page = 0, filters = {} }) 
     .filter((entry) => entry.cardID)
     .map((entry) => createPreview(entry, pack));
   const maxPage = Number(body.maxPage) || 0;
-  return { cards, nextOffset: cards.length && page + 1 < maxPage ? page + 1 : null };
+  const expectedTotal = Number.isFinite(Number(body.hitCnt)) ? Number(body.hitCnt) : null;
+  return { cards, nextOffset: cards.length && page + 1 < maxPage ? page + 1 : null, expectedTotal };
 }
 
 export async function searchCards(term, page = 0, filters = {}) {

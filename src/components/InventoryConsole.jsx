@@ -23,7 +23,6 @@ import { hydrateCardPreviews, getRarityCode, getRarityLabel, ALL_RARITY_CODES } 
 import { CARD_GAMES, getGameById, getPokemonRarityLabel, POKEMON_RARITY_CODES } from "../lib/cardGames";
 import {
   fetchGameCardById,
-  fetchGameReleaseCards,
   fetchGameReleaseCardsPage,
   fetchGameReleaseList,
   improveJapaneseCardSearchPage,
@@ -33,6 +32,8 @@ import {
   searchGameCards,
   translateJapaneseReleaseQuery,
 } from "../lib/tcgApi";
+import { compareCardCodes, getCardSortCode, sortCardsByCode } from "../lib/cardCodeOrder.js";
+import { evaluateCompleteness } from "../lib/setCompleteness.js";
 import SalesHistory from "./SalesHistory";
 import CatalogSearchHeader from "./CatalogSearchHeader";
 import { downloadInventoryWorkbook } from "../lib/inventoryExport.js";
@@ -122,6 +123,8 @@ export default function InventoryConsole({
   const [packPendingRarities, setPackPendingRarities] = useState(new Set());
   const [packModalOpen, setPackModalOpen] = useState(false);
   const [packLoading, setPackLoading] = useState(false);
+  const [packExpectedTotal, setPackExpectedTotal] = useState(null);
+  const [packPageProgress, setPackPageProgress] = useState(null);
   const [packWindow, setPackWindow] = useState(null);
   const [addWindow, setAddWindow] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -284,6 +287,8 @@ export default function InventoryConsole({
     setAddWindow(null);
     setPackMatches([]);
     setPackCards([]);
+    setPackExpectedTotal(null);
+    setPackPageProgress(null);
     setPackSearchMessage("");
     setPackPendingRarities(new Set());
     setAddResults([]);
@@ -298,6 +303,8 @@ export default function InventoryConsole({
     setAddWindow(null);
     setPackMatches([]);
     setPackCards([]);
+    setPackExpectedTotal(null);
+    setPackPageProgress(null);
     setPackSearchMessage("");
     setPackPendingRarities(new Set());
     setAddResults([]);
@@ -379,23 +386,37 @@ export default function InventoryConsole({
     setPackWindow(null);
     setPackLoading(true);
     setPackCards([]);
+    setPackExpectedTotal(null);
+    setPackPageProgress(null);
     setPackPendingRarities(new Set());
     setPackModalOpen(true);
     try {
       let cards;
+      let expectedTotal = null;
       if (intakeGame === "pokemon" || intakeGame === "onepiece") {
         cards = [];
         let offset = 0;
+        let pagesFetched = 0;
+        let expectedPageCount = null;
         while (offset != null) {
           const page = await fetchGameReleaseCardsPage(intakeGame, release.path, offset, intakeLanguage);
           cards.push(...page.cards);
+          pagesFetched += 1;
+          if (page.expectedTotal != null) expectedTotal = page.expectedTotal;
+          if (page.expectedPageCount != null) expectedPageCount = page.expectedPageCount;
           if (!page.cards.length) break;
           offset = page.nextOffset;
         }
+        if (expectedTotal == null && expectedPageCount != null) {
+          setPackPageProgress({ pagesFetched, expectedPageCount });
+        }
         cards = [...new Map(cards.map((card) => [card.cardId, card])).values()];
       } else {
-        cards = await fetchGameReleaseCards(intakeGame, release.path, intakeLanguage);
+        const page = await fetchGameReleaseCardsPage(intakeGame, release.path, 0, intakeLanguage);
+        cards = page.cards;
+        expectedTotal = page.expectedTotal ?? null;
       }
+      setPackExpectedTotal(expectedTotal);
       let detailedCards = cards;
       if (intakeGame === "yugioh") {
         detailedCards = [];
@@ -419,13 +440,7 @@ export default function InventoryConsole({
           rarity: getRarityCode(set?.rarity_code || set?.set_rarity) || "",
         }));
       });
-      if (intakeGame === "yugioh") {
-        variants.sort((left, right) => {
-          const leftCode = left.card.card_sets?.[0]?.set_code || left.card.cardId;
-          const rightCode = right.card.card_sets?.[0]?.set_code || right.card.cardId;
-          return leftCode.localeCompare(rightCode, "en", { numeric: true, sensitivity: "base" });
-        });
-      }
+      variants.sort((left, right) => compareCardCodes(getCardSortCode(left.card), getCardSortCode(right.card)));
       setPackCards(variants);
       setPackMatches([]);
       setPackQuery(release.name);
@@ -635,6 +650,8 @@ export default function InventoryConsole({
       }
       await onBatchIntake(resolved);
       setPackCards([]);
+      setPackExpectedTotal(null);
+      setPackPageProgress(null);
       setPackModalOpen(false);
     } finally {
       setPackLoading(false);
@@ -727,6 +744,8 @@ export default function InventoryConsole({
     setPackQuery("");
     setPackMatches([]);
     setPackCards([]);
+    setPackExpectedTotal(null);
+    setPackPageProgress(null);
     setPackPendingRarities(new Set());
     setPackLoading(false);
   };
@@ -958,6 +977,7 @@ export default function InventoryConsole({
       }
     };
     await Promise.all([resolveCodes(), resolveCodes()]);
+    if (addSearchVersion.current === searchVersion) setAddResults((items) => sortCardsByCode(items));
   };
   const chooseAddCard = async (card) => {
     setAddWindow(null);
@@ -1769,8 +1789,33 @@ export default function InventoryConsole({
                       <small>잠시만 기다려 주세요.</small>
                     </div>
                   ) : (
-                    <div className="pack-card-list pack-card-album">
-                      {packCards.map(({ card, quantity, price, memo, rarity }) => (
+                    <>
+                      {(() => {
+                        const completeness = evaluateCompleteness(packExpectedTotal, packCards.length);
+                        if (completeness.expectedTotal != null) {
+                          return (
+                            <p className={`pack-completeness ${completeness.ok ? "ok" : "warning"}`}>
+                              {completeness.ok
+                                ? `✅ 공식 사이트 수량과 일치 (${completeness.actualCount}/${completeness.expectedTotal})`
+                                : `⚠ 공식 사이트 기준 ${completeness.expectedTotal}장 중 ${completeness.actualCount}장만 확인됨`}
+                            </p>
+                          );
+                        }
+                        if (packPageProgress) {
+                          const { pagesFetched, expectedPageCount } = packPageProgress;
+                          const ok = pagesFetched >= expectedPageCount;
+                          return (
+                            <p className={`pack-completeness ${ok ? "ok" : "warning"}`}>
+                              {ok
+                                ? `✅ 공식 사이트 전체 ${expectedPageCount}페이지 확인 완료`
+                                : `⚠ 공식 사이트 기준 전체 ${expectedPageCount}페이지 중 ${pagesFetched}페이지만 확인됨`}
+                            </p>
+                          );
+                        }
+                        return null;
+                      })()}
+                      <div className="pack-card-list pack-card-album">
+                        {packCards.map(({ card, quantity, price, memo, rarity }) => (
                         <article className="pack-card" key={card.id || card.cardId}>
                           <div className="pack-card-image">
                             <img
@@ -1833,8 +1878,9 @@ export default function InventoryConsole({
                             )}
                           </small>
                         </article>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

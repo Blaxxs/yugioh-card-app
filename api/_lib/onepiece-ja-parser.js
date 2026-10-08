@@ -1,4 +1,5 @@
 import { load } from "cheerio";
+import { sortCardsByCode } from "../../src/lib/cardCodeOrder.js";
 
 const ORIGIN = "https://www.onepiece-cardgame.com";
 const CARD_LIST_URL = `${ORIGIN}/cardlist/`;
@@ -88,10 +89,12 @@ async function fetchCardList({ term = "", series = "", filters = {} }) {
   });
   if (!response.ok) throw new Error(`일본 원피스 카드 검색 실패 (${response.status})`);
   const $ = load(await response.text());
-  const cards = $(".resultCol dl.modalCol")
-    .map((_index, element) => parseCard($, element))
-    .get()
-    .filter(Boolean);
+  const cards = sortCardsByCode(
+    $(".resultCol dl.modalCol")
+      .map((_index, element) => parseCard($, element))
+      .get()
+      .filter(Boolean),
+  );
   return { cards, nextOffset: null };
 }
 
