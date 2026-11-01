@@ -1,5 +1,28 @@
 import { CARD_GAMES, getGameById } from "./cardGames.js";
-import { ALL_RARITY_CODES } from "./officialCardApi.js";
+import { ALL_RARITY_CODES, getRarityCode, getRarityLabel } from "./officialCardApi.js";
+
+const YUGIOH_EXPORT_RARITY_LABELS = {
+  N: "노멀",
+  P: "패러렐",
+  R: "레어",
+  GR: "골레",
+  M: "밀레니엄 레어",
+  SR: "슈레",
+  UR: "울레",
+  CR: "컬레",
+  "P+UR": "패러렐 울레",
+  UL: "얼티",
+  SE: "시크",
+  HR: "홀로",
+  PG: "프골레",
+  EXSE: "엑시크",
+  "P+ES": "패러렐 엑시크",
+  OFUR: "오버울레",
+  PSE: "프싴",
+  OFPSE: "오버프싴",
+  QCSE: "쿼싴",
+  GMR: "그랜드마스터 레어",
+};
 
 const GAME_ORDER = new Map(CARD_GAMES.map((game, index) => [game.id, index]));
 const LANGUAGE_ORDER = new Map([
@@ -98,6 +121,13 @@ const getGameId = (item) =>
 const getRarity = (item) =>
   String(item.rarity_code || item.card_snapshot?.card_sets?.[0]?.rarity_code || item.rarity || "").trim();
 const normalizeRarity = (rarity) => RARITY_ALIASES.get(rarity.toLowerCase()) || rarity.toUpperCase();
+const getExportRarity = (item, gameId) => {
+  const original = item.rarity || item.rarity_code || item.card_snapshot?.card_sets?.[0]?.set_rarity || "";
+  if (gameId !== "yugioh") return original;
+  const rarity = getRarity(item) || String(original).trim();
+  const code = getRarityCode(getRarityLabel(rarity));
+  return YUGIOH_EXPORT_RARITY_LABELS[code] || YUGIOH_EXPORT_RARITY_LABELS[normalizeRarity(rarity)] || original;
+};
 const parsePokemonCode = (value) => {
   const match = String(value || "")
     .normalize("NFKC")
@@ -170,7 +200,7 @@ export async function downloadInventoryWorkbook(items, fileName = "tcg-inventory
       game: getGameById(gameId).label,
       name: item.card_name || "",
       code: item.set_code || "",
-      rarity: item.rarity || item.rarity_code || item.card_snapshot?.card_sets?.[0]?.set_rarity || "",
+      rarity: getExportRarity(item, gameId),
       quantity: Number(item.quantity) || 0,
       price: item.purchase_price ?? item.sale_price ?? "",
       condition: item.condition || "",
