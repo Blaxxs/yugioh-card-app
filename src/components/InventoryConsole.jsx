@@ -38,7 +38,7 @@ import {
   searchGameCards,
   translateJapaneseReleaseQuery,
 } from "../lib/tcgApi";
-import { compareCardCodes, getCardSortCode, sortCardsByCode } from "../lib/cardCodeOrder.js";
+import { compareCardCodes, sortCardsByCode } from "../lib/cardCodeOrder.js";
 import { evaluateCompleteness } from "../lib/setCompleteness.js";
 import SalesHistory from "./SalesHistory";
 import CatalogSearchHeader from "./CatalogSearchHeader";
@@ -47,7 +47,14 @@ import { downloadInventoryWorkbook } from "../lib/inventoryExport.js";
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
 const comparePackCards = (left, right, game) => {
-  const codeDifference = compareCardCodes(getCardSortCode(left.card), getCardSortCode(right.card));
+  const leftCode = left.card.card_sets?.[0]?.set_code || left.card.collectorNumber || "";
+  const rightCode = right.card.card_sets?.[0]?.set_code || right.card.collectorNumber || "";
+  if (!leftCode || !rightCode) {
+    if (leftCode) return -1;
+    if (rightCode) return 1;
+    return compareCardCodes(left.card.cardId || left.card.id, right.card.cardId || right.card.id);
+  }
+  const codeDifference = compareCardCodes(leftCode, rightCode);
   if (codeDifference || game !== "yugioh") return codeDifference;
   const leftRarityRank = RARITY_SORT_ORDER.get(left.rarity) ?? Number.MAX_SAFE_INTEGER;
   const rightRarityRank = RARITY_SORT_ORDER.get(right.rarity) ?? Number.MAX_SAFE_INTEGER;
