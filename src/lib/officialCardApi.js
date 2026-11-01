@@ -266,7 +266,7 @@ const parseOfficialCard = (document, fallbackName, imageUrl, cardId, language = 
       ?.querySelector(".item_box_value")
       ?.textContent.trim() || null;
   const name =
-    [...(root.querySelector("#cardname h1")?.childNodes || [])]
+    [...(root.querySelector("#cardname h1, h1")?.childNodes || [])]
       .find((node) => node.nodeType === 3 && node.textContent.trim())
       ?.textContent.trim() || fallbackName;
   const auth = document.documentElement.innerHTML.match(

@@ -160,7 +160,7 @@ export const parseCardDetail = (html, cardId, fallbackName = "", fallbackImageUr
   textNode.find("br").replaceWith("\n");
   const name =
     root
-      .find("#cardname h1")
+      .find("#cardname h1, h1")
       .first()
       .contents()
       .filter((_index, node) => node.type === "text")

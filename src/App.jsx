@@ -1095,6 +1095,8 @@ export default function App() {
         }
         const setCode = set?.set_code || "";
         const rarityCode = set?.rarity_code || "";
+        const cardName = String(card.localizedName || card.koreanData?.cardName || card.name || "").trim();
+        if (!cardName) throw new Error(`${setCode || card.cardId} 카드 이름을 확인하지 못했습니다. 다시 조회한 뒤 입고해 주세요.`);
         const current = currentByVariant.get(getInventoryVariantKey(card));
         const { data, error } = await supabase
           .from("inventory_items")
@@ -1102,7 +1104,7 @@ export default function App() {
             {
               user_id: session.user.id,
               card_id: card.cardId,
-              card_name: card.localizedName || card.koreanData?.cardName || card.name,
+              card_name: cardName,
               card_snapshot: card,
               rarity: set?.set_rarity || null,
               set_code: setCode,
@@ -1147,6 +1149,46 @@ export default function App() {
     const variants = new Map(inventoryItems.map((item) => [getInventoryVariantKey(item), item]));
     for (const { card, quantity, price, memo } of items) {
       await addInventoryCards([{ ...card, purchase_price: price, memo: memo ?? card.memo }], quantity, variants);
+    }
+  };
+
+  const repairInventoryNames = async () => {
+    if (!supabase || !session || inventoryBusy) return;
+    setInventoryBusy(true);
+    setActionError("");
+    try {
+      const details = new Map();
+      for (const item of inventoryItems.filter((entry) => !entry.card_name?.trim())) {
+        const game = item.card_snapshot?.game || "yugioh";
+        const language = item.card_snapshot?.language || (/JP/i.test(item.set_code || "") ? "ja" : "ko");
+        const key = `${game}:${language}:${item.card_id}`;
+        if (!details.has(key)) {
+          details.set(key, await fetchGameCardById(game, item.card_id, "", "", language));
+        }
+        const detail = details.get(key);
+        const name = String(detail?.localizedName || detail?.koreanData?.cardName || detail?.name || "").trim();
+        if (!name) throw new Error(`${item.set_code || item.card_id} 카드 이름을 복구하지 못했습니다.`);
+        const snapshot = {
+          ...detail,
+          ...item.card_snapshot,
+          name: detail.name,
+          localizedName: detail.localizedName,
+          koreanData: { ...item.card_snapshot?.koreanData, ...detail.koreanData, cardName: name },
+        };
+        const { data, error } = await supabase
+          .from("inventory_items")
+          .update({ card_name: name, card_snapshot: snapshot })
+          .eq("id", item.id)
+          .eq("user_id", session.user.id)
+          .select()
+          .single();
+        if (error) throw error;
+        setInventoryItems((current) => current.map((entry) => entry.id === data.id ? data : entry));
+      }
+    } catch (error) {
+      setActionError(`카드명 복구 오류: ${error.message}`);
+    } finally {
+      setInventoryBusy(false);
     }
   };
 
@@ -1706,6 +1748,7 @@ export default function App() {
         inventoryBusy={inventoryBusy}
         onBatchIntake={batchIntake}
         onRepairInventoryRarities={repairInventoryRarities}
+        onRepairInventoryNames={repairInventoryNames}
         onAddInventory={addInventoryVariant}
         onDeleteInventory={deleteInventoryItems}
         onUpdateInventory={updateInventoryItems}

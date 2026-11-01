@@ -123,6 +123,7 @@ export default function InventoryConsole({
   busy,
   onBatchIntake,
   onRepairInventoryRarities,
+  onRepairInventoryNames,
   onAddInventory,
   onDeleteInventory,
   onUpdateInventory,
@@ -689,6 +690,7 @@ export default function InventoryConsole({
           ...item,
           card: {
             ...card,
+            condition: "S급 (신품급)",
             game: intakeGame,
             language: intakeLanguage,
             card_sets: [
@@ -1209,6 +1211,11 @@ export default function InventoryConsole({
                 onClick={previewRarityRepair}
               >
                 <RefreshCw size={16} aria-hidden="true" />
+              </button>
+            )}
+            {onRepairInventoryNames && inventoryItems.some((item) => !item.card_name?.trim()) && (
+              <button type="button" disabled={busy} onClick={onRepairInventoryNames}>
+                <RefreshCw size={16} aria-hidden="true" /> 카드명 복구
               </button>
             )}
           </div>
