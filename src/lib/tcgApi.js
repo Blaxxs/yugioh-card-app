@@ -18,11 +18,18 @@ const fetchJapaneseNameBatch = async (game, kind, items) => {
   return fetchGameApi(params);
 };
 
+const canTranslateDisplayName = (name) => {
+  const value = String(name || "").trim();
+  return value.length > 0 && value.length <= 160;
+};
+
 export async function localizeJapaneseCards(game, cards) {
   if (!cards.length) return cards;
   const localized = [...cards];
   const pending = cards.flatMap((card, index) =>
-    card.localizedName || /[\uac00-\ud7a3]/.test(card.koreanData?.cardName || "")
+    card.localizedName ||
+    /[\uac00-\ud7a3]/.test(card.koreanData?.cardName || "") ||
+    !canTranslateDisplayName(card.name)
       ? []
       : [
           {
@@ -48,7 +55,9 @@ export async function localizeJapaneseCards(game, cards) {
   const setItems = [
     ...new Set(
       localized.flatMap((card) =>
-        (card.card_sets || []).filter((set) => !set.localizedName && set.set_name).map((set) => set.set_name),
+        (card.card_sets || [])
+          .filter((set) => !set.localizedName && canTranslateDisplayName(set.set_name))
+          .map((set) => set.set_name),
       ),
     ),
   ]
@@ -59,7 +68,9 @@ export async function localizeJapaneseCards(game, cards) {
   const setNames = [
     ...new Set(
       localized.flatMap((card) =>
-        (card.card_sets || []).filter((set) => !set.localizedName && set.set_name).map((set) => set.set_name),
+        (card.card_sets || [])
+          .filter((set) => !set.localizedName && canTranslateDisplayName(set.set_name))
+          .map((set) => set.set_name),
       ),
     ),
   ];
@@ -76,7 +87,9 @@ export async function localizeJapaneseCards(game, cards) {
 const localizeJapaneseReleases = async (game, releases) => {
   const localized = [...releases];
   const pending = releases.flatMap((release, index) =>
-    release.localizedName ? [] : [{ index, name: release.name, id: String(release.id || release.path || "") }],
+    release.localizedName || !canTranslateDisplayName(release.name)
+      ? []
+      : [{ index, name: release.name, id: String(release.id || release.path || "") }],
   );
   for (let index = 0; index < pending.length; index += 80) {
     const batch = pending.slice(index, index + 80);
@@ -235,11 +248,11 @@ export async function fetchGameReleaseCards(game, path, language = "ko") {
   return sortCardsByCode(language === "ja" ? await localizeJapaneseCards(game, cards) : cards);
 }
 
-export async function fetchGameReleaseCardsPage(game, path, offset = 0, language = "ko") {
+export async function fetchGameReleaseCardsPage(game, path, offset = 0, language = "ko", options = {}) {
   if (!path) return { cards: [], nextOffset: null };
   if (game === "yugioh") {
     const { cards, expectedTotal } = await fetchYugiohReleaseCards(path, language);
-    const localized = language === "ja" ? await localizeJapaneseCards(game, cards) : cards;
+    const localized = language === "ja" && options.localize !== false ? await localizeJapaneseCards(game, cards) : cards;
     return { cards: sortCardsByCode(localized), nextOffset: null, expectedTotal };
   }
   const page = await fetchGameApi(

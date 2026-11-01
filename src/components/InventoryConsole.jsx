@@ -385,6 +385,7 @@ export default function InventoryConsole({
     let listReady = false;
     setPackWindow(null);
     setPackLoading(true);
+    setPackSearchMessage("");
     setPackCards([]);
     setPackExpectedTotal(null);
     setPackPageProgress(null);
@@ -412,40 +413,66 @@ export default function InventoryConsole({
         }
         cards = [...new Map(cards.map((card) => [card.cardId, card])).values()];
       } else {
-        const page = await fetchGameReleaseCardsPage(intakeGame, release.path, 0, intakeLanguage);
+        const page = await fetchGameReleaseCardsPage(intakeGame, release.path, 0, intakeLanguage, { localize: false });
         cards = page.cards;
         expectedTotal = page.expectedTotal ?? null;
       }
       setPackExpectedTotal(expectedTotal);
-      let detailedCards = cards;
-      if (intakeGame === "yugioh") {
-        detailedCards = [];
-        await hydrateCardPreviews(cards, (detailedCard) => detailedCards.push(detailedCard), intakeLanguage);
-      }
-      if (intakeLanguage === "ja") detailedCards = await localizeJapaneseCards(intakeGame, detailedCards);
       if (packLoadVersion.current !== loadVersion) return;
-      const variants = detailedCards.flatMap((detailedCard) => {
-        const sets = detailedCard.card_sets.filter((set) => set.set_name === release.name);
-        return (sets.length ? sets : [null]).map((set) => ({
-          card: set
-            ? {
-                ...detailedCard,
-                id: `${detailedCard.cardId}-${set.set_code}-${set.rarity_code || set.set_rarity}`,
-                card_sets: [set],
-              }
-            : detailedCard,
-          quantity: 0,
-          price: "",
-          memo: "",
-          rarity: getRarityCode(set?.rarity_code || set?.set_rarity) || "",
-        }));
-      });
-      variants.sort((left, right) => compareCardCodes(getCardSortCode(left.card), getCardSortCode(right.card)));
+      const createVariants = (sourceCards) =>
+        sourceCards
+          .flatMap((card) => {
+            const sets = (card.card_sets || []).filter((set) => set.set_name === release.name);
+            return (sets.length ? sets : [null]).map((set) => ({
+              card: set
+                ? {
+                    ...card,
+                    id: `${card.cardId}-${set.set_code}-${set.rarity_code || set.set_rarity}`,
+                    card_sets: [set],
+                  }
+                : card,
+              quantity: 0,
+              price: "",
+              memo: "",
+              rarity: getRarityCode(set?.rarity_code || set?.set_rarity) || "",
+            }));
+          })
+          .sort((left, right) => compareCardCodes(getCardSortCode(left.card), getCardSortCode(right.card)));
+      const variants = createVariants(cards);
       setPackCards(variants);
       setPackMatches([]);
       setPackQuery(release.name);
       setPackLoading(false);
       listReady = true;
+      if (intakeGame === "yugioh") {
+        const pendingCardIds = new Set(cards.map((card) => String(card.cardId)));
+        setPackPendingRarities(pendingCardIds);
+        const hydratePackCards = async () => {
+          const detailedById = new Map();
+          await hydrateCardPreviews(
+            cards,
+            (card) => detailedById.set(String(card.cardId), card),
+            intakeLanguage,
+          );
+          if (packLoadVersion.current !== loadVersion) return;
+          let detailedCards = cards.map((card) => detailedById.get(String(card.cardId)) || card);
+          if (intakeLanguage === "ja") {
+            try {
+              detailedCards = await localizeJapaneseCards(intakeGame, detailedCards);
+            } catch (error) {
+              setPackSearchMessage(`일본어 카드명 보정 실패: ${error.message || "일시적인 오류"}. 원문 목록을 표시합니다.`);
+            }
+          }
+          if (packLoadVersion.current !== loadVersion) return;
+          setPackCards(createVariants(detailedCards));
+          setPackPendingRarities(new Set());
+        };
+        void hydratePackCards().catch((error) => {
+          if (packLoadVersion.current !== loadVersion) return;
+          setPackPendingRarities(new Set());
+          setPackSearchMessage(`팩 카드 상세를 불러오지 못했습니다: ${error.message || "일시적인 오류"}. 원문 목록은 계속 표시됩니다.`);
+        });
+      }
       if (intakeGame === "pokemon") {
         const pending = variants.filter(
           (item) =>
@@ -514,11 +541,17 @@ export default function InventoryConsole({
         };
         await Promise.all([resolveCodes(), resolveCodes()]);
       }
+    } catch (error) {
+      if (packLoadVersion.current === loadVersion) {
+        setPackSearchMessage(`팩 카드 목록을 불러오지 못했습니다: ${error.message || "일시적인 오류"}`);
+      }
     } finally {
       if (!listReady && packLoadVersion.current === loadVersion) setPackLoading(false);
     }
   };
   const packKey = (card) => card.id || card.cardId;
+  const isPackCardPending = (card) =>
+    packPendingRarities.has(String(card.cardId)) || packPendingRarities.has(packKey(card));
   const changePackQuantity = (key, nextQuantity) =>
     setPackCards((items) =>
       items.map((item) =>
@@ -1825,16 +1858,25 @@ export default function InventoryConsole({
                               decoding="async"
                             />
                             <div>
-                              <button type="button" onClick={() => changePackQuantity(packKey(card), quantity - 1)}>
+                              <button
+                                type="button"
+                                disabled={isPackCardPending(card)}
+                                onClick={() => changePackQuantity(packKey(card), quantity - 1)}
+                              >
                                 <Minus size={14} />
                               </button>
                               <input
                                 type="number"
                                 min="0"
+                                disabled={isPackCardPending(card)}
                                 value={quantity}
                                 onChange={(event) => changePackQuantity(packKey(card), event.target.value)}
                               />
-                              <button type="button" onClick={() => changePackQuantity(packKey(card), quantity + 1)}>
+                              <button
+                                type="button"
+                                disabled={isPackCardPending(card)}
+                                onClick={() => changePackQuantity(packKey(card), quantity + 1)}
+                              >
                                 <Plus size={14} />
                               </button>
                             </div>
@@ -1845,6 +1887,7 @@ export default function InventoryConsole({
                               type="number"
                               min="0"
                               placeholder="가격"
+                              disabled={isPackCardPending(card)}
                               value={price}
                               onChange={(event) => changePackPrice(packKey(card), event.target.value)}
                             />
@@ -1853,6 +1896,7 @@ export default function InventoryConsole({
                             className="pack-card-memo"
                             type="text"
                             placeholder="비고"
+                            disabled={isPackCardPending(card)}
                             value={memo || ""}
                             onChange={(event) => changePackMemo(packKey(card), event.target.value)}
                           />
@@ -1871,9 +1915,12 @@ export default function InventoryConsole({
                                 {rarity}
                               </span>
                             )}
-                            {intakeGame === "pokemon" && !rarity && (
+                            {isPackCardPending(card) && (
+                              <span className="pack-rarity-status">상세 확인 중</span>
+                            )}
+                            {intakeGame === "pokemon" && !rarity && !isPackCardPending(card) && (
                               <span className="pack-rarity-status">
-                                {packPendingRarities.has(packKey(card)) ? "레어도 확인 중" : "레어도 확인 필요"}
+                                레어도 확인 필요
                               </span>
                             )}
                           </small>
@@ -1894,7 +1941,7 @@ export default function InventoryConsole({
                       busy ||
                       packLoading ||
                       !packCards.some((item) => item.quantity) ||
-                      packCards.some((item) => item.quantity > 0 && packPendingRarities.has(packKey(item.card)))
+                      packCards.some((item) => item.quantity > 0 && isPackCardPending(item.card))
                     }
                     onClick={savePack}
                   >
