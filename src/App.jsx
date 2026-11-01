@@ -1888,7 +1888,7 @@ export default function App() {
                         onOpen={openCardWindow}
                         viewMode="album"
                         showCardName={false}
-                        showSetRarity={activeGame === "yugioh" && getCardReleaseSets(card, selectedRelease).length > 0}
+                        showSetRarity={false}
                         prioritizeImage={index < 8}
                       />
                     ))}
