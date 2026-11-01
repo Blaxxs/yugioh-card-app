@@ -26,3 +26,27 @@ export function sortCardsByCode(cards) {
     return compareCardCodes(left?.name, right?.name);
   });
 }
+
+export function getCardReleaseSets(card, release) {
+  const normalize = (value) =>
+    String(value || "")
+      .normalize("NFKC")
+      .replace(/\s+/g, "")
+      .toLowerCase();
+  const releaseName = normalize(release?.name);
+  return (card?.card_sets || []).filter(
+    (set) =>
+      (releaseName && normalize(set.set_name) === releaseName) ||
+      (set.set_id != null && release?.id != null && String(set.set_id) === String(release.id)),
+  );
+}
+
+export function sortCardsByReleaseCode(cards, release) {
+  const codeFor = (card) => getCardReleaseSets(card, release).find((set) => set.set_code)?.set_code || "";
+  return [...cards].sort((left, right) => {
+    const leftCode = codeFor(left);
+    const rightCode = codeFor(right);
+    if (Boolean(leftCode) !== Boolean(rightCode)) return leftCode ? -1 : 1;
+    return compareCardCodes(leftCode, rightCode) || compareCardCodes(left.name, right.name);
+  });
+}

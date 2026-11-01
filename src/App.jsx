@@ -17,7 +17,7 @@ import { CARD_GAMES, DEFAULT_GAME_ID, getGameById } from "./lib/cardGames";
 import { normalizeYugiohReleaseSearch } from "./lib/yugiohReleaseNames.js";
 import { getInventoryVariantKey, INVENTORY_VARIANT_CONFLICT, normalizeInventoryMemo } from "./lib/inventoryVariants";
 import { scanPokemonRarityRepairs } from "./lib/pokemonRarityRepair";
-import { sortCardsByCode } from "./lib/cardCodeOrder.js";
+import { getCardReleaseSets, sortCardsByCode, sortCardsByReleaseCode } from "./lib/cardCodeOrder.js";
 import { evaluateCompleteness } from "./lib/setCompleteness.js";
 import {
   fetchGameCardById,
@@ -744,6 +744,7 @@ export default function App() {
       setReleaseExpectedTotal(null);
       setReleasePageProgress(null);
       setReleaseLoading(true);
+      setActionError("");
       try {
         const page = await fetchGameReleaseCardsPage(activeGame, selectedRelease.path, 0, activeLanguage);
         const previews = page.cards;
@@ -751,7 +752,7 @@ export default function App() {
         setReleaseNextOffset(page.nextOffset);
         setReleaseExpectedTotal(page.expectedTotal ?? null);
         if (page.expectedPageCount != null) setReleasePageProgress({ pagesFetched: 1, expectedPageCount: page.expectedPageCount });
-        if (activeGame !== "yugioh" || !isQuarterCenturyChronicleRelease(selectedRelease.name)) {
+        if (activeGame !== "yugioh") {
           setReleaseCards(previews);
           return;
         }
@@ -759,21 +760,43 @@ export default function App() {
         await hydrateCardPreviews(previews, (card) => detailedCards.push(card), activeLanguage);
         if (cancelled || releaseContextRef.current !== `${activeGame}:${activeLanguage}`) return;
         const detailsById = new Map(detailedCards.map((card) => [card.cardId, card]));
-        setReleaseCards(
-          sortCardsByCode(
-            previews
-              .map((preview) => detailsById.get(preview.cardId) || preview)
-              .flatMap((card) =>
-                getReleaseSetVariants(card.card_sets, selectedRelease.name).length
-                  ? getReleaseSetVariants(card.card_sets, selectedRelease.name).map((set) => ({
-                      ...card,
-                      id: `${card.cardId}-${set.set_code}-${set.rarity_code}`,
-                      card_sets: [set],
-                    }))
-                  : [card],
-              ),
-          ),
+        const releaseResults = previews.flatMap((preview) => {
+          const detail = detailsById.get(preview.cardId);
+          const card = detail
+            ? {
+                ...detail,
+                localizedName: preview.localizedName || detail.localizedName,
+                koreanData: {
+                  ...detail.koreanData,
+                  cardName: preview.localizedName || detail.koreanData?.cardName || preview.name,
+                },
+              }
+            : preview;
+          const releaseSets = getCardReleaseSets(card, selectedRelease);
+          if (isQuarterCenturyChronicleRelease(selectedRelease.name)) {
+            const variants = getReleaseSetVariants(releaseSets, selectedRelease.name);
+            if (variants.length) {
+              return variants.map((set) => ({
+                ...card,
+                id: `${card.cardId}-${set.set_code}-${set.rarity_code}`,
+                card_sets: [set],
+              }));
+            }
+          }
+          return [
+            {
+              ...card,
+              card_sets: [...releaseSets, ...(card.card_sets || []).filter((set) => !releaseSets.includes(set))],
+            },
+          ];
+        });
+        const missingCodes = releaseResults.filter(
+          (card) => !getCardReleaseSets(card, selectedRelease).some((set) => set.set_code),
         );
+        if (missingCodes.length) {
+          setActionError(`선택한 팩의 수록 코드를 확인하지 못한 카드 ${missingCodes.length}장은 목록 뒤에 표시됩니다. 다시 팩을 선택해 주세요.`);
+        }
+        setReleaseCards(sortCardsByReleaseCode(releaseResults, selectedRelease));
       } catch (error) {
         if (!cancelled && releaseContextRef.current === `${activeGame}:${activeLanguage}`) {
           loadedReleasePath.current = null;
@@ -1865,7 +1888,7 @@ export default function App() {
                         onOpen={openCardWindow}
                         viewMode="album"
                         showCardName={false}
-                        showSetRarity={isQuarterCenturyChronicleRelease(selectedRelease.name)}
+                        showSetRarity={activeGame === "yugioh" && getCardReleaseSets(card, selectedRelease).length > 0}
                         prioritizeImage={index < 8}
                       />
                     ))}
