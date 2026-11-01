@@ -8,6 +8,8 @@ import { fetchCardApi as fetchGameApi, invalidateCardApiCache } from "./cardApiC
 import { getYugiohReleaseDisplayName, getYugiohReleaseSearchTerms } from "./yugiohReleaseNames.js";
 import { sortCardsByCode } from "./cardCodeOrder.js";
 
+const JAPANESE_DISPLAY_NAME_BATCH_SIZE = 24;
+
 const fetchJapaneseNameBatch = async (game, kind, items) => {
   const params = new URLSearchParams({ game, lang: "ja", translate: "display", kind });
   items.forEach((item) => {
@@ -40,8 +42,8 @@ export async function localizeJapaneseCards(game, cards) {
           },
         ],
   );
-  for (let index = 0; index < pending.length; index += 40) {
-    const batch = pending.slice(index, index + 40);
+  for (let index = 0; index < pending.length; index += JAPANESE_DISPLAY_NAME_BATCH_SIZE) {
+    const batch = pending.slice(index, index + JAPANESE_DISPLAY_NAME_BATCH_SIZE);
     const names = await fetchJapaneseNameBatch(game, "cards", batch);
     batch.forEach((item, batchIndex) => {
       const name = names?.[batchIndex] || item.name;

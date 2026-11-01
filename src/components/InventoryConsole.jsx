@@ -19,7 +19,13 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { hydrateCardPreviews, getRarityCode, getRarityLabel, ALL_RARITY_CODES } from "../lib/officialCardApi";
+import {
+  hydrateCardPreviews,
+  getRarityCode,
+  getRarityLabel,
+  ALL_RARITY_CODES,
+  RARITY_SORT_ORDER,
+} from "../lib/officialCardApi";
 import { CARD_GAMES, getGameById, getPokemonRarityLabel, POKEMON_RARITY_CODES } from "../lib/cardGames";
 import {
   fetchGameCardById,
@@ -40,6 +46,14 @@ import { downloadInventoryWorkbook } from "../lib/inventoryExport.js";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
+const comparePackCards = (left, right, game) => {
+  const codeDifference = compareCardCodes(getCardSortCode(left.card), getCardSortCode(right.card));
+  if (codeDifference || game !== "yugioh") return codeDifference;
+  const leftRarityRank = RARITY_SORT_ORDER.get(left.rarity) ?? Number.MAX_SAFE_INTEGER;
+  const rightRarityRank = RARITY_SORT_ORDER.get(right.rarity) ?? Number.MAX_SAFE_INTEGER;
+  return leftRarityRank - rightRarityRank;
+};
+const sortPackCards = (items, game) => [...items].sort((left, right) => comparePackCards(left, right, game));
 const resizeHandles = [
   ["right", "오른쪽 크기 조절"],
   ["left", "왼쪽 크기 조절"],
@@ -419,25 +433,25 @@ export default function InventoryConsole({
       }
       setPackExpectedTotal(expectedTotal);
       if (packLoadVersion.current !== loadVersion) return;
-      const createVariants = (sourceCards) =>
-        sourceCards
-          .flatMap((card) => {
-            const sets = (card.card_sets || []).filter((set) => set.set_name === release.name);
-            return (sets.length ? sets : [null]).map((set) => ({
-              card: set
-                ? {
-                    ...card,
-                    id: `${card.cardId}-${set.set_code}-${set.rarity_code || set.set_rarity}`,
-                    card_sets: [set],
-                  }
-                : card,
-              quantity: 0,
-              price: "",
-              memo: "",
-              rarity: getRarityCode(set?.rarity_code || set?.set_rarity) || "",
-            }));
-          })
-          .sort((left, right) => compareCardCodes(getCardSortCode(left.card), getCardSortCode(right.card)));
+      const createVariants = (sourceCards) => {
+        const variants = sourceCards.flatMap((card) => {
+          const sets = (card.card_sets || []).filter((set) => set.set_name === release.name);
+          return (sets.length ? sets : [null]).map((set) => ({
+            card: set
+              ? {
+                  ...card,
+                  id: `${card.cardId}-${set.set_code}-${set.rarity_code || set.set_rarity}`,
+                  card_sets: [set],
+                }
+              : card,
+            quantity: 0,
+            price: "",
+            memo: "",
+            rarity: getRarityCode(set?.rarity_code || set?.set_rarity) || "",
+          }));
+        });
+        return sortPackCards(variants, intakeGame);
+      };
       const variants = createVariants(cards);
       setPackCards(variants);
       setPackMatches([]);
@@ -1848,7 +1862,7 @@ export default function InventoryConsole({
                         return null;
                       })()}
                       <div className="pack-card-list pack-card-album">
-                        {packCards.map(({ card, quantity, price, memo, rarity }) => (
+                        {sortPackCards(packCards, intakeGame).map(({ card, quantity, price, memo, rarity }) => (
                         <article className="pack-card" key={card.id || card.cardId}>
                           <div className="pack-card-image">
                             <img

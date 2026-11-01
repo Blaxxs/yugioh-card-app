@@ -1,4 +1,5 @@
 import { CARD_GAMES, getGameById } from "./cardGames.js";
+import { ALL_RARITY_CODES } from "./officialCardApi.js";
 
 const GAME_ORDER = new Map(CARD_GAMES.map((game, index) => [game.id, index]));
 const LANGUAGE_ORDER = new Map([
@@ -6,28 +7,7 @@ const LANGUAGE_ORDER = new Map([
   ["ja", 1],
 ]);
 const GAME_RARITY_ORDER = {
-  yugioh: [
-    "N",
-    "P",
-    "R",
-    "SR",
-    "UR",
-    "GR",
-    "M",
-    "CR",
-    "UL",
-    "SE",
-    "HR",
-    "PG",
-    "EXSE",
-    "P+UR",
-    "P+ES",
-    "PSE",
-    "OFUR",
-    "OFPSE",
-    "QCSE",
-    "GMR",
-  ],
+  yugioh: ALL_RARITY_CODES,
   pokemon: [
     "N",
     "C",
