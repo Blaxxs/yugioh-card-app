@@ -144,32 +144,28 @@ const comparePokemonCodes = (leftCode, rightCode) => {
 
 export function sortInventoryForExport(items) {
   return [...items].sort((left, right) => {
-    const languageDifference = LANGUAGE_ORDER.get(getLanguageId(left)) - LANGUAGE_ORDER.get(getLanguageId(right));
-    if (languageDifference) return languageDifference;
-    const gameDifference =
-      (GAME_ORDER.get(getGameId(left)) ?? GAME_ORDER.get("yugioh")) -
-      (GAME_ORDER.get(getGameId(right)) ?? GAME_ORDER.get("yugioh"));
-    if (gameDifference) return gameDifference;
-
-    const gameId = getGameId(left);
-    const codeDifference =
-      gameId === "pokemon"
-        ? comparePokemonCodes(left.set_code, right.set_code)
-        : collator.compare(left.set_code || "", right.set_code || "");
+    const codeDifference = comparePokemonCodes(left.set_code, right.set_code);
     if (codeDifference) return codeDifference;
 
-    const rarityOrder = GAME_RARITY_ORDER[gameId] || [];
     const leftRarity = normalizeRarity(getRarity(left));
     const rightRarity = normalizeRarity(getRarity(right));
-    const leftRank = rarityOrder.indexOf(leftRarity);
-    const rightRank = rarityOrder.indexOf(rightRarity);
+    const leftRank = (GAME_RARITY_ORDER[getGameId(left)] || []).indexOf(leftRarity);
+    const rightRank = (GAME_RARITY_ORDER[getGameId(right)] || []).indexOf(rightRarity);
     if (leftRank !== rightRank) {
       if (leftRank < 0) return 1;
       if (rightRank < 0) return -1;
       return leftRank - rightRank;
     }
     const rarityDifference = collator.compare(leftRarity, rightRarity);
-    return rarityDifference || collator.compare(left.card_name || "", right.card_name || "");
+    if (rarityDifference) return rarityDifference;
+    const memoDifference = Number(Boolean(left.memo?.trim())) - Number(Boolean(right.memo?.trim()));
+    if (memoDifference) return memoDifference;
+    const languageDifference = LANGUAGE_ORDER.get(getLanguageId(left)) - LANGUAGE_ORDER.get(getLanguageId(right));
+    if (languageDifference) return languageDifference;
+    const gameDifference =
+      (GAME_ORDER.get(getGameId(left)) ?? GAME_ORDER.get("yugioh")) -
+      (GAME_ORDER.get(getGameId(right)) ?? GAME_ORDER.get("yugioh"));
+    return gameDifference || collator.compare(left.card_name || "", right.card_name || "");
   });
 }
 
@@ -196,7 +192,7 @@ export async function downloadInventoryWorkbook(items, fileName = "tcg-inventory
     const language = getLanguageId(item);
     const gameId = getGameId(item);
     sheet.addRow({
-      language: language === "ja" ? "일본어" : "한국어",
+      language: language === "ja" ? "일본판" : "한글판",
       game: getGameById(gameId).label,
       name: item.card_name || "",
       code: item.set_code || "",
