@@ -1147,7 +1147,7 @@ export default function App() {
 
   const batchIntake = async (items) => {
     const variants = new Map(inventoryItems.map((item) => [getInventoryVariantKey(item), item]));
-    for (const { card, quantity, price, memo } of items) {
+    for (const { card, quantity, price, memo } of [...items].reverse()) {
       await addInventoryCards([{ ...card, purchase_price: price, memo: memo ?? card.memo }], quantity, variants);
     }
   };
