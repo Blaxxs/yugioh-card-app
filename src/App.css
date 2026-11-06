@@ -2566,6 +2566,17 @@ button:disabled {
   max-height: calc(100dvh - 48px);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
+.pack-intake-dialog.sell-intake-dialog {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.sell-intake-dialog > .pack-card-list {
+  min-height: 0;
+  max-height: none;
+}
+.sell-intake-dialog > .pack-save {
+  height: 38px;
+  align-self: end;
+}
 .pack-intake-dialog.pack-search-dialog {
   width: min(480px, calc(100vw - 48px));
   min-width: 0;
@@ -2591,9 +2602,15 @@ button:disabled {
   display: grid;
   align-content: start;
   gap: 6px;
-  max-height: 150px;
+  min-height: 0;
   overflow: auto;
   padding: 10px 12px 0;
+}
+.pack-intake-content:has(> .pack-match-list) {
+  grid-template-rows: minmax(0, 1fr);
+}
+.pack-intake-content:has(> .pack-match-list) > .pack-intake-main {
+  display: none;
 }
 .pack-intake-dialog.pack-search-dialog .pack-intake-content {
   grid-template-rows: auto;
