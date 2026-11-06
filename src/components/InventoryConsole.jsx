@@ -443,8 +443,18 @@ export default function InventoryConsole({
       if (packLoadVersion.current !== loadVersion) return;
       const createVariants = (sourceCards) => {
         const variants = sourceCards.flatMap((card) => {
-          const sets = (card.card_sets || []).filter((set) => set.set_name === release.name);
+          const sets = [
+            ...new Map(
+              (card.card_sets || [])
+                .filter((set) => set.set_name === release.name)
+                .map((set) => [
+                  JSON.stringify([set.set_code, getRarityCode(set.rarity_code || set.set_rarity)]),
+                  set,
+                ]),
+            ).values(),
+          ];
           return (sets.length ? sets : [null]).map((set) => ({
+            rowId: crypto.randomUUID(),
             card: set
               ? {
                   ...card,
@@ -572,7 +582,7 @@ export default function InventoryConsole({
     }
   };
   const packKey = (card) => card.id || card.cardId;
-  const packRowKey = (item) => item.rowId || packKey(item.card);
+  const packRowKey = (item) => item.rowId;
   const isPackCardPending = (card) =>
     packPendingRarities.has(String(card.cardId)) || packPendingRarities.has(packKey(card));
   const changePackQuantity = (key, nextQuantity) =>
@@ -593,7 +603,7 @@ export default function InventoryConsole({
       const source = items[index];
       return [
         ...items.slice(0, index + 1),
-        { ...source, rowId, quantity: 0, price: "", memo: "" },
+        { ...source, rowId, isAdditional: true, quantity: 0, price: "", memo: "" },
         ...items.slice(index + 1),
       ];
     });
@@ -1870,7 +1880,7 @@ export default function InventoryConsole({
                       {(() => {
                         const completeness = evaluateCompleteness(
                           packExpectedTotal,
-                          packCards.filter((item) => !item.rowId).length,
+                          packCards.filter((item) => !item.isAdditional).length,
                         );
                         if (completeness.expectedTotal != null) {
                           return (
