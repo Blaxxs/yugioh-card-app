@@ -2920,6 +2920,21 @@ button:disabled {
   padding: 0 6px;
   font-size: 11px;
 }
+.pack-card-album .pack-card-memo-row {
+  display: flex;
+  width: 100%;
+  gap: 3px;
+}
+.pack-card-memo-row .pack-card-memo {
+  flex: 1;
+  width: 0;
+}
+.pack-card-memo-row .pack-card-add {
+  flex: 0 0 32px;
+  width: 32px;
+  padding: 0;
+  font-size: 11px;
+}
 .pack-card-row .pack-card-rarity {
   flex: 0.7 1 6ch;
   min-width: 6ch;

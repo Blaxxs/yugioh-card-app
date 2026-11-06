@@ -572,18 +572,32 @@ export default function InventoryConsole({
     }
   };
   const packKey = (card) => card.id || card.cardId;
+  const packRowKey = (item) => item.rowId || packKey(item.card);
   const isPackCardPending = (card) =>
     packPendingRarities.has(String(card.cardId)) || packPendingRarities.has(packKey(card));
   const changePackQuantity = (key, nextQuantity) =>
     setPackCards((items) =>
       items.map((item) =>
-        packKey(item.card) === key ? { ...item, quantity: Math.max(0, Number(nextQuantity) || 0) } : item,
+        packRowKey(item) === key ? { ...item, quantity: Math.max(0, Number(nextQuantity) || 0) } : item,
       ),
     );
   const changePackPrice = (key, price) =>
-    setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, price } : item)));
+    setPackCards((items) => items.map((item) => (packRowKey(item) === key ? { ...item, price } : item)));
   const changePackMemo = (key, memo) =>
-    setPackCards((items) => items.map((item) => (packKey(item.card) === key ? { ...item, memo } : item)));
+    setPackCards((items) => items.map((item) => (packRowKey(item) === key ? { ...item, memo } : item)));
+  const addPackRow = (key) => {
+    const rowId = crypto.randomUUID();
+    setPackCards((items) => {
+      const index = items.findIndex((item) => packRowKey(item) === key);
+      if (index < 0) return items;
+      const source = items[index];
+      return [
+        ...items.slice(0, index + 1),
+        { ...source, rowId, quantity: 0, price: "", memo: "" },
+        ...items.slice(index + 1),
+      ];
+    });
+  };
   const startPackResize = (event, direction, setWindow = setPackWindow) => {
     const rect = event.currentTarget.parentElement.getBoundingClientRect();
     resizeRef.current = { startX: event.clientX, startY: event.clientY, rect, direction, setWindow };
@@ -709,6 +723,8 @@ export default function InventoryConsole({
       setPackExpectedTotal(null);
       setPackPageProgress(null);
       setPackModalOpen(false);
+    } catch (error) {
+      setPackSearchMessage(`일괄 입고 저장 오류: ${error.message}`);
     } finally {
       setPackLoading(false);
     }
@@ -1852,7 +1868,10 @@ export default function InventoryConsole({
                   ) : (
                     <>
                       {(() => {
-                        const completeness = evaluateCompleteness(packExpectedTotal, packCards.length);
+                        const completeness = evaluateCompleteness(
+                          packExpectedTotal,
+                          packCards.filter((item) => !item.rowId).length,
+                        );
                         if (completeness.expectedTotal != null) {
                           return (
                             <p className={`pack-completeness ${completeness.ok ? "ok" : "warning"}`}>
@@ -1876,8 +1895,11 @@ export default function InventoryConsole({
                         return null;
                       })()}
                       <div className="pack-card-list pack-card-album">
-                        {sortPackCards(packCards, intakeGame).map(({ card, quantity, price, memo, rarity }) => (
-                        <article className="pack-card" key={card.id || card.cardId}>
+                        {sortPackCards(packCards, intakeGame).map((item) => {
+                          const { card, quantity, price, memo, rarity } = item;
+                          const rowKey = packRowKey(item);
+                          return (
+                        <article className="pack-card" key={rowKey}>
                           <div className="pack-card-image">
                             <img
                               src={card.card_images[0]?.image_url_small}
@@ -1889,7 +1911,7 @@ export default function InventoryConsole({
                               <button
                                 type="button"
                                 disabled={isPackCardPending(card)}
-                                onClick={() => changePackQuantity(packKey(card), quantity - 1)}
+                                onClick={() => changePackQuantity(rowKey, quantity - 1)}
                               >
                                 <Minus size={14} />
                               </button>
@@ -1898,12 +1920,12 @@ export default function InventoryConsole({
                                 min="0"
                                 disabled={isPackCardPending(card)}
                                 value={quantity}
-                                onChange={(event) => changePackQuantity(packKey(card), event.target.value)}
+                                onChange={(event) => changePackQuantity(rowKey, event.target.value)}
                               />
                               <button
                                 type="button"
                                 disabled={isPackCardPending(card)}
-                                onClick={() => changePackQuantity(packKey(card), quantity + 1)}
+                                onClick={() => changePackQuantity(rowKey, quantity + 1)}
                               >
                                 <Plus size={14} />
                               </button>
@@ -1917,17 +1939,28 @@ export default function InventoryConsole({
                               placeholder="가격"
                               disabled={isPackCardPending(card)}
                               value={price}
-                              onChange={(event) => changePackPrice(packKey(card), event.target.value)}
+                              onChange={(event) => changePackPrice(rowKey, event.target.value)}
                             />
                           </div>
-                          <input
-                            className="pack-card-memo"
-                            type="text"
-                            placeholder="비고"
-                            disabled={isPackCardPending(card)}
-                            value={memo || ""}
-                            onChange={(event) => changePackMemo(packKey(card), event.target.value)}
-                          />
+                          <div className="pack-card-memo-row">
+                            <input
+                              className="pack-card-memo"
+                              type="text"
+                              placeholder="비고"
+                              disabled={isPackCardPending(card)}
+                              value={memo || ""}
+                              onChange={(event) => changePackMemo(rowKey, event.target.value)}
+                            />
+                            <button
+                              type="button"
+                              className="pack-card-add"
+                              disabled={busy || isPackCardPending(card)}
+                              aria-label={`${card.koreanData?.cardName || card.name} ${rarity} 입력란 추가`}
+                              onClick={() => addPackRow(rowKey)}
+                            >
+                              추가
+                            </button>
+                          </div>
                           <strong>{card.koreanData?.cardName || card.localizedName || card.name}</strong>
                           <small>
                             {card.card_sets?.[0]?.set_code || "코드 없음"}
@@ -1953,7 +1986,8 @@ export default function InventoryConsole({
                             )}
                           </small>
                         </article>
-                        ))}
+                          );
+                        })}
                       </div>
                     </>
                   )}
