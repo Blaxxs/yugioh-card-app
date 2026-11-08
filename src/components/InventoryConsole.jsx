@@ -46,6 +46,37 @@ import { downloadInventoryWorkbook } from "../lib/inventoryExport.js";
 
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_IMPORT_ROWS = 500;
+const mergePokemonPackDetail = (preview, detail, detailSet) => {
+  const previewImages = (preview.card_images || []).filter((image) => image.image_url_small);
+  const previewSet = preview.card_sets?.[0] || {};
+  return {
+    ...preview,
+    ...detail,
+    id: preview.id,
+    name: detail.name || preview.name,
+    card_images: previewImages.length ? previewImages : detail.card_images || [],
+    localizedName: preview.localizedName || detail.localizedName,
+    koreanData: {
+      ...preview.koreanData,
+      ...detail.koreanData,
+      cardName:
+        preview.koreanData?.cardName ||
+        preview.localizedName ||
+        detail.koreanData?.cardName ||
+        detail.name ||
+        preview.name,
+    },
+    card_sets: [
+      {
+        ...detailSet,
+        ...previewSet,
+        set_code: previewSet.set_code || detailSet.set_code,
+        rarity_code: previewSet.rarity_code || detailSet.rarity_code,
+        set_rarity: previewSet.set_rarity || detailSet.set_rarity,
+      },
+    ],
+  };
+};
 const comparePackCards = (left, right, game) => {
   const leftCode = left.card.card_sets?.[0]?.set_code || left.card.collectorNumber || "";
   const rightCode = right.card.card_sets?.[0]?.set_code || right.card.collectorNumber || "";
@@ -534,26 +565,7 @@ export default function InventoryConsole({
                     ? {
                         ...item,
                         rarity: item.rarity || getRarityCode(detailSet.rarity_code || detailSet.set_rarity) || "",
-                        card: {
-                          ...item.card,
-                          ...detail,
-                          id: item.card.id,
-                          localizedName: item.card.localizedName || detail.localizedName,
-                          koreanData: {
-                            ...detail.koreanData,
-                            ...item.card.koreanData,
-                            cardName: item.card.koreanData?.cardName || detail.koreanData?.cardName || detail.name,
-                          },
-                          card_sets: [
-                            {
-                              ...detailSet,
-                              ...item.card.card_sets?.[0],
-                              set_code: item.card.card_sets?.[0]?.set_code || detailSet.set_code,
-                              rarity_code: item.card.card_sets?.[0]?.rarity_code || detailSet.rarity_code,
-                              set_rarity: item.card.card_sets?.[0]?.set_rarity || detailSet.set_rarity,
-                            },
-                          ],
-                        },
+                        card: mergePokemonPackDetail(item.card, detail, detailSet),
                       }
                     : item,
                 ),
