@@ -40,6 +40,7 @@ import {
 } from "../lib/tcgApi";
 import { compareCardCodes, sortCardsByCode } from "../lib/cardCodeOrder.js";
 import { evaluateCompleteness } from "../lib/setCompleteness.js";
+import { UNKNOWN_POKEMON_RARITY } from "../lib/inventoryVariants.js";
 import SalesHistory from "./SalesHistory";
 import CatalogSearchHeader from "./CatalogSearchHeader";
 import { downloadInventoryWorkbook } from "../lib/inventoryExport.js";
@@ -701,8 +702,8 @@ export default function InventoryConsole({
       for (const item of selected) {
         let card = item.card;
         let set = card.card_sets?.[0] || {};
-        const requireRarity = intakeGame === "pokemon";
-        if (!set.set_code || (requireRarity && !(item.rarity || set.rarity_code || set.set_rarity))) {
+        const isPokemon = intakeGame === "pokemon";
+        if (!set.set_code) {
           const detail = await fetchGameCardById(
             intakeGame,
             card.cardId,
@@ -718,12 +719,10 @@ export default function InventoryConsole({
           card = detail;
           set = detailedSet;
         }
-        if (requireRarity && !(item.rarity || set.rarity_code || set.set_rarity)) {
-          window.alert(`${card.name} 레어도를 확인하지 못해 입고를 중단했습니다. 잠시 후 다시 시도해 주세요.`);
-          return;
-        }
+        const rarityUnconfirmed = isPokemon && !(item.rarity || set.rarity_code || set.set_rarity);
         resolved.push({
           ...item,
+          rarityUnconfirmed,
           card: {
             ...card,
             condition: "S급 (신품급)",
@@ -2002,9 +2001,7 @@ export default function InventoryConsole({
                               <span className="pack-rarity-status">상세 확인 중</span>
                             )}
                             {intakeGame === "pokemon" && !rarity && !isPackCardPending(card) && (
-                              <span className="pack-rarity-status">
-                                레어도 확인 필요
-                              </span>
+                              <span className="pack-rarity-status">{UNKNOWN_POKEMON_RARITY}</span>
                             )}
                           </small>
                         </article>

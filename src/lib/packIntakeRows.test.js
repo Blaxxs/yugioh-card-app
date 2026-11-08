@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { compareCardCodes } from "./cardCodeOrder.js";
+import {
+  getInventoryRarity,
+  isPokemonRarityUnconfirmed,
+  UNKNOWN_POKEMON_RARITY,
+} from "./inventoryVariants.js";
 
 const source = readFileSync(new URL("../components/InventoryConsole.jsx", import.meta.url), "utf8");
 const createVariantsSource = source.slice(
@@ -111,4 +116,16 @@ test("resolving a Pokemon pack code preserves its already loaded official pack i
   assert.equal(merged.koreanData.cardAttr, "물");
   assert.equal(merged.card_sets[0].set_code, "123/150");
   assert.equal(merged.card_sets[0].rarity_code, "SR");
+});
+
+test("unknown Pokemon rarity is opt-in and stays out of the rarity code", () => {
+  const card = { game: "pokemon", card_sets: [{ set_code: "123/150" }] };
+  assert.equal(isPokemonRarityUnconfirmed(card), true);
+  assert.equal(getInventoryRarity(card), null);
+  assert.equal(getInventoryRarity(card, true), UNKNOWN_POKEMON_RARITY);
+  assert.equal(card.card_sets[0].rarity_code, undefined);
+  assert.equal(
+    getInventoryRarity({ game: "pokemon", card_sets: [{ set_rarity: "SR" }] }, true),
+    "SR",
+  );
 });

@@ -15,7 +15,13 @@ import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { getReleaseSetVariants, hydrateCardPreviews, isQuarterCenturyChronicleRelease } from "./lib/officialCardApi";
 import { CARD_GAMES, DEFAULT_GAME_ID, getGameById } from "./lib/cardGames";
 import { normalizeYugiohReleaseSearch } from "./lib/yugiohReleaseNames.js";
-import { getInventoryVariantKey, INVENTORY_VARIANT_CONFLICT, normalizeInventoryMemo } from "./lib/inventoryVariants";
+import {
+  getInventoryVariantKey,
+  getInventoryRarity,
+  INVENTORY_VARIANT_CONFLICT,
+  isPokemonRarityUnconfirmed,
+  normalizeInventoryMemo,
+} from "./lib/inventoryVariants";
 import { scanPokemonRarityRepairs } from "./lib/pokemonRarityRepair";
 import { getCardReleaseSets, sortCardsByCode, sortCardsByReleaseCode } from "./lib/cardCodeOrder.js";
 import { evaluateCompleteness } from "./lib/setCompleteness.js";
@@ -1078,7 +1084,7 @@ export default function App() {
     setInventoryBusy(false);
   };
 
-  const addInventoryCards = async (cardsToAdd, quantity, variantMap) => {
+  const addInventoryCards = async (cardsToAdd, quantity, variantMap, { allowUnknownPokemonRarity = false } = {}) => {
     if (!supabase || !session || inventoryBusy) throw new Error("재고 기능은 로그인 후 사용할 수 있습니다.");
     const uniqueCards = [
       ...new Map(cardsToAdd.filter(Boolean).map((card) => [getInventoryVariantKey(card), card])).values(),
@@ -1090,7 +1096,8 @@ export default function App() {
       const savedItems = [];
       for (const card of uniqueCards) {
         const set = card.card_sets?.[0];
-        if (card.game === "pokemon" && !(set?.rarity_code || set?.set_rarity)) {
+        const rarityUnconfirmed = isPokemonRarityUnconfirmed(card);
+        if (rarityUnconfirmed && !allowUnknownPokemonRarity) {
           throw new Error("포켓몬 카드의 레어도를 확인한 뒤 입고해 주세요.");
         }
         const setCode = set?.set_code || "";
@@ -1106,7 +1113,7 @@ export default function App() {
               card_id: card.cardId,
               card_name: cardName,
               card_snapshot: card,
-              rarity: set?.set_rarity || null,
+              rarity: getInventoryRarity(card, allowUnknownPokemonRarity),
               set_code: setCode,
               rarity_code: rarityCode,
               condition: card.condition || null,
@@ -1147,8 +1154,13 @@ export default function App() {
 
   const batchIntake = async (items) => {
     const variants = new Map(inventoryItems.map((item) => [getInventoryVariantKey(item), item]));
-    for (const { card, quantity, price, memo } of [...items].reverse()) {
-      await addInventoryCards([{ ...card, purchase_price: price, memo: memo ?? card.memo }], quantity, variants);
+    for (const { card, quantity, price, memo, rarityUnconfirmed } of [...items].reverse()) {
+      await addInventoryCards(
+        [{ ...card, purchase_price: price, memo: memo ?? card.memo }],
+        quantity,
+        variants,
+        { allowUnknownPokemonRarity: rarityUnconfirmed },
+      );
     }
   };
 
