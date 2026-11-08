@@ -59,7 +59,7 @@ const EXTERNAL_GAMES = {
       search: (term, offset, filters) => pokemonKr.searchCards(term, offset, filters),
       detail: (id, fallbackName) => pokemonKr.fetchCardDetail(id, fallbackName),
       releaseList: () => pokemonKr.fetchSets(),
-      releaseCards: (packId, offset) => pokemonKr.searchCards(packId, offset),
+      releaseCards: (packId, offset) => pokemonKr.fetchSetCards(packId, offset),
     },
     ja: {
       search: (term, offset, filters) => pokemonJa.searchCards(term, offset, filters),
@@ -626,7 +626,7 @@ async function getExternalReleaseCards(game, setId, database, offset = 0, langua
     game === "onepiece"
       ? `${game}:${language}:v4:set:${setId}`
       : game === "pokemon"
-        ? `${game}:${language}:v7:set:${setId}`
+        ? `${game}:${language}:v8:set:${setId}`
         : `${game}:${language}:set:${setId}`;
   const queryKey = pageCacheKey(cacheScope, offset);
   if (database) {
